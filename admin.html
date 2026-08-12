@@ -1,1 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>포도톡 관리</title>
+<meta name="robots" content="noindex"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"/>
+<style>
+:root{--ink:#1E1130;--grape:#6F2DBD;--lilac:#F1E9FE;--paper:#FCFAFF;--line:#E9DFF7;--muted:#7A6B8C;--ok:#2F9E68;--warn:#C2410C}
+*{box-sizing:border-box}
+body{margin:0;padding:22px 18px calc(40px + env(safe-area-inset-bottom,0px));background:var(--paper);color:var(--ink);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,system-ui,"Apple SD Gothic Neo",sans-serif;
+  line-height:1.55;max-width:560px;margin-inline:auto;letter-spacing:-.01em}
+h1{font-size:21px;margin:0 0 4px;letter-spacing:-.03em}
+h1 em{font-style:normal;color:var(--grape)}
+p.lead{margin:0 0 22px;color:var(--muted);font-size:13.5px}
+section{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+h2{font-size:15px;margin:0 0 4px}
+h2+p{margin:0 0 14px;color:var(--muted);font-size:13px}
+label{display:block;margin-bottom:12px}
+label span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+input{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:11px 13px;
+  font:inherit;color:inherit;outline:none}
+input:focus{border-color:var(--grape);background:#fff}
+button{width:100%;background:var(--grape);color:#fff;border:0;border-radius:13px;padding:13px;
+  font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+button.sub{background:var(--lilac);color:#42177A;font-size:14px;padding:11px;margin-top:8px}
+button:disabled{opacity:.45}
+.out{margin-top:12px;font-size:13px;padding:11px 13px;border-radius:12px;background:var(--lilac);
+  color:#42177A;white-space:pre-wrap;word-break:break-all;display:none}
+.out.on{display:block}
+.out.err{background:#FFEDE6;color:var(--warn)}
+.out.ok{background:#E6F5EC;color:#1F6B45}
+.row{display:flex;gap:8px}
+.row input{flex:1}
+.note{font-size:12.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
 
+<h1>포도<em>톡</em> 관리</h1>
+<p class="lead">관리자 키는 이 기기에만 저장되고 서버로는 요청할 때만 전송됩니다.</p>
+
+<section>
+  <h2>연결</h2>
+  <p>API 주소와 관리자 키를 먼저 넣으세요.</p>
+  <label><span>API 주소</span><input id="api" placeholder="https://podotalk-api.hasin7jk.workers.dev"/></label>
+  <label><span>ADMIN_KEY</span><input id="key" type="password" placeholder="Worker에 넣은 관리자 키"/></label>
+  <button class="sub" id="save">저장하고 상태 확인</button>
+  <div class="out" id="oHealth"></div>
+</section>
+
+<section>
+  <h2>기본 봇 심기</h2>
+  <p>@summary @translate @idea @quiz @shopping 다섯 개를 등록합니다. 여러 번 눌러도 중복되지 않습니다.</p>
+  <button id="seed">기본 봇 심기</button>
+  <div class="out" id="oSeed"></div>
+</section>
+
+<section>
+  <h2>등록된 봇</h2>
+  <p>지금 대화방에서 부를 수 있는 봇 목록입니다.</p>
+  <button class="sub" id="list">목록 불러오기</button>
+  <div class="out" id="oList"></div>
+</section>
+
+<section>
+  <h2>외부 봇 추가</h2>
+  <p>https 주소만 등록됩니다. 이름은 영문 소문자로 쓰세요.</p>
+  <label><span>이름</span><input id="bName" placeholder="notion"/></label>
+  <label><span>주소</span><input id="bUrl" placeholder="https://mcp.notion.com/sse"/></label>
+  <div class="row">
+    <label style="flex:2"><span>설명</span><input id="bDesc" placeholder="노션 연동"/></label>
+    <label style="flex:1"><span>아이콘</span><input id="bIcon" placeholder="📓" maxlength="4"/></label>
+  </div>
+  <button id="reg">봇 등록</button>
+  <div class="out" id="oReg"></div>
+</section>
+
+<div class="note">
+  이 페이지는 검색에 노출되지 않지만, 주소를 아는 사람은 열 수 있습니다.
+  관리자 키가 없으면 아무 작업도 되지 않으니 키만 잘 지키면 됩니다.
+  더 안전하게 하려면 봇 설정을 끝낸 뒤 저장소에서 이 파일을 지우세요.
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const DEF = "https://podotalk-api.hasin7jk.workers.dev";
+$("api").value = localStorage.getItem("pt_admin_api") || DEF;
+$("key").value = localStorage.getItem("pt_admin_key") || "";
+
+function show(el, text, kind) {
+  el.className = "out on" + (kind ? " " + kind : "");
+  el.textContent = text;
+}
+const api = () => $("api").value.trim().replace(/\/+$/, "");
+const key = () => $("key").value.trim();
+
+async function call(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (opts.admin) headers["X-Admin-Key"] = key();
+  const r = await fetch(api() + path, {
+    method: opts.body ? "POST" : "GET",
+    headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return r.json();
+}
+
+$("save").onclick = async () => {
+  localStorage.setItem("pt_admin_api", api());
+  localStorage.setItem("pt_admin_key", key());
+  const el = $("oHealth");
+  show(el, "확인 중…");
+  try {
+    const d = await call("/health");
+    show(el, `연결됨\nAI ${d.ai ? "켜짐" : "꺼짐 · Workers AI 바인딩을 확인하세요"}\n알림 ${d.push ? "켜짐" : "꺼짐 · VAPID 키를 아직 넣지 않았습니다"}`, d.ok ? "ok" : "err");
+  } catch (e) {
+    show(el, "서버에 연결하지 못했습니다. API 주소를 확인하세요.", "err");
+  }
+};
+
+$("seed").onclick = async (e) => {
+  const el = $("oSeed");
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  e.target.disabled = true; show(el, "심는 중…");
+  try {
+    const d = await call("/seed", { body: {}, admin: true });
+    show(el, d.ok ? `봇 ${d.seeded}개를 등록했습니다. 대화방에서 @summary 로 불러보세요.` : d.error, d.ok ? "ok" : "err");
+  } catch { show(el, "요청에 실패했습니다.", "err"); }
+  e.target.disabled = false;
+};
+
+$("list").onclick = async () => {
+  const el = $("oList");
+  show(el, "불러오는 중…");
+  try {
+    const d = await call("/mcp/servers");
+    const s = d.servers || [];
+    show(el, s.length ? s.map((x) => `${x.icon || "🤖"} @${x.name} · ${x.descr || ""}`).join("\n") : "아직 등록된 봇이 없습니다. 위에서 기본 봇을 심으세요.", s.length ? "ok" : "");
+  } catch { show(el, "불러오지 못했습니다.", "err"); }
+};
+
+$("reg").onclick = async (e) => {
+  const el = $("oReg");
+  const name = $("bName").value.trim().toLowerCase();
+  const url = $("bUrl").value.trim();
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  if (!name || !url) return show(el, "이름과 주소를 모두 입력하세요.", "err");
+  e.target.disabled = true; show(el, "등록 중…");
+  try {
+    const d = await call("/mcp/register", {
+      admin: true,
+      body: { name, url, type: "general", descr: $("bDesc").value.trim(), icon: $("bIcon").value.trim() || "🤖" },
+    });
+    show(el, d.ok ? `@${name} 봇을 등록했습니다.` : d.error, d.ok ? "ok" : "err");
+  } catch { show(el, "요청에 실패했습니다.", "err"); }
+  e.target.disabled = false;
+};
+</script>
+</body>
+</html>
