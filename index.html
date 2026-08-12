@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#6F2DBD"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<link rel="apple-touch-icon" href="/icon-192.png"/>
+<link rel="apple-touch-icon" href="/podotalk-192.png"/>
 <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"/>
 <style>
@@ -468,8 +468,20 @@ async function send() {
   if (d.bots && d.bots.length) {
     append(`<div class="botcard wait"><div class="bothead"><span>🤖</span><span class="tag">@${esc(d.bots.join(", @"))}</span><span class="lbl">답하는 중</span></div><div class="botbody"><span class="dots"><span></span><span></span><span></span></span> 생각하고 있습니다</div></div>`);
     $("feed").scrollTop = $("feed").scrollHeight;
-    setTimeout(() => poll(false), 1500);
+    chaseBot();
   }
+}
+/* 봇 답이 저장되는 즉시 잡아내려고 처음엔 촘촘히, 점점 느리게 확인한다 */
+function chaseBot() {
+  const gaps = [700, 900, 1200, 1600, 2000, 2500, 3000, 4000, 5000];
+  let i = 0;
+  const tick = async () => {
+    if (!S.room || i >= gaps.length) return;
+    await poll(false);
+    if (!document.querySelector(".botcard.wait")) return;
+    setTimeout(tick, gaps[i++]);
+  };
+  setTimeout(tick, gaps[i++]);
 }
 
 /* ═══ 방 만들기 ═══ */
