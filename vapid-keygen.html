@@ -1,1 +1,52 @@
-
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>포도톡 · 웹푸시 키 만들기</title>
+<style>
+body{margin:0;padding:28px 20px;font-family:-apple-system,BlinkMacSystemFont,system-ui,"Apple SD Gothic Neo",sans-serif;
+  background:#FCFAFF;color:#1E1130;line-height:1.6;max-width:620px;margin-inline:auto}
+h1{font-size:21px;letter-spacing:-.02em;margin:0 0 6px}
+p{color:#7A6B8C;font-size:14px;margin:0 0 20px}
+button{width:100%;background:#6F2DBD;color:#fff;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:700}
+.box{margin-top:18px;background:#fff;border:1px solid #E9DFF7;border-radius:16px;padding:14px}
+.box h2{font-size:12.5px;color:#7A6B8C;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em}
+code{display:block;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;
+  background:#F1E9FE;padding:11px;border-radius:10px;color:#42177A}
+.copy{margin-top:9px;background:#F1E9FE;color:#42177A;font-size:13px;padding:9px;border-radius:10px;font-weight:600}
+.note{margin-top:20px;font-size:13px;color:#7A6B8C;border-top:1px solid #E9DFF7;padding-top:16px}
+</style>
+</head>
+<body>
+<h1>웹푸시 키 만들기</h1>
+<p>이 페이지는 기기 안에서만 키를 만듭니다. 어디에도 전송되지 않습니다.</p>
+<button id="go">키 만들기</button>
+<div id="out"></div>
+<div class="note">
+  만든 값은 Cloudflare 대시보드 → Workers &amp; Pages → <b>podotalk-api</b> → Settings → Variables and Secrets 에
+  <b>VAPID_PUBLIC</b>, <b>VAPID_PRIVATE</b> 라는 이름의 Secret 으로 넣으세요. 비밀키는 다시 볼 수 없으니 지금 안전한 곳에 옮겨두세요.
+</div>
+<script>
+const b64u = (b) => { const a = new Uint8Array(b); let s = ""; for (const x of a) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); };
+document.getElementById("go").onclick = async () => {
+  const kp = await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"}, true, ["deriveBits"]);
+  const pub = await crypto.subtle.exportKey("raw", kp.publicKey);
+  const jwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  render(b64u(pub), jwk.d);
+};
+function render(pub, priv) {
+  document.getElementById("out").innerHTML = `
+    <div class="box"><h2>VAPID_PUBLIC</h2><code id="a">${pub}</code>
+      <button class="copy" data-t="a">공개키 복사</button></div>
+    <div class="box"><h2>VAPID_PRIVATE</h2><code id="b">${priv}</code>
+      <button class="copy" data-t="b">비밀키 복사</button></div>`;
+  document.querySelectorAll(".copy").forEach(b => b.onclick = async () => {
+    await navigator.clipboard.writeText(document.getElementById(b.dataset.t).textContent);
+    b.textContent = "복사했습니다";
+  });
+}
+</script>
+</body>
+</html>
