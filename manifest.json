@@ -1,32 +1,26 @@
 {
-  "name": "포도톡 · PodoTalk",
+  "name": "포도톡 · 봇을 부르는 단체방",
   "short_name": "포도톡",
-  "description": "사장님을 위한 채팅 — 1:1·오픈채팅·일반채팅. 포도다·포도야와 연동됩니다.",
-  "start_url": "/#/talk/direct",
+  "description": "@봇을 불러서 요약하고 번역하고 퀴즈 만드는 단체 채팅",
+  "start_url": "/?src=pwa",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F3EDFC",
-  "theme_color": "#7C3AED",
+  "background_color": "#FCFAFF",
+  "theme_color": "#6F2DBD",
   "lang": "ko",
+  "dir": "ltr",
+  "categories": ["social", "productivity", "education"],
   "icons": [
-    {
-      "src": "/podotalk-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/podotalk-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/podotalk-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ]
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "내 방", "url": "/?type=mine" },
+    { "name": "스터디", "url": "/?type=study" },
+    { "name": "크리에이터", "url": "/?type=creator" }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
 }
