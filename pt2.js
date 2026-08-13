@@ -23,7 +23,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var STEP = 2;                                            /* ← 1~7 */
+var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
 var PFX = "sv_";                                          /* 서버 방 id 접두어 */
@@ -144,7 +144,9 @@ function rich(s) {
     '.pt2-task.done .bx{background:#10B981;border-color:#10B981;color:#fff}',
     '.pt2-task.done b{text-decoration:line-through;color:var(--tk-sub)}',
     '.pt2-task small{display:block;color:var(--tk-sub);font-size:11.5px}',
-    '.pt2-sub{font-size:11.5px;color:var(--tk-sub);margin:-6px 0 10px;line-height:1.6}'
+    '.pt2-sub{font-size:11.5px;color:var(--tk-sub);margin:-6px 0 10px;line-height:1.6}',
+    /* 설정 맨 아래 버튼이 하단 탭바에 가리지 않도록 여백을 준다 */
+    '.tk-set{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}'
   ].join("\n");
   var el = document.createElement("style");
   el.setAttribute("data-pt2", "css");
