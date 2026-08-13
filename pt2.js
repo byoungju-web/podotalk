@@ -147,6 +147,12 @@ function rich(s) {
     '.pt2-task.done b{text-decoration:line-through;color:var(--tk-sub)}',
     '.pt2-task small{display:block;color:var(--tk-sub);font-size:11.5px}',
     '.pt2-sub{font-size:11.5px;color:var(--tk-sub);margin:-6px 0 10px;line-height:1.6}',
+    /* 방 헤더를 화면 상단에 붙박이로. sticky 는 이 스크롤 구조에서
+       위로 밀려 사라져 ⚙️ 를 누를 수 없게 된다. */
+    '.pt2-fixhead{position:fixed;left:0;right:0;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:var(--tk-bg);border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
+    '.pt2-fixhead .tk-rh-mid{min-width:0;flex:1 1 auto;overflow:hidden}',
+    '.pt2-fixhead .tk-hi{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '#tkMsgs.pt2-pad{padding-top:62px}',
     /* 설정 맨 아래 버튼이 하단 탭바에 가리지 않도록 여백을 준다 */
     '.tk-set{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}'
   ].join("\n");
@@ -387,7 +393,7 @@ function renderRoom(id) {
   var head = "";
   try { head = ""; } catch (e) {}
   document.querySelector("#view").innerHTML =
-    '<div class="tk-rhead"><span class="tk-back" data-action="talk-tab" data-v="open">‹</span>' +
+    '<div class="tk-rhead pt2-fixhead"><span class="tk-back" data-action="talk-tab" data-v="open">‹</span>' +
       '<div class="tk-savatar">🍇</div>' +
       '<div class="tk-rh-mid"><div class="tk-hi" id="pt2Title">불러오는 중…</div>' +
         '<div class="tk-hs" id="pt2Sub">서버 방</div></div>' +
@@ -395,7 +401,7 @@ function renderRoom(id) {
         (STEP >= 5 ? '<button class="tk-ract" id="pt2TaskBtn" data-pt2="tasks" style="display:none">✓</button>' : "") +
         '<button class="tk-ract" data-pt2="roomset">⚙️</button>' +
       "</div></div>" +
-    '<div class="tk-msgs" id="tkMsgs"><div class="tk-spacer" style="height:calc(70px + env(safe-area-inset-bottom))"></div></div>' +
+    '<div class="tk-msgs pt2-pad" id="tkMsgs"><div class="tk-spacer" style="height:calc(70px + env(safe-area-inset-bottom))"></div></div>' +
     '<div class="tk-inputbar">' +
       (STEP >= 4 ? '<div class="pt2-mentions" id="pt2Mentions"></div>' : "") +
       '<div class="tk-inrow">' +
