@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=1"></script>
+              <script src="/pt2.js?v=16"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -153,7 +153,13 @@ function rich(s) {
     '.pt2-fixhead{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:var(--tk-bg);border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
     '.pt2-fixhead .tk-rh-mid{min-width:0;flex:1 1 auto;overflow:hidden}',
     '.pt2-fixhead .tk-hi{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '#tkMsgs.pt2-scroll{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:70px;bottom:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;margin:0;z-index:1}',
+    /* 목록은 flex 가 아니라 일반 블록이다.
+       고정 높이 flex 세로 배치는 자리가 모자라면 자식을 눌러 높이 0 으로 만든다.
+       그래서 봇 카드가 얇은 줄로만 남았다. 블록이면 눌릴 수가 없다. */
+    '#tkMsgs.pt2-scroll{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:70px;bottom:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;margin:0;z-index:1;display:block}',
+    '#tkMsgs.pt2-scroll > *{flex:0 0 auto;flex-shrink:0;min-height:0;margin-bottom:8px}',
+    '#tkMsgs.pt2-scroll > *:last-child{margin-bottom:0}',
+    '.pt2-botcard{flex-shrink:0}',
     '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
     '.tk-al{cursor:pointer}',
     '.tk-al:active{opacity:.7}',
@@ -317,7 +323,7 @@ window.renderTalkList = function (kind) {
 };
 
 /* ══════════════ STEP 3 · 서버 방 입장 · 전송 · 폴링 ══════════════ */
-var P = { room: null, id: null, lastTs: 0, timer: null, bots: [] };
+var P = { room: null, id: null, sig: "", timer: null, bots: [], waiting: false, waitSince: 0, waitNames: "" };
 
 /* index5 는 화면 크기가 바뀔 때마다 채팅방을 맨 아래로 끌어내린다(#view 를 스크롤).
    서버 방은 목록이 자체 스크롤을 가지므로 그 동작이 끼어들 필요가 없고,
@@ -406,36 +412,54 @@ function append(html) {
   if (f) f.insertAdjacentHTML("beforeend", html);
 }
 
+function waitCard() {
+  return '<div class="pt2-botcard wait"><div class="pt2-bothead"><span>🤖</span>' +
+    '<span class="tag">@' + esc(P.waitNames || "bot") + '</span><span class="lbl">답하는 중</span></div>' +
+    '<div class="pt2-botbody"><span class="pt2-dots"><span></span><span></span><span></span></span> 생각하고 있어요</div></div>';
+}
+
+/* 목록을 통째로 다시 그린다.
+   예전에는 after= 로 새 메시지만 받아 이어붙였는데, 서버가 그 조건을
+   다르게 해석하면 봇 답변이 영영 안 들어온다(알림만 오고 화면은 빈다).
+   전체를 받아 그대로 그리면 그 문제가 원천적으로 사라진다. */
+function renderMsgs(list, force) {
+  var m = msgsEl();
+  if (!m) return;
+  var near = nearBottom();
+  var html = (list || []).map(msgHtml).join("");
+  if (!html) html = '<div class="tk-sys">첫 메시지를 남겨보세요. @summary 처럼 봇을 부르면 답을 해줘요.</div>';
+  if (P.waiting) html += waitCard();
+  m.innerHTML = html;
+  if (force || near) doScroll();
+}
+
 function poll(first) {
-  if (!P.id) return;
-  var q = "/talk/messages?room_id=" + encodeURIComponent(bare(P.id)) + (P.lastTs ? "&after=" + P.lastTs : "");
-  return api(q).then(function (d) {
+  if (!P.id) return Promise.resolve();
+  return api("/talk/messages?room_id=" + encodeURIComponent(bare(P.id))).then(function (d) {
     if (!P.id || !d || !d.messages) return;
     var list = d.messages || [];
-    var near = nearBottom();          /* 붙이기 전에 재야 한다 */
-    if (first) {
-      var f = document.getElementById("tkMsgs");
-      if (f && !list.length) {
-        f.insertAdjacentHTML("afterbegin",
-          '<div class="tk-sys">첫 메시지를 남겨보세요. @summary 처럼 봇을 부르면 답을 해줘요.</div>');
+    var last = list.length ? list[list.length - 1] : null;
+
+    /* 봇 답이 들어왔으면 '답하는 중' 카드를 내린다 */
+    if (P.waiting) {
+      for (var i = list.length - 1; i >= 0; i--) {
+        if (list[i].kind === "bot" && (list[i].created || 0) >= (P.waitSince || 0)) { P.waiting = false; break; }
       }
+      if (P.waiting && Date.now() - (P.waitSince || 0) > 90000) P.waiting = false;   /* 90초 넘으면 포기 */
     }
-    list.forEach(function (m) {
-      if (m.kind === "bot") { var w = document.querySelector(".pt2-botcard.wait"); if (w) w.remove(); }
-      var tmp = document.getElementById("pt2tmp");
-      if (tmp && m.uid === myUid() && m.kind === "user") { tmp.id = ""; P.lastTs = Math.max(P.lastTs, m.created); return; }
-      append(msgHtml(m));
-      P.lastTs = Math.max(P.lastTs, m.created);
-    });
-    /* 옛 메시지를 보고 있는 중이면 끌어내리지 않는다 */
-    if (list.length && (first || near)) doScroll();
-    if (P.lastTs) { try { setRead(P.id, P.lastTs); } catch (e) {} }
+
+    var sig = list.length + "|" + (last ? (last.id || last.created) : "") + "|" + (P.waiting ? 1 : 0);
+    if (!first && sig === P.sig) return;              /* 바뀐 게 없으면 다시 그리지 않는다 */
+    P.sig = sig;
+    renderMsgs(list, first);
+    if (last && last.created) { try { setRead(P.id, last.created); } catch (e) {} }
   });
 }
 
 function renderRoom(id) {
   stopPoll();
-  P.id = id; P.lastTs = 0; P.room = null; P.bots = [];
+  P.id = id; P.sig = ""; P.room = null; P.bots = [];
+  P.waiting = false; P.waitSince = 0; P.waitNames = "";
   var head = "";
   try { head = ""; } catch (e) {}
   document.querySelector("#view").innerHTML =
@@ -507,31 +531,29 @@ function svSend(id) {
   var mb = document.getElementById("pt2Mentions");
   if (mb) mb.classList.remove("on");
 
-  append('<div class="tk-row me" id="pt2tmp"><div class="tk-bcol"><div class="tk-bub">' + rich(text) +
+  /* 서버가 bots 를 안 돌려줘도 답을 기다리도록, @이름은 내가 직접 읽는다 */
+  var mentions = [];
+  if (STEP >= 4) {
+    var mm = text.match(/(?:^|[\s(])@([a-z0-9_-]{2,24})/gi) || [];
+    mentions = mm.map(function (x) { return x.replace(/^[\s(]*@/, ""); });
+  }
+
+  append('<div class="tk-row me"><div class="tk-bcol"><div class="tk-bub">' + rich(text) +
     '</div></div><span class="tk-time">전송중</span></div>');
-  doScroll();                       /* 내가 보낸 건 항상 따라간다 */
+  doScroll();
 
   api("/talk/message", { body: { room_id: bare(id), uid: myUid(), nick: myNick(), body: text } })
     .then(function (d) {
-      var tmp = document.getElementById("pt2tmp");
-      if (!d.ok) {
-        if (tmp) { var s = tmp.querySelector(".tk-time"); if (s) s.textContent = "실패"; }
-        say(d.error || "전송하지 못했어요");
-        return;
-      }
-      if (tmp) {
-        tmp.id = "";
-        var s2 = tmp.querySelector(".tk-time");
-        if (s2) { try { s2.textContent = tkClock(d.created); } catch (e) { s2.textContent = ""; } }
-      }
-      P.lastTs = Math.max(P.lastTs, d.created || 0);
-      if (STEP >= 4 && d.bots && d.bots.length) {
-        append('<div class="pt2-botcard wait"><div class="pt2-bothead"><span>🤖</span>' +
-          '<span class="tag">@' + esc(d.bots.join(", @")) + '</span><span class="lbl">답하는 중</span></div>' +
-          '<div class="pt2-botbody"><span class="pt2-dots"><span></span><span></span><span></span></span> 생각하고 있어요</div></div>');
-        doScroll();
+      if (!d || !d.ok) { say((d && d.error) || "전송하지 못했어요"); poll(true); return; }
+      var names = (d.bots && d.bots.length) ? d.bots : mentions;
+      if (STEP >= 4 && names.length) {
+        P.waiting = true;
+        P.waitSince = d.created || Date.now();
+        P.waitNames = names.join(", @");
         chaseBot();
       }
+      P.sig = "";                    /* 강제로 다시 그리게 */
+      poll(true);
     });
 }
 
@@ -574,7 +596,7 @@ function chaseBot() {
     setTimeout(function () {
       if (!P.id) return;
       poll(false).then(function () {
-        if (document.querySelector(".pt2-botcard.wait")) tick();
+        if (P.waiting) tick();          /* 아직 답이 안 왔으면 계속 확인 */
       });
     }, gaps[i++]);
   })();
