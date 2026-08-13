@@ -23,7 +23,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var STEP = 5;                                            /* ← 1~7 */
+var STEP = 6;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
 var PFX = "sv_";                                          /* 서버 방 id 접두어 */
