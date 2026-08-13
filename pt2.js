@@ -108,11 +108,13 @@ function api(path, opt) {
     .catch(function () { return { ok: false, error: "서버에 연결하지 못했어요" }; });
 }
 
-/* 링크와 @이름만 살리고 나머지는 전부 이스케이프한다. 순서를 바꾸면 저장형 XSS가 된다. */
+/* 링크와 @이름, **굵게**만 살리고 나머지는 전부 이스케이프한다.
+   반드시 이스케이프 뒤에 치환해야 한다. 순서를 바꾸면 저장형 XSS가 된다. */
 function rich(s) {
   return esc(s)
     .replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
-    .replace(/(^|[\s(])@([a-z0-9_-]{2,24})/gi, '$1<span class="pt2-at">@$2</span>');
+    .replace(/(^|[\s(])@([a-z0-9_-]{2,24})/gi, '$1<span class="pt2-at">@$2</span>')
+    .replace(/\*\*([^*\n]{1,300})\*\*/g, "<b>$1</b>");
 }
 
 /* ── 레이어 전용 CSS ── */
@@ -413,13 +415,17 @@ function renderRoom(id) {
   api("/talk/room?id=" + encodeURIComponent(bare(id))).then(function (d) {
     if (!d.ok || !d.room) { say(d.error || "방을 열지 못했어요"); location.hash = "#/talk/open"; return; }
     if (P.id !== id) return;
-    P.room = d.room;
+    /* 목록에서 받아둔 값(type·emoji·code 등)을 밑에 깔고 상세 응답으로 덮는다.
+       상세가 얇게 오더라도 스터디 여부 같은 정보가 사라지지 않는다. */
+    var cached = null;
+    svRooms().forEach(function (x) { if (x.id === bare(id)) cached = x; });
+    P.room = Object.assign({}, cached || {}, d.room || {});
     var ttl = document.getElementById("pt2Title");
     var sub = document.getElementById("pt2Sub");
-    if (ttl) ttl.textContent = d.room.name;
-    if (sub) sub.textContent = (d.room.members || 1) + "명 · 코드 " + (d.room.code || "-");
+    if (ttl) ttl.textContent = P.room.name || "";
+    if (sub) sub.textContent = (P.room.members || 1) + "명 · 코드 " + (P.room.code || "-");
     var tb = document.getElementById("pt2TaskBtn");
-    if (tb && d.room.type === "study") tb.style.display = "";
+    if (tb && P.room.type === "study") tb.style.display = "";
     api("/talk/room/join", { body: { room_id: bare(id), uid: myUid(), nick: myNick() } });
     if (STEP >= 4) loadBots(id);
     poll(true).then(function () { startPoll(); });
@@ -554,7 +560,9 @@ function drawTasks(id) {
 function roomSetSheet() {
   if (!P.room) return;
   var id = P.id, r = P.room;
-  var owner = r.owner_uid === myUid();
+  /* 서버가 owner_uid 를 안 돌려주는 경우가 있어서, 이 기기에 방장 토큰이
+     저장돼 있으면 방장으로 본다. 토큰은 방을 만든 사람만 받는다. */
+  var owner = (r.owner_uid && r.owner_uid === myUid()) || !!tokenOf(bare(id));
   var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
   var bg = document.createElement("div");
   bg.className = "sheet-bg";
@@ -565,6 +573,7 @@ function roomSetSheet() {
     '<button class="cta grape" data-pt2="copy-code">초대 코드 복사</button>' +
     (r.type === "study" ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="tasks">✓ 과제 보기</button>' : "") +
     (owner && STEP >= 5 ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="new-agent">🤖 이 방 전용 봇 만들기</button>' : "") +
+    (!owner && STEP >= 5 ? '<div class="pt2-sub" style="margin-top:8px">방 전용 봇은 이 방을 만든 기기에서만 추가할 수 있어요.</div>' : "") +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="leave">방 나가기</button>' +
     (owner ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none" data-pt2="del-room">방 삭제하기</button>' : "") +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
