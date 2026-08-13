@@ -147,12 +147,16 @@ function rich(s) {
     '.pt2-task.done b{text-decoration:line-through;color:var(--tk-sub)}',
     '.pt2-task small{display:block;color:var(--tk-sub);font-size:11.5px}',
     '.pt2-sub{font-size:11.5px;color:var(--tk-sub);margin:-6px 0 10px;line-height:1.6}',
-    /* 방 헤더를 화면 상단에 붙박이로. sticky 는 이 스크롤 구조에서
-       위로 밀려 사라져 ⚙️ 를 누를 수 없게 된다. */
-    '.pt2-fixhead{position:fixed;left:0;right:0;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:var(--tk-bg);border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
+    /* 방 헤더와 메시지 목록을 화면에 직접 고정한다.
+       #view 스크롤 안에 두면 index5 의 자동 스크롤과 계속 부딪혀
+       맨 위까지 올라가지 못한다. 목록에 자체 스크롤을 주면 그 싸움에서 빠진다. */
+    '.pt2-fixhead{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:var(--tk-bg);border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
     '.pt2-fixhead .tk-rh-mid{min-width:0;flex:1 1 auto;overflow:hidden}',
     '.pt2-fixhead .tk-hi{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '#tkMsgs.pt2-pad{padding-top:62px}',
+    '#tkMsgs.pt2-scroll{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:70px;bottom:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;margin:0;z-index:1}',
+    '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
+    '.tk-al{cursor:pointer}',
+    '.tk-al:active{opacity:.7}',
     /* 설정 맨 아래 버튼이 하단 탭바에 가리지 않도록 여백을 준다 */
     '.tk-set{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}'
   ].join("\n");
@@ -315,6 +319,49 @@ window.renderTalkList = function (kind) {
 /* ══════════════ STEP 3 · 서버 방 입장 · 전송 · 폴링 ══════════════ */
 var P = { room: null, id: null, lastTs: 0, timer: null, bots: [] };
 
+/* index5 는 화면 크기가 바뀔 때마다 채팅방을 맨 아래로 끌어내린다(#view 를 스크롤).
+   서버 방은 목록이 자체 스크롤을 가지므로 그 동작이 끼어들 필요가 없고,
+   끼어들면 위로 올라가려는 손가락과 계속 싸운다. 그래서 방에 있는 동안 막는다. */
+var _tkSB = window.tkScrollBottom;
+window.tkScrollBottom = function () {
+  if (P.id) return;                               /* 서버 방에 있는 동안은 무시 */
+  return _tkSB.apply(this, arguments);
+};
+function msgsEl()   { return document.getElementById("tkMsgs"); }
+function nearBottom() {
+  var m = msgsEl();
+  if (!m) return true;
+  return (m.scrollHeight - m.scrollTop - m.clientHeight) < 160;
+}
+function doScroll() {
+  /* 목록 자체 스크롤이므로 index5 의 전역 스크롤 함수는 쓰지 않는다 */
+  function go() { var m = msgsEl(); if (m) m.scrollTop = m.scrollHeight + 9999; }
+  go();
+  requestAnimationFrame(go);
+  [60, 200, 500, 900].forEach(function (ms) { setTimeout(go, ms); });
+}
+
+/* 헤더 높이와 입력바 위치는 기기 글자 크기·키보드 상태에 따라 달라진다.
+   고정값을 쓰면 맨 위 메시지가 헤더 밑에 깔리거나 아래가 잘린다. 그래서 직접 잰다. */
+function fitHead() {
+  var h = document.querySelector(".pt2-fixhead");
+  var m = msgsEl();
+  if (!h || !m) return;
+  m.style.top = h.offsetHeight + "px";
+  var bar = document.querySelector(".tk-inputbar");
+  var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  if (bar) {
+    var r = bar.getBoundingClientRect();
+    m.style.bottom = Math.max(0, Math.round(vh - r.top)) + "px";
+  }
+}
+window.addEventListener("resize", function () { if (P.id) fitHead(); });
+try {
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", function () { if (P.id) fitHead(); });
+  }
+} catch (e) {}
+
 function stopPoll() { if (P.timer) { clearInterval(P.timer); P.timer = null; } }
 function startPoll() {
   stopPoll();
@@ -355,12 +402,8 @@ function msgHtml(m) {
 }
 
 function append(html) {
-  var f = document.getElementById("tkMsgs");
-  if (!f) return;
-  var sp = document.querySelector("#tkMsgs .tk-spacer");
-  if (sp) sp.insertAdjacentHTML("beforebegin", html);
-  else f.insertAdjacentHTML("beforeend", html);
-  try { tkScrollBottom(); } catch (e) {}
+  var f = msgsEl();
+  if (f) f.insertAdjacentHTML("beforeend", html);
 }
 
 function poll(first) {
@@ -369,6 +412,7 @@ function poll(first) {
   return api(q).then(function (d) {
     if (!P.id || !d || !d.messages) return;
     var list = d.messages || [];
+    var near = nearBottom();          /* 붙이기 전에 재야 한다 */
     if (first) {
       var f = document.getElementById("tkMsgs");
       if (f && !list.length) {
@@ -383,6 +427,8 @@ function poll(first) {
       append(msgHtml(m));
       P.lastTs = Math.max(P.lastTs, m.created);
     });
+    /* 옛 메시지를 보고 있는 중이면 끌어내리지 않는다 */
+    if (list.length && (first || near)) doScroll();
     if (P.lastTs) { try { setRead(P.id, P.lastTs); } catch (e) {} }
   });
 }
@@ -398,10 +444,11 @@ function renderRoom(id) {
       '<div class="tk-rh-mid"><div class="tk-hi" id="pt2Title">불러오는 중…</div>' +
         '<div class="tk-hs" id="pt2Sub">서버 방</div></div>' +
       '<div class="tk-racts">' +
+        '<button class="tk-ract" data-pt2="top" title="맨 위로">⤒</button>' +
         (STEP >= 5 ? '<button class="tk-ract" id="pt2TaskBtn" data-pt2="tasks" style="display:none">✓</button>' : "") +
         '<button class="tk-ract" data-pt2="roomset">⚙️</button>' +
       "</div></div>" +
-    '<div class="tk-msgs pt2-pad" id="tkMsgs"><div class="tk-spacer" style="height:calc(70px + env(safe-area-inset-bottom))"></div></div>' +
+    '<div class="tk-msgs pt2-scroll" id="tkMsgs"></div>' +
     '<div class="tk-inputbar">' +
       (STEP >= 4 ? '<div class="pt2-mentions" id="pt2Mentions"></div>' : "") +
       '<div class="tk-inrow">' +
@@ -409,6 +456,8 @@ function renderRoom(id) {
         '<button class="tk-send" data-action="talk-send" data-id="' + esc(id) + '">➤</button>' +
       "</div></div>";
   try { setTalkTab("open"); } catch (e) {}
+  fitHead();
+  requestAnimationFrame(fitHead);          /* 폰트 적용 뒤 한 번 더 */
 
   var inp = document.getElementById("tkInput");
   if (inp) {
@@ -460,6 +509,7 @@ function svSend(id) {
 
   append('<div class="tk-row me" id="pt2tmp"><div class="tk-bcol"><div class="tk-bub">' + rich(text) +
     '</div></div><span class="tk-time">전송중</span></div>');
+  doScroll();                       /* 내가 보낸 건 항상 따라간다 */
 
   api("/talk/message", { body: { room_id: bare(id), uid: myUid(), nick: myNick(), body: text } })
     .then(function (d) {
@@ -479,6 +529,7 @@ function svSend(id) {
         append('<div class="pt2-botcard wait"><div class="pt2-bothead"><span>🤖</span>' +
           '<span class="tag">@' + esc(d.bots.join(", @")) + '</span><span class="lbl">답하는 중</span></div>' +
           '<div class="pt2-botbody"><span class="pt2-dots"><span></span><span></span><span></span></span> 생각하고 있어요</div></div>');
+        doScroll();
         chaseBot();
       }
     });
@@ -529,9 +580,70 @@ function chaseBot() {
   })();
 }
 
+/* ══════════════ 알림 목록 ══════════════
+   index5 원본은 항목에 data-action 을 붙이지 않아 눌러도 아무 일이 없고,
+   로컬 방만 훑어서 서버 방 알림은 아예 나오지 않는다. 둘 다 고친다. */
+function renderAlarm() {
+  var items = [], up = upMap();
+  try {
+    talkRooms().forEach(function (r) {
+      if (r.noti === false) return;
+      if (up[r.id]) return;                       /* 서버로 옮긴 방은 서버 쪽으로 나온다 */
+      var m = talkMsgs(r.id);
+      if (!m.length) return;
+      var last = m[m.length - 1];
+      if (last.who !== "them" && last.who !== "sys") return;
+      items.push({
+        ic: r.type === "dm" ? (r.emoji || "💬") : ((r.mode === "group") ? "👥" : "💬"),
+        t: r.name,
+        b: last.who === "sys" ? last.text : ((last.name ? last.name + ": " : "") + last.text),
+        ts: last.ts, id: r.id, local: true
+      });
+    });
+  } catch (e) {}
+
+  svRooms().forEach(function (r) {
+    if (!r.last_body) return;
+    items.push({
+      ic: r.emoji || "🍇", t: r.name,
+      b: (r.last_nick ? r.last_nick + ": " : "") + r.last_body,
+      ts: r.last_ts || 0, id: PFX + r.id, local: false, unread: svUnread(r)
+    });
+  });
+
+  items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+
+  var body = items.length
+    ? '<div class="tk-alarm pt2-alarm">' + items.map(function (it) {
+        var t = "";
+        try { t = it.ts ? relTime(it.ts) : ""; } catch (e) {}
+        return '<div class="tk-al" data-action="talk-open" data-id="' + esc(it.id) + '">' +
+          '<div class="tk-ai">' + esc(it.ic) + "</div>" +
+          '<div class="tk-at"><div class="tk-att">' + esc(it.t) +
+            (it.local ? ' <span class="pt2-badge">📱 이 기기</span>' : "") + "</div>" +
+          '<div class="tk-ab">' + esc(it.b) + "</div></div>" +
+          '<div class="tk-atime">' + esc(t) +
+            (it.unread ? ' <span class="pt2-dot"></span>' : "") + "</div></div>";
+      }).join("") + "</div>"
+    : '<div class="tk-empty"><div class="ee">🔔</div>새로운 알림이 없어요</div>';
+
+  var head = "";
+  try { head = tkHeader("알림", "포도톡"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head + body;
+  try { setTalkTab("alarm"); } catch (e) {}
+}
+
 /* ══════════════ STEP 5 · 과제 · 방 설정 ══════════════ */
 window.renderTalk = function (sub, arg) {
   if (STEP >= 5 && on() && sub === "tasks" && arg) return renderTasks(arg);
+  if (STEP >= 2 && on() && sub === "alarm") {
+    renderAlarm();
+    /* 서버 목록을 새로 받아 한 번만 다시 그린다. renderAlarm 안에서 부르면 무한 반복이 된다 */
+    refreshRooms(function () {
+      if (location.hash.indexOf("#/talk/alarm") === 0) renderAlarm();
+    });
+    return;
+  }
   return O.renderTalk.apply(this, arguments);
 };
 
@@ -612,6 +724,29 @@ function newRoomSheet() {
 }
 
 /* ══════════════ STEP 6 · 웹푸시 (podotalk-api 하나만) ══════════════ */
+/* 서비스워커 등록.
+   index5 는 pdPushSubscribe() 안에서만 sw.js 를 등록하는데, 아래에서 그 함수를
+   무력화하기 때문에 여기서 직접 등록해야 한다. 이게 없으면
+   serviceWorker.ready 가 영원히 멈춰 토글을 눌러도 아무 반응이 없다. */
+function swReady() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return Promise.reject(new Error("이 브라우저는 웹 알림을 지원하지 않아요"));
+  }
+  return navigator.serviceWorker.register("/sw.js")
+    .catch(function () { return null; })              /* 이미 등록돼 있으면 그대로 진행 */
+    .then(function () {
+      return Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise(function (_r, rej) {
+          setTimeout(function () { rej(new Error("서비스워커가 준비되지 않아요. sw.js 가 있는지 확인하세요")); }, 8000);
+        })
+      ]);
+    });
+}
+if (STEP >= 6 && "serviceWorker" in navigator) {
+  try { navigator.serviceWorker.register("/sw.js").catch(function () {}); } catch (e) {}
+}
+
 function b64u(s) {
   s = String(s).replace(/-/g, "+").replace(/_/g, "/");
   s += "=".repeat((4 - s.length % 4) % 4);
@@ -630,7 +765,9 @@ function sameKey(sub, key) {
 }
 function getSub() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return Promise.resolve(null);
-  return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); })
+  /* ready 는 등록이 없으면 영영 멈춘다. 상태 확인용으로는 getRegistration 을 쓴다. */
+  return navigator.serviceWorker.getRegistration()
+    .then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; })
     .catch(function () { return null; });
 }
 function paintPushSwitch() {
@@ -640,12 +777,16 @@ function paintPushSwitch() {
   });
 }
 function pushOn() {
-  if (!("serviceWorker" in navigator)) { say("이 브라우저는 알림을 지원하지 않아요"); return; }
-  Notification.requestPermission().then(function (p) {
-    if (p !== "granted") { say("기기 설정에서 알림을 허용해 주세요"); return; }
-    api("/push/key").then(function (k) {
-      if (!k || !k.key) { say("서버에 알림 키가 아직 없어요"); return; }
-      navigator.serviceWorker.ready.then(function (reg) {
+  say("알림을 준비하는 중…");
+  Promise.resolve()
+    .then(function () { return Notification.requestPermission(); })
+    .then(function (p) {
+      if (p !== "granted") throw new Error("기기 설정에서 알림을 허용해 주세요");
+      return api("/push/key");
+    })
+    .then(function (k) {
+      if (!k || !k.key) throw new Error("서버에 알림 키가 없어요. 워커에 VAPID_PUBLIC 을 넣어주세요");
+      return swReady().then(function (reg) {
         return reg.pushManager.getSubscription().then(function (old) {
           /* 예전에 포도다 키로 만든 구독이 남아 있으면 반드시 먼저 해지해야
              다른 키로 subscribe 가 InvalidStateError 없이 성공한다 */
@@ -655,16 +796,19 @@ function pushOn() {
           if (cur) return cur;
           return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(k.key) });
         });
-      }).then(function (sub) {
-        return api("/push/subscribe", { body: { uid: myUid(), sub: sub.toJSON ? sub.toJSON() : sub } });
-      }).then(function (r) {
-        if (r && r.ok) { say("알림을 켰어요 🔔"); paintPushSwitch(); }
-        else say((r && r.error) || "서버에 등록하지 못했어요");
-      }).catch(function (e) {
-        say("알림 등록 실패: " + (e && e.message ? e.message : e));
       });
+    })
+    .then(function (sub) {
+      return api("/push/subscribe", { body: { uid: myUid(), sub: sub.toJSON ? sub.toJSON() : sub } });
+    })
+    .then(function (r) {
+      if (r && r.ok) { say("알림을 켰어요 🔔"); paintPushSwitch(); }
+      else throw new Error((r && r.error) || "서버에 등록하지 못했어요");
+    })
+    .catch(function (e) {
+      say(e && e.message ? e.message : "알림을 켜지 못했어요");
+      paintPushSwitch();
     });
-  });
 }
 function pushOff() {
   getSub().then(function (s) {
@@ -986,6 +1130,23 @@ document.addEventListener("click", function (e) {
       say("방을 삭제했어요");
       refreshRooms();
       location.hash = "#/talk/open";
+    });
+    return;
+  }
+
+  /* STEP 3 · 맨 위로. 어느 쪽이 실제 스크롤 주체든 상관없도록 둘 다 0 으로 보낸다 */
+  if (a === "top") {
+    var m = msgsEl();
+    if (m) m.scrollTop = 0;
+    var v = document.querySelector("#view");
+    if (v) v.scrollTop = 0;
+    try { window.scrollTo(0, 0); } catch (_e) {}
+    /* index5 의 자동 스크롤이 뒤늦게 끌어내리는 걸 눌러 둔다 */
+    [80, 240, 600, 1000, 1400].forEach(function (ms) {
+      setTimeout(function () {
+        var m2 = msgsEl(); if (m2) m2.scrollTop = 0;
+        var v2 = document.querySelector("#view"); if (v2) v2.scrollTop = 0;
+      }, ms);
     });
     return;
   }
