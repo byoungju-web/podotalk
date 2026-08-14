@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=19"></script>
+              <script src="/pt2.js?v=20"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -217,6 +217,8 @@ function rich(s) {
     '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
+    '.pt2-orig{margin-top:6px;padding-top:6px;border-top:1px dashed var(--tk-line);font-size:11.5px;color:var(--tk-sub);line-height:1.5;word-break:break-word}',
+    '.pt2-langsel{width:100%;box-sizing:border-box;border:1.5px solid var(--tk-line);border-radius:10px;padding:11px;font-size:14px;font-family:inherit;background:#fff}',
     '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
     '.tk-al{cursor:pointer}',
     '.tk-al:active{opacity:.7}',
@@ -477,12 +479,20 @@ function msgHtml(m) {
   var mine = m.uid === myUid();
   var t = "";
   try { t = tkClock(m.created); } catch (e) {}
+
+  /* 남이 쓴 글은 자동번역을 시도한다. 원문은 아래에 작게 남긴다 */
+  var tr = mine ? null : trFor(m.body);
+  var main = (tr && tr.text) ? tr.text : m.body;
+  var sub = "";
+  if (tr && tr.text) sub = '<div class="pt2-orig">' + esc(m.body) + "</div>";
+  else if (tr && tr.pending) sub = '<div class="pt2-orig">🌐 번역 중…</div>';
+
   if (m.kind === "bot") {
     var icon = "🤖";
     try { icon = JSON.parse(m.meta || "{}").icon || "🤖"; } catch (e) {}
     return '<div class="pt2-botcard"><div class="pt2-bothead"><span>' + esc(icon) + "</span>" +
       '<span class="tag">@' + esc(m.nick) + '</span><span class="lbl">' + esc(t) + "</span></div>" +
-      '<div class="pt2-botbody">' + rich(m.body) + "</div></div>";
+      '<div class="pt2-botbody">' + rich(main) + sub + "</div></div>";
   }
   if (mine) {
     return '<div class="tk-row me"><div class="tk-bcol"><div class="tk-bub">' + rich(m.body) + "</div></div>" +
@@ -490,13 +500,90 @@ function msgHtml(m) {
   }
   return '<div class="tk-row them"><div class="tk-savatar">🙂</div>' +
     '<div class="tk-bcol"><div class="tk-who">' + esc(m.nick || "익명") + "</div>" +
-    '<div class="tk-bub">' + rich(m.body) + "</div></div>" +
+    '<div class="tk-bub">' + rich(main) + sub + "</div></div>" +
     '<span class="tk-time">' + esc(t) + "</span></div>";
 }
 
 function append(html) {
   var f = msgsEl();
   if (f) f.insertAdjacentHTML("beforeend", html);
+}
+
+
+/* ══════════════ 서버 방 자동번역 ══════════════
+   각자 자기 폰에서 '내 언어'만 고르면, 남이 쓴 글이 내 언어로 번역돼 보인다.
+   서버에는 원문만 저장된다. 번역은 각 폰이 직접 하고 결과는 이 기기에 쌓아둔다.
+   그래서 워커를 고칠 필요가 없고, 같은 문장은 두 번 번역하지 않는다. */
+function trOn(id){ return LS("pt2_tr_" + bare(id || P.id || "")) === "1"; }
+function trSetOn(id, v){ LSS("pt2_tr_" + bare(id), v ? "1" : "0"); }
+function myLang(){ return LS("pt2_tr_lang") || "KO"; }
+function setMyLang(v){ LSS("pt2_tr_lang", v); }
+
+function trCache(){ return LSJ("pt2_tr_cache", {}); }
+function trCacheSave(o){
+  var k = Object.keys(o);
+  if (k.length > 500) { var t = {}; k.slice(-400).forEach(function (x) { t[x] = o[x]; }); o = t; }
+  LSS("pt2_tr_cache", JSON.stringify(o));
+}
+
+/* 글자만 보고 어느 문자인지 가른다. 같은 문자면 번역할 필요가 없다 */
+function scriptOf(s){
+  s = String(s || "");
+  if (/[가-힣]/.test(s)) return "ko";
+  if (/[\u3040-\u30ff]/.test(s)) return "ja";
+  if (/[\u4e00-\u9fff]/.test(s)) return "zh";
+  if (/[\u0400-\u04ff]/.test(s)) return "cy";
+  if (/[\u0600-\u06ff]/.test(s)) return "ar";
+  if (/[\u0e00-\u0e7f]/.test(s)) return "th";
+  if (/[\u0900-\u097f]/.test(s)) return "dv";
+  if (/[\u1000-\u109f]/.test(s)) return "my";
+  if (/[\u1780-\u17ff]/.test(s)) return "km";
+  if (/[\u0590-\u05ff]/.test(s)) return "he";
+  if (/[\u0980-\u09ff]/.test(s)) return "bn";
+  return "la";
+}
+function scriptOfLang(c){
+  var m = { KO:"ko", JA:"ja", ZH:"zh", RU:"cy", UK:"cy", MN:"cy",
+            AR:"ar", TH:"th", HI:"dv", NE:"dv", MY:"my", KM:"km", HE:"he", BN:"bn" };
+  return m[c] || "la";
+}
+
+var trQ = [], trBusy = false, trSeen = {}, trPaint = null;
+function trEnqueue(text, tgt, key){
+  if (trSeen[key]) return;
+  trSeen[key] = 1;
+  trQ.push({ text: text, tgt: tgt, key: key });
+  if (!trBusy) trStep();
+}
+function trStep(){
+  var job = trQ.shift();
+  if (!job) { trBusy = false; return; }
+  trBusy = true;
+  var done = function (out){
+    if (out) {
+      var c = trCache(); c[job.key] = out; trCacheSave(c);
+      if (trPaint) clearTimeout(trPaint);
+      trPaint = setTimeout(function () { renderMsgs(P.list || [], false); }, 180);
+    }
+    setTimeout(trStep, 60);
+  };
+  /* 보낸 사람 언어를 모르므로 자동 감지가 되는 무료 번역을 먼저 쓴다 */
+  trxGoogle(job.text, "auto", trxG(job.tgt), done, function () {
+    trxAI(job.text, "EN", job.tgt, function (o) { done(o); });
+  });
+}
+
+/* 이 메시지를 내 언어로 바꾼 결과. 아직 없으면 줄 세우고 '번역 중'을 돌려준다 */
+function trFor(text){
+  if (!P.id || !trOn(P.id) || !text) return null;
+  var tgt = myLang();
+  var sc = scriptOf(text);
+  if (sc !== "la" && sc === scriptOfLang(tgt)) return null;   /* 이미 내 문자 */
+  var key = tgt + "|" + hash36(text);
+  var c = trCache()[key];
+  if (c) return { text: c };
+  trEnqueue(text, tgt, key);
+  return { pending: true };
 }
 
 function waitCard() {
@@ -512,8 +599,9 @@ function waitCard() {
 function renderMsgs(list, force) {
   var m = msgsEl();
   if (!m) return;
+  P.list = list || P.list || [];
   var near = nearBottom();
-  var html = (list || []).map(msgHtml).join("");
+  var html = (P.list || []).map(msgHtml).join("");
   if (!html) html = '<div class="tk-sys">첫 메시지를 남겨보세요. @summary 처럼 봇을 부르면 답을 해줘요.</div>';
   if (P.waiting) html += waitCard();
   m.innerHTML = html;
@@ -589,7 +677,8 @@ function renderRoom(id) {
     var ttl = document.getElementById("pt2Title");
     var sub = document.getElementById("pt2Sub");
     if (ttl) ttl.textContent = P.room.name || "";
-    if (sub) sub.textContent = (P.room.members || 1) + "명 · 코드 " + (P.room.code || "-");
+    if (sub) sub.textContent = (P.room.members || 1) + "명 · 코드 " + (P.room.code || "-") +
+      (trOn(id) ? " · 🌐 " + trxName(myLang()) : "");
     var tb = document.getElementById("pt2TaskBtn");
     if (tb && P.room.type === "study") tb.style.display = "";
     api("/talk/room/join", { body: { room_id: bare(id), uid: myUid(), nick: myNick() } });
@@ -824,6 +913,10 @@ function roomSetSheet() {
     "<h3>" + esc(r.name) + "</h3>" +
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중</div>" +
     '<button class="cta grape" data-pt2="copy-code">초대 코드 복사</button>' +
+    '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
+    '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
+    '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
+      '<select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + '</select></div>' +
     (r.type === "study" ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="tasks">✓ 과제 보기</button>' : "") +
     (owner && STEP >= 5 ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="new-agent">🤖 이 방 전용 봇 만들기</button>' : "") +
     (!owner && STEP >= 5 ? '<div class="pt2-sub" style="margin-top:8px">방 전용 봇은 이 방을 만든 기기에서만 추가할 수 있어요.</div>' : "") +
@@ -1583,6 +1676,13 @@ document.addEventListener("click", function(e){
     location.hash="#/talk/trans"; return;
   }
 });
+document.addEventListener("change", function (e) {
+  var el = e.target;
+  if (!el || !el.getAttribute || el.getAttribute("data-pt2-lang") !== "1") return;
+  setMyLang(el.value);
+  say("내 언어를 " + trxFlag(el.value) + " " + trxName(el.value) + " 로 정했어요");
+  P.sig = ""; renderMsgs(P.list || [], false);
+});
 document.addEventListener("change", function(e){
   var el=e.target;
   if(!el || !el.getAttribute || el.getAttribute("data-action")!=="trx-lang") return;
@@ -1694,6 +1794,15 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "tr-toggle") {
+    var rid0 = el.getAttribute("data-id") || P.id;
+    var nx = !trOn(rid0);
+    trSetOn(rid0, nx);
+    el.className = "tk-sw" + (nx ? " on" : "");
+    say(nx ? ("🌐 자동번역을 켰어요 · " + trxFlag(myLang()) + " " + trxName(myLang())) : "자동번역을 껐어요");
+    P.sig = ""; renderMsgs(P.list || [], false);
+    return;
+  }
   if (a === "copy-code"){ try { copyText((P.room && P.room.code) || ""); say("초대 코드를 복사했어요"); } catch (_e) {} return; }
   if (a === "tasks")    {
     var sb2 = document.querySelector(".sheet-bg"); if (sb2) sb2.remove();
