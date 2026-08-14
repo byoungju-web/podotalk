@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=18"></script>
+              <script src="/pt2.js?v=19"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -177,6 +177,7 @@ function rich(s) {
     '.trx-eng{flex:1;padding:7px 6px;border-radius:10px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-sub);font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.trx-eng.on{background:var(--tk-soft);border-color:var(--tk-grape);color:var(--tk-grape-d)}',
     '.trx-msgs{flex:1 1 auto;min-height:0;display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}',
+    '.trx-flipnote{flex:0 0 auto;background:#FFF7E8;border-bottom:1px solid #F5E1B8;color:#8a6d2f;font-size:11.5px;font-weight:700;padding:8px 12px;line-height:1.5}',
     '.trx-row{display:flex;margin-bottom:11px}',
     '.trx-row.a{justify-content:flex-end}.trx-row.b{justify-content:flex-start}',
     '.trx-row.flip .trx-b{transform:rotate(180deg)}',
@@ -1411,7 +1412,9 @@ function trxRoom(id){
     var dstL= mine ? r.bLang : r.aLang;
     var big = m.dst || m.src;
     var pend= m.pending ? '<span class="trx-dots">●●●</span>' : "";
-    var cls = "trx-row "+(mine?"a":"b")+((flip&&!mine)?" flip":"");
+    /* 마주보기: 상대(오른쪽 사람)가 읽어야 하는 말풍선을 뒤집는다.
+       왼쪽 사람이 한 말 → 번역문이 상대 언어이므로 이쪽을 돌려야 맞은편에서 읽힌다. */
+    var cls = "trx-row "+(mine?"a":"b")+((flip&&mine)?" flip":"");
     return '<div class="'+cls+'"><div class="trx-b">'+
       '<div class="trx-who">'+esc(who)+' <span class="trx-lg">'+trxFlag(srcL)+"</span></div>"+
       '<div class="trx-src">'+esc(m.src)+"</div>"+
@@ -1444,6 +1447,7 @@ function trxRoom(id){
         '<button class="trx-eng'+(trxEngine()==="podo"?" on":"")+'" data-action="trx-eng" data-v="podo" data-id="'+esc(id)+'">🍇 포도랑 정밀번역</button>'+
         '<button class="trx-eng'+(trxEngine()==="free"?" on":"")+'" data-action="trx-eng" data-v="free" data-id="'+esc(id)+'">⚡ 무료 번역</button>'+
       "</div>"+
+      (flip ? '<div class="trx-flipnote">🔄 마주보기 · '+esc(r.bName)+'님이 읽을 글은 뒤집혀 있어요. 폰을 두 사람 사이에 놓으세요</div>' : "")+
       '<div class="trx-msgs" id="trxMsgs">'+rows+"</div>"+
     "</div>"+
     '<div class="trx-bar">'+
@@ -1536,7 +1540,13 @@ document.addEventListener("click", function(e){
     return;
   }
   if(a==="trx-set"){ location.hash="#/talk/transset/"+id; return; }
-  if(a==="trx-flip"){ LSS("pt2_trx_flip", trxFlipOn()?"0":"1"); trxRoom(id||(location.hash.split("/")[3]||"")); return; }
+  if(a==="trx-flip"){
+    var on2=!trxFlipOn();
+    LSS("pt2_trx_flip", on2?"1":"0");
+    trxRoom(id||(location.hash.split("/")[3]||""));
+    say(on2 ? "🔄 마주보기 켰어요 · 폰을 두 사람 사이에 놓으세요" : "마주보기를 껐어요");
+    return;
+  }
   if(a==="trx-turn"){
     var r=trxFind(id); if(!r) return;
     r.turn=el.getAttribute("data-w"); trxPut(r); trxRoom(id);
