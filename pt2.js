@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=21"></script>
+              <script src="/pt2.js?v=22"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -217,6 +217,8 @@ function rich(s) {
     '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
+    '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
+    '.pt2-mic.rec{background:#EF4444 !important;color:#fff !important;animation:trxpulse 1s infinite}',
     '.pt2-orig{margin-top:6px;padding-top:6px;border-top:1px dashed var(--tk-line);font-size:11.5px;color:var(--tk-sub);line-height:1.5;word-break:break-word}',
     '.pt2-langsel{width:100%;box-sizing:border-box;border:1.5px solid var(--tk-line);border-radius:10px;padding:11px;font-size:14px;font-family:inherit;background:#fff}',
     '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
@@ -470,7 +472,7 @@ function startPoll() {
    hashchange 를 따로 듣는다. 새 해시가 서버 방이면 건드리지 않는다. */
 window.addEventListener("hashchange", function () {
   var m = (location.hash || "").match(/#\/talk\/room\/([\w-]+)/);
-  if (!m || !isSv(m[1])) { stopPoll(); P.id = null; P.room = null; }
+  if (!m || !isSv(m[1])) { stopPoll(); pt2MicStop(); P.id = null; P.room = null; }
 });
 document.addEventListener("visibilitychange", function () {
   if (!document.hidden && P.id) poll(false);
@@ -518,6 +520,8 @@ function append(html) {
 function trOn(id){ return LS("pt2_tr_" + bare(id || P.id || "")) === "1"; }
 function trSetOn(id, v){ LSS("pt2_tr_" + bare(id), v ? "1" : "0"); }
 function myLang(){ return LS("pt2_tr_lang") || "KO"; }
+/* 처음 한 번은 한국어로 맞춰둔다. 이후 직접 고른 값은 그대로 지킨다 */
+(function(){ if (LS("pt2_lang_init") !== "1") { LSS("pt2_tr_lang", "KO"); LSS("pt2_lang_init", "1"); } })();
 function setMyLang(v){ LSS("pt2_tr_lang", v); }
 
 function trCache(){ return LSJ("pt2_tr_cache", {}); }
@@ -632,6 +636,49 @@ function poll(first) {
   });
 }
 
+
+/* ── 서버 방 받아쓰기 : 내 언어로 말하면 그대로 글이 되어 전송된다 ── */
+var pt2Rec = null;
+function pt2MicStop(){
+  if (pt2Rec) { try { pt2Rec.stop(); } catch (e) {} }
+  pt2Rec = null;
+  var b = document.getElementById("pt2Mic");
+  if (b) b.classList.remove("rec");
+}
+function pt2MicStart(id){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { say("이 브라우저는 받아쓰기를 지원하지 않아요"); return; }
+  if (pt2Rec) { pt2MicStop(); return; }
+  var lang = myLang();
+  try {
+    pt2Rec = new SR();
+    pt2Rec.lang = trxBcp(lang);
+    pt2Rec.interimResults = true;
+    pt2Rec.continuous = false;
+    var got = "";
+    pt2Rec.onresult = function (ev) {
+      var it = "";
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var t = ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) got += t; else it += t;
+      }
+      var inp = document.getElementById("tkInput");
+      if (inp) inp.value = (got + it).trim();
+    };
+    pt2Rec.onerror = function () { pt2MicStop(); };
+    pt2Rec.onend = function () {
+      var inp = document.getElementById("tkInput");
+      var v = inp ? (inp.value || "").trim() : "";
+      pt2MicStop();
+      if (v) window.talkSend(id);          /* 말이 끝나면 바로 보낸다 */
+    };
+    pt2Rec.start();
+    var b = document.getElementById("pt2Mic");
+    if (b) b.classList.add("rec");
+    say("🎙️ " + trxFlag(lang) + " " + trxName(lang) + "로 듣는 중… 말이 끝나면 자동으로 보내요");
+  } catch (e) { pt2MicStop(); say("마이크를 시작할 수 없어요"); }
+}
+
 function renderRoom(id) {
   stopPoll();
   P.id = id; P.sig = ""; P.room = null; P.bots = [];
@@ -655,7 +702,8 @@ function renderRoom(id) {
     '<div class="tk-inputbar">' +
       (STEP >= 4 ? '<div class="pt2-mentions" id="pt2Mentions"></div>' : "") +
       '<div class="tk-inrow">' +
-        '<input id="tkInput" placeholder="메시지 입력' + (STEP >= 4 ? " · @로 봇 부르기" : "") + '" autocomplete="off">' +
+        '<input id="tkInput" placeholder="' + esc(isLive(bare(id)) ? (trxName(myLang()) + "로 말하거나 입력하세요") : ("메시지 입력" + (STEP >= 4 ? " · @로 봇 부르기" : ""))) + '" autocomplete="off">' +
+        '<button class="tk-send pt2-mic" id="pt2Mic" data-pt2="mic" data-id="' + esc(id) + '">🎙️</button>' +
         '<button class="tk-send" data-action="talk-send" data-id="' + esc(id) + '">➤</button>' +
       "</div></div>";
   markTab(isLive(bare(id)) ? "lang" : "open");
@@ -1825,6 +1873,7 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "live-new") { liveNew(); return; }
+  if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
   if (a === "new-sv")   { newRoomSheet(); return; }
