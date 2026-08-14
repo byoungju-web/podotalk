@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=20"></script>
+              <script src="/pt2.js?v=21"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -340,6 +340,7 @@ function renderOpen() {
   var items = (cur === "shop") ? shopItems() : localOpenItems();
   if (cur === "open") {
     svRooms().forEach(function (r) {
+      if (isLive(r.id)) return;          /* 동시통역방은 통역톡 탭에서만 보인다 */
       items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
     });
   }
@@ -637,8 +638,11 @@ function renderRoom(id) {
   P.waiting = false; P.waitSince = 0; P.waitNames = "";
   var head = "";
   try { head = ""; } catch (e) {}
+  var backTo = isLive(bare(id))
+    ? '<span class="tk-back" data-pt2="lang">‹</span>'
+    : '<span class="tk-back" data-action="talk-tab" data-v="open">‹</span>';
   document.querySelector("#view").innerHTML =
-    '<div class="tk-rhead pt2-fixhead"><span class="tk-back" data-action="talk-tab" data-v="open">‹</span>' +
+    '<div class="tk-rhead pt2-fixhead">' + backTo +
       '<div class="tk-savatar">🍇</div>' +
       '<div class="tk-rh-mid"><div class="tk-hi" id="pt2Title">불러오는 중…</div>' +
         '<div class="tk-hs" id="pt2Sub">서버 방</div></div>' +
@@ -654,7 +658,7 @@ function renderRoom(id) {
         '<input id="tkInput" placeholder="메시지 입력' + (STEP >= 4 ? " · @로 봇 부르기" : "") + '" autocomplete="off">' +
         '<button class="tk-send" data-action="talk-send" data-id="' + esc(id) + '">➤</button>' +
       "</div></div>";
-  markTab("open");
+  markTab(isLive(bare(id)) ? "lang" : "open");
   fitHead();
   requestAnimationFrame(fitHead);          /* 폰트 적용 뒤 한 번 더 */
 
@@ -801,6 +805,75 @@ function markTab(id) {
   });
 }
 
+
+/* ══════════════ 동시통역톡 (통역톡 안의 두 번째 칸) ══════════════
+   서버 방인데 자동번역이 켜진 채로 태어난다.
+   각자 자기 폰에서 자기 언어만 고르면 서로 자기 말로 쓰면 된다. */
+function lseg(){ return LS("pt2_lseg") === "live" ? "live" : "trx"; }
+function liveRooms(){ return LSJ("pt2_live_rooms", []); }
+function liveAdd(sid){
+  var a = liveRooms();
+  if (a.indexOf(sid) < 0) { a.push(sid); LSS("pt2_live_rooms", JSON.stringify(a)); }
+}
+function isLive(sid){ return liveRooms().indexOf(String(sid)) >= 0; }
+
+function segBarHtml(cur){
+  return '<div class="pt2-seg">' +
+    '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기</button>' +
+    '<button class="' + (cur === "live" ? "on" : "") + '" data-pt2="lseg" data-v="live">💬 동시통역톡</button>' +
+  "</div>";
+}
+
+function renderLive(){
+  var ids = liveRooms();
+  var mine = svRooms().filter(function (r) { return ids.indexOf(r.id) >= 0; });
+  mine.sort(function (a, b) { return (b.last_ts || b.ts || 0) - (a.last_ts || a.ts || 0); });
+
+  var rows = mine.map(function (r) {
+    var last = r.last_body ? ((r.last_nick ? r.last_nick + ": " : "") + r.last_body) : "아직 대화가 없어요";
+    var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
+    return '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
+      '<div class="tk-av trx-av">💬</div>' +
+      '<div class="tk-rmid"><div class="tk-rname">' + esc(r.name) +
+        '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
+        '<span class="trx-pair">' + esc(r.code || "") + "</span></div>" +
+        '<div class="tk-rlast">' + esc(last) + "</div></div>" +
+      '<div class="tk-rmeta"><span class="tk-rtime">' + esc(t) + "</span>" +
+        (svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>";
+  }).join("");
+
+  var head = ""; try { head = tkHeader("통역톡", "💬 동시통역"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head + segBarHtml("live") +
+    '<div class="trx-lead">서로 <b>떨어져 있을 때</b> 쓰는 통역입니다. 각자 자기 폰에서 <b>자기 말로만</b> 쓰면, 상대 화면에는 그 사람 언어로 번역돼 보여요.<br>' +
+    '내 언어: <b>' + trxFlag(myLang()) + " " + trxName(myLang()) + '</b> · 아래에서 바꿀 수 있어요</div>' +
+    '<div class="tk-field"><label>내 언어</label><select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + "</select></div>" +
+    '<div class="tk-tools" style="margin-top:12px">' +
+      '<button class="tk-tool primary" data-pt2="live-new">＋ 1:1 동시통역 만들기</button>' +
+      '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
+    "</div>" +
+    (rows ? '<div class="tk-list">' + rows + "</div>"
+          : '<div class="tk-empty"><div class="ee">💬</div>아직 통역방이 없어요.<br>＋ 를 눌러 바로 만드세요. 초대 코드만 알려주면 상대가 들어옵니다.</div>');
+  markTab("lang");
+}
+
+/* 만들면 바로 자동번역이 켜진 방이 생긴다 */
+function liveNew(){
+  if (!on()) { say("설정에서 서버 연결을 먼저 켜주세요"); return; }
+  say("통역방을 만드는 중…");
+  api("/talk/room/create", { body: {
+    name: "1:1 동시통역", intro: "각자 자기 말로 쓰면 상대 언어로 번역됩니다",
+    type: "general", uid: myUid(), nick: myNick(), is_private: 1, emoji: "💬"
+  }}).then(function (d) {
+    if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
+    saveToken(d.id, d.token);
+    liveAdd(d.id);
+    trSetOn(PFX + d.id, true);            /* 자동번역을 켠 채로 시작 */
+    refreshRooms();
+    location.hash = "#/talk/room/" + PFX + d.id;
+    setTimeout(function () { say("초대 코드를 상대에게 알려주면 바로 들어와요"); }, 900);
+  });
+}
+
 /* ══════════════ 알림 목록 ══════════════
    index5 원본은 항목에 data-action 을 붙이지 않아 눌러도 아무 일이 없고,
    로컬 방만 훑어서 서버 방 알림은 아예 나오지 않는다. 둘 다 고친다. */
@@ -856,7 +929,17 @@ function renderAlarm() {
 
 /* ══════════════ STEP 5 · 과제 · 방 설정 ══════════════ */
 window.renderTalk = function (sub, arg) {
-  if (sub === "trans") return arg ? trxRoom(arg) : trxList();
+  if (sub === "trans") {
+    if (arg) return trxRoom(arg);
+    if (lseg() === "live") {
+      renderLive();
+      if (on()) refreshRooms(function () {
+        if (location.hash.indexOf("#/talk/trans") === 0 && lseg() === "live") renderLive();
+      });
+      return;
+    }
+    return trxList();
+  }
   if (sub === "transset" && arg) return trxSettings(arg);
   if (sub === "lang") { location.replace("#/talk/trans"); return; }
   if (STEP >= 5 && on() && sub === "tasks" && arg) return renderTasks(arg);
@@ -1477,8 +1560,8 @@ function trxList(){
         '<div class="tk-rlast">'+esc(lastText.length>34?lastText.slice(0,34)+"…":lastText)+"</div></div>"+
       '<div class="tk-rmeta"><span class="tk-rtime">'+esc(t)+"</span></div></div>";
   }).join("");
-  var head=""; try{ head=tkHeader("통역톡","🌍 통역방"); }catch(e){}
-  document.querySelector("#view").innerHTML = head +
+  var head=""; try{ head=tkHeader("통역톡","🔄 마주보기"); }catch(e){}
+  document.querySelector("#view").innerHTML = head + segBarHtml("trx") +
     '<div class="trx-lead">한 방에서 <b>각자 자기 말로</b> 씁니다. 상대에게는 <b>그 사람 언어로</b> 번역돼 보여요.<br>'+
     '마이크를 누르면 말한 대로 옮겨 보내고, 상대 말은 폰이 읽어줍니다.</div>'+
     '<div class="tk-tools"><button class="tk-tool primary" data-action="trx-new">＋ 통역방 만들기</button></div>'+
@@ -1735,6 +1818,13 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "lang") { location.hash = "#/talk/trans"; return; }
+  if (a === "lseg") {
+    LSS("pt2_lseg", el.getAttribute("data-v") === "live" ? "live" : "trx");
+    if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
+    else location.hash = "#/talk/trans";
+    return;
+  }
+  if (a === "live-new") { liveNew(); return; }
 
   /* STEP 2 */
   if (a === "new-sv")   { newRoomSheet(); return; }
