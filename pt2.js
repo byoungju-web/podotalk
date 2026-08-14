@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=16"></script>
+              <script src="/pt2.js?v=18"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -160,6 +160,62 @@ function rich(s) {
     '#tkMsgs.pt2-scroll > *{flex:0 0 auto;flex-shrink:0;min-height:0;margin-bottom:8px}',
     '#tkMsgs.pt2-scroll > *:last-child{margin-bottom:0}',
     '.pt2-botcard{flex-shrink:0}',
+    '.trx-lead{background:#fff;border:1px solid var(--tk-line);border-radius:14px;padding:13px 14px;font-size:12.8px;line-height:1.65;color:var(--tk-sub);margin-bottom:12px}',
+    '.trx-lead b{color:var(--tk-grape-d)}',
+    '.tk-av.trx-av{background:linear-gradient(135deg,#0ea5e9,#7C3AED);color:#fff}',
+    '.trx-pair{margin-left:6px;font-size:12px;letter-spacing:-1px}',
+    '.trx-wrap{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:70px;bottom:150px;display:flex;flex-direction:column;z-index:1}',
+    '.trx-langbar{flex:0 0 auto;display:flex;align-items:flex-end;gap:8px;background:#fff;border-bottom:1px solid var(--tk-line);padding:10px 12px}',
+    '.trx-lsel{flex:1;min-width:0}',
+    '.trx-lsel label{display:block;font-size:10.5px;font-weight:800;margin:0 0 4px 3px}',
+    '.trx-lsel.a label{color:#B45309}.trx-lsel.b label{color:var(--tk-grape-d)}',
+    '.trx-lsel select{width:100%;font-family:inherit;font-size:13.5px;font-weight:800;padding:10px 8px;border-radius:12px}',
+    '.trx-lsel.a select{background-color:#FEF3C7;border:1.5px solid #FCD34D;color:#92400E}',
+    '.trx-lsel.b select{background-color:#EDE9FE;border:1.5px solid #C4B5FD;color:#5B21B6}',
+    '.trx-swap{flex:0 0 auto;width:38px;height:38px;margin-bottom:1px;border-radius:50%;border:1.5px solid var(--tk-line);background:#fff;font-size:16px}',
+    '.trx-engbar{flex:0 0 auto;display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--tk-line)}',
+    '.trx-eng{flex:1;padding:7px 6px;border-radius:10px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-sub);font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.trx-eng.on{background:var(--tk-soft);border-color:var(--tk-grape);color:var(--tk-grape-d)}',
+    '.trx-msgs{flex:1 1 auto;min-height:0;display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}',
+    '.trx-row{display:flex;margin-bottom:11px}',
+    '.trx-row.a{justify-content:flex-end}.trx-row.b{justify-content:flex-start}',
+    '.trx-row.flip .trx-b{transform:rotate(180deg)}',
+    '.trx-b{max-width:88%;border-radius:16px;padding:11px 13px}',
+    '.trx-row.a .trx-b{background:#FEF9E7;border:1.5px solid #FCD34D}',
+    '.trx-row.b .trx-b{background:#F5F3FF;border:1.5px solid #C4B5FD}',
+    '.trx-who{font-size:11px;font-weight:800;color:var(--tk-sub);margin-bottom:5px}',
+    '.trx-lg{font-size:12px}',
+    '.trx-src{font-size:12.5px;color:#7b7b8c;line-height:1.5;margin-bottom:5px;word-break:break-word}',
+    '.trx-dst{font-size:17px;font-weight:800;line-height:1.5;word-break:break-word}',
+    '.trx-row.a .trx-dst{color:#92400E}.trx-row.b .trx-dst{color:#5B21B6}',
+    '.trx-dots{margin-left:6px;font-size:11px;opacity:.5}',
+    '.trx-foot{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10.5px;color:var(--tk-sub)}',
+    '.trx-foot span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.trx-mini{flex:0 0 auto;border:1px solid var(--tk-line);background:#fff;border-radius:9px;padding:4px 8px;font-size:10.5px;font-weight:800;color:var(--tk-sub)}',
+    '.trx-empty{text-align:center;color:var(--tk-sub);font-size:13px;line-height:1.7;padding:44px 10px}',
+    '.trx-ee{font-size:38px;margin-bottom:10px}',
+    '.trx-bar{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;background:#fff;border-top:1px solid var(--tk-line);padding:9px 11px 11px;z-index:30}',
+    '.trx-turn{display:flex;gap:7px;margin-bottom:7px}',
+    '.trx-t{flex:1;padding:9px 6px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-sub);font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.trx-t.on.a{background:#FEF3C7;border-color:#F59E0B;color:#92400E}',
+    '.trx-t.on.b{background:#EDE9FE;border-color:var(--tk-grape);color:#5B21B6}',
+    '.trx-hint{font-size:11px;color:var(--tk-grape-d);font-weight:700;min-height:14px;margin:0 0 5px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.trx-inrow{display:flex;gap:7px;align-items:center}',
+    '.trx-inrow input{flex:1;min-width:0;border:1.5px solid var(--tk-line);border-radius:22px;padding:11px 15px;font-size:14.5px;font-family:inherit;outline:none;background:#FAF8FF}',
+    '.trx-mic,.trx-send{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;font-size:17px}',
+    '.trx-mic{background:var(--tk-soft);color:var(--tk-grape-d)}',
+    '.trx-mic.rec{background:#EF4444;color:#fff;animation:trxpulse 1s infinite}',
+    '@keyframes trxpulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 9px rgba(239,68,68,0)}}',
+    '.trx-send{background:var(--tk-grape);color:#fff}',
+    '.tk-ract.on{background:var(--tk-soft)}',
+    '.trx-set{padding:14px 12px calc(90px + env(safe-area-inset-bottom,0px))}',
+    '.trx-set label{display:block;font-size:11.5px;font-weight:800;color:var(--tk-sub);margin:14px 3px 6px}',
+    '.trx-set input{width:100%;box-sizing:border-box;border:1.5px solid var(--tk-line);border-radius:12px;padding:12px 14px;font-size:14.5px;font-family:inherit;outline:none}',
+    '.trx-set .cta{margin-top:18px}',
+    '.trx-set .cta.trx-ghost{background:#fff;color:#EF4444;border:1.5px solid #FCA5A5;box-shadow:none;margin-top:9px}',
+    '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
+    '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
+    '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
     '.tk-al{cursor:pointer}',
     '.tk-al:active{opacity:.7}',
@@ -258,25 +314,51 @@ function localOpenItems() {
   return out;
 }
 
+/* 오픈채팅 탭 = [ 오픈채팅 | 상점톡 ] 두 칸.
+   상점톡은 예전 '일반채팅'(가게·판매자와의 1:1)을 그대로 옮긴 것이다. */
+function seg() { return LS("pt2_seg") === "shop" ? "shop" : "open"; }
+
+function shopItems() {
+  var out = [];
+  try {
+    talkRooms().forEach(function (r) {
+      if (tkIsBlocked(r) || tkIsPending(r)) return;
+      if (r.type === "open" || r.type === "bot") return;   /* 오픈방·비서는 여기 아님 */
+      var ms = talkMsgs(r.id);
+      var ts = ms.length ? ms[ms.length - 1].ts : (r.ts || 0);
+      out.push({ pin: !!r.pinned, ts: ts, html: roomListItem(r) });
+    });
+  } catch (e) {}
+  return out;
+}
+
 function renderOpen() {
-  var items = localOpenItems();
-  svRooms().forEach(function (r) {
-    items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
-  });
+  var cur = seg();
+  var items = (cur === "shop") ? shopItems() : localOpenItems();
+  if (cur === "open") {
+    svRooms().forEach(function (r) {
+      items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
+    });
+  }
   items.sort(function (a, b) {
     if (a.pin !== b.pin) return a.pin ? -1 : 1;
     return (b.ts || 0) - (a.ts || 0);
   });
 
   var head = "";
-  try { head = tkHeader("오픈채팅", "공개방"); } catch (e) {}
+  try { head = tkHeader(cur === "shop" ? "상점톡" : "오픈채팅", cur === "shop" ? "가게" : "공개방"); } catch (e) {}
+  var segBar =
+    '<div class="pt2-seg">' +
+      '<button class="' + (cur === "open" ? "on" : "") + '" data-pt2="seg" data-v="open">🗨️ 오픈채팅</button>' +
+      '<button class="' + (cur === "shop" ? "on" : "") + '" data-pt2="seg" data-v="shop">🏪 상점톡</button>' +
+    "</div>";
   var say_ =
     '<div class="tk-say">' +
       '<input id="tkSay" class="tk-say-in" placeholder="방 이름 말하거나 입력 → 바로 이동" autocomplete="off">' +
       '<button class="tk-say-mic" data-action="talk-say-mic" id="tkSayMic">🎙️</button>' +
       '<button class="tk-say-go" data-action="talk-say-go">이동</button>' +
     "</div>";
-  var tools =
+  var tools = (cur === "shop") ? "" :
     '<div class="tk-tools">' +
       '<button class="tk-tool primary" data-pt2="new-sv">＋ 방 만들기</button>' +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
@@ -285,12 +367,15 @@ function renderOpen() {
       '<button class="tk-tool" data-action="talk-new" data-mode="group">📱 이 기기에만 만들기</button>' +
       '<button class="tk-tool" data-action="talk-join-code">🔑 초대 링크로 입장</button>' +
     "</div>";
+  var empty = (cur === "shop")
+    ? '<div class="tk-empty"><div class="ee">🏪</div>가게와 나눈 대화가 없어요.<br>상점에서 문의하기를 누르면 여기에 생겨요.</div>'
+    : '<div class="tk-empty"><div class="ee">💬</div>방이 없어요. 새로 만들어보세요!</div>';
   var body = items.length
     ? '<div class="tk-list" id="tkList">' + items.map(function (x) { return x.html; }).join("") + "</div>"
-    : '<div class="tk-empty"><div class="ee">💬</div>방이 없어요. 새로 만들어보세요!</div>';
+    : empty;
 
-  document.querySelector("#view").innerHTML = head + say_ + tools + body;
-  try { setTalkTab("open"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head + segBar + say_ + tools + body;
+  markTab("open");
   var sy = document.getElementById("tkSay");
   if (sy) sy.addEventListener("keydown", function (e) {
     if (e.key === "Enter") { e.preventDefault(); try { runTalkSay(); } catch (_e) {} }
@@ -312,10 +397,11 @@ function refreshRooms(cb) {
 }
 
 window.renderTalkList = function (kind) {
-  if (STEP >= 2 && on() && kind === "open") {
-    renderOpen();                                  /* 캐시로 즉시 그리고 */
-    refreshRooms(function () {                     /* 서버 응답 오면 다시 */
-      if (location.hash.indexOf("#/talk/open") === 0) renderOpen();
+  if (STEP >= 2 && (kind === "open" || kind === "general")) {
+    if (kind === "general") LSS("pt2_seg", "shop");   /* 옛 '일반채팅' 진입 → 상점톡 칸 */
+    renderOpen();                                    /* 캐시로 즉시 그리고 */
+    if (on()) refreshRooms(function () {              /* 서버 응답 오면 다시 */
+      if (location.hash.indexOf("#/talk/open") === 0 || location.hash === "#/talk") renderOpen();
     });
     return;
   }
@@ -479,7 +565,7 @@ function renderRoom(id) {
         '<input id="tkInput" placeholder="메시지 입력' + (STEP >= 4 ? " · @로 봇 부르기" : "") + '" autocomplete="off">' +
         '<button class="tk-send" data-action="talk-send" data-id="' + esc(id) + '">➤</button>' +
       "</div></div>";
-  try { setTalkTab("open"); } catch (e) {}
+  markTab("open");
   fitHead();
   requestAnimationFrame(fitHead);          /* 폰트 적용 뒤 한 번 더 */
 
@@ -602,6 +688,29 @@ function chaseBot() {
   })();
 }
 
+/* ══════════════ 하단 탭 재구성 ══════════════
+   쇼핑 · 채팅 · 통역톡 · 오픈채팅 · 설정 (5칸 유지)
+   기존 '일반채팅'은 오픈채팅 안의 '상점톡' 칸으로 옮긴다.
+   index.html 은 건드리지 않고 여기서 버튼만 다시 그린다. */
+function fixTabbar() {
+  var bar = document.getElementById("talkbar");
+  if (!bar || bar.getAttribute("data-pt2") === "1") return;
+  bar.setAttribute("data-pt2", "1");
+  bar.innerHTML =
+    '<button data-action="nav" data-to="#/" id="tk-tab-home"><span class="ti">🏠</span>쇼핑</button>' +
+    '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
+    '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
+    '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">🗨️</span>오픈채팅</button>' +
+    '<button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>';
+}
+function markTab(id) {
+  fixTabbar();
+  ["home", "direct", "lang", "open", "settings"].forEach(function (t) {
+    var b = document.getElementById("tk-tab-" + t);
+    if (b) b.classList.toggle("on", t === id);
+  });
+}
+
 /* ══════════════ 알림 목록 ══════════════
    index5 원본은 항목에 data-action 을 붙이지 않아 눌러도 아무 일이 없고,
    로컬 방만 훑어서 서버 방 알림은 아예 나오지 않는다. 둘 다 고친다. */
@@ -652,11 +761,14 @@ function renderAlarm() {
   var head = "";
   try { head = tkHeader("알림", "포도톡"); } catch (e) {}
   document.querySelector("#view").innerHTML = head + body;
-  try { setTalkTab("alarm"); } catch (e) {}
+  markTab("");
 }
 
 /* ══════════════ STEP 5 · 과제 · 방 설정 ══════════════ */
 window.renderTalk = function (sub, arg) {
+  if (sub === "trans") return arg ? trxRoom(arg) : trxList();
+  if (sub === "transset" && arg) return trxSettings(arg);
+  if (sub === "lang") { location.replace("#/talk/trans"); return; }
   if (STEP >= 5 && on() && sub === "tasks" && arg) return renderTasks(arg);
   if (STEP >= 2 && on() && sub === "alarm") {
     renderAlarm();
@@ -678,7 +790,7 @@ function renderTasks(id) {
     '<div class="tk-field"><label>새 과제</label><input id="pt2TaskT" maxlength="100" placeholder="예: 3과 단어 외우기" autocomplete="off"></div>' +
     '<button class="cta grape" data-pt2="task-add" data-id="' + esc(id) + '">과제 추가</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="talk-open" data-id="' + esc(id) + '">방으로 돌아가기</button>';
-  try { setTalkTab("open"); } catch (e) {}
+  markTab("open");
   drawTasks(id);
 }
 
@@ -1009,6 +1121,472 @@ function uploadRoom(localId) {
   });
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   🌍 통역톡 — 방 자체가 통역기
+     · 한 방에서 두 사람이 각자 자기 말로 쓴다
+     · 상대에게는 그 사람 언어로 번역돼 보인다
+     · 🔄 마주보기를 켜면 상대 말풍선이 180도 돌아 맞은편에서 읽힌다
+     · 🎙️ 를 누르면 말한 대로 옮겨 보내고, 상대 말은 폰이 읽어준다
+   번역: 포도랑 워커(DeepL·GPT) → Google 무료 → MyMemory → 내 AI 키
+   ══════════════════════════════════════════════════════════════ */
+var TRX_API = "https://podolang.hasin7jk.workers.dev";
+var TRXL = [
+  ["KO","한국어","🇰🇷","ko","ko-KR"], ["EN","영어","🇺🇸","en","en-US"],
+  ["VI","베트남어","🇻🇳","vi","vi-VN"], ["ZH","중국어","🇨🇳","zh-CN","zh-CN"],
+  ["TH","태국어","🇹🇭","th","th-TH"], ["JA","일본어","🇯🇵","ja","ja-JP"],
+  ["ID","인도네시아어","🇮🇩","id","id-ID"], ["UZ","우즈베크어","🇺🇿","uz","uz-UZ"],
+  ["NE","네팔어","🇳🇵","ne","ne-NP"], ["MY","미얀마어","🇲🇲","my","my-MM"],
+  ["KM","캄보디아어","🇰🇭","km","km-KH"], ["MN","몽골어","🇲🇳","mn","mn-MN"],
+  ["TL","필리핀어","🇵🇭","tl","fil-PH"], ["RU","러시아어","🇷🇺","ru","ru-RU"],
+  ["ES","스페인어","🇪🇸","es","es-ES"], ["FR","프랑스어","🇫🇷","fr","fr-FR"],
+  ["DE","독일어","🇩🇪","de","de-DE"], ["PT","포르투갈어","🇧🇷","pt","pt-BR"],
+  ["IT","이탈리아어","🇮🇹","it","it-IT"], ["AR","아랍어","🇸🇦","ar","ar-SA"],
+  ["HI","힌디어","🇮🇳","hi","hi-IN"], ["NL","네덜란드어","🇳🇱","nl","nl-NL"],
+  ["TR","터키어","🇹🇷","tr","tr-TR"], ["UK","우크라이나어","🇺🇦","uk","uk-UA"]
+];
+function trxL(c){ for(var i=0;i<TRXL.length;i++){ if(TRXL[i][0]===c) return TRXL[i]; } return TRXL[0]; }
+function trxName(c){ return trxL(c)[1]; }
+function trxFlag(c){ return trxL(c)[2]; }
+function trxG(c){ return trxL(c)[3]; }
+function trxBcp(c){ return trxL(c)[4]; }
+function trxOpts(sel){
+  var h="";
+  for(var i=0;i<TRXL.length;i++){ var x=TRXL[i];
+    h += '<option value="'+x[0]+'"'+(x[0]===sel?" selected":"")+'>'+x[2]+" "+x[1]+"</option>"; }
+  return h;
+}
+
+/* 저장은 원본 localStorage 로. 나라 접두어·정화를 타면 대화가 사라지거나 글자가 깎인다 */
+function trxRooms(){ return LSJ("pt2_trx_rooms", []); }
+function trxSaveRooms(v){ LSS("pt2_trx_rooms", JSON.stringify(v || [])); }
+function trxFind(id){ var r=trxRooms(); for(var i=0;i<r.length;i++){ if(r[i].id===id) return r[i]; } return null; }
+function trxPut(room){
+  var rs=trxRooms(), hit=false;
+  for(var i=0;i<rs.length;i++){ if(rs[i].id===room.id){ rs[i]=room; hit=true; } }
+  if(!hit) rs.unshift(room);
+  trxSaveRooms(rs);
+}
+function trxMsgs(id){ return LSJ("pt2_trx_m_"+id, []); }
+function trxSaveMsgs(id, v){ LSS("pt2_trx_m_"+id, JSON.stringify((v||[]).slice(-300))); }
+function trxFlipOn(){ return LS("pt2_trx_flip") === "1"; }
+function trxEngine(){ return LS("pt2_trx_engine") === "free" ? "free" : "podo"; }
+
+/* ── 번역 엔진 ── */
+function trxTr(text, fromC, toC, ok){
+  var f=trxG(fromC), t=trxG(toC);
+  if(!text || fromC===toC){ ok(text, "원문"); return; }
+  var free=function(){
+    trxGoogle(text,f,t,function(o){ ok(o,"Google"); }, function(){
+      trxMyMemory(text,f,t,function(o){ ok(o,"MyMemory"); }, function(){
+        trxAI(text,fromC,toC,function(o){ ok(o, o?"AI":""); });
+      });
+    });
+  };
+  if(trxEngine()==="free"){ free(); return; }
+  trxPodolang(text, fromC, toC, function(o,e){ ok(o,e); }, free);
+}
+function trxPodolang(text, fromC, toC, ok, fail){
+  try{
+    var to=setTimeout(function(){ to=null; fail(); }, 12000);
+    fetch(TRX_API+"/api/translate", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ text:text, sourceLang:fromC, targetLang:toC }) })
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(d){
+        if(to===null) return; clearTimeout(to);
+        var out = d && d.translated ? String(d.translated).trim() : "";
+        if(!out){ fail(); return; }
+        ok(out, "포도랑·"+(d.engine||"GPT"));
+      })["catch"](function(){ if(to===null) return; clearTimeout(to); fail(); });
+  }catch(e){ fail(); }
+}
+function trxGoogle(text, f, t, ok, fail){
+  try{
+    var u="https://translate.googleapis.com/translate_a/single?client=gtx&sl="+encodeURIComponent(f)+
+          "&tl="+encodeURIComponent(t)+"&dt=t&q="+encodeURIComponent(text);
+    var to=setTimeout(function(){ to=null; fail(); }, 8000);
+    fetch(u).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){
+      if(to===null) return; clearTimeout(to);
+      var seg=d&&d[0]; if(!seg||!seg.length){ fail(); return; }
+      var out=""; for(var i=0;i<seg.length;i++) out+=(seg[i][0]||"");
+      out=out.trim(); if(!out){ fail(); return; }
+      ok(out);
+    })["catch"](function(){ if(to===null) return; clearTimeout(to); fail(); });
+  }catch(e){ fail(); }
+}
+function trxMyMemory(text, f, t, ok, fail){
+  try{
+    var u="https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+
+          "&langpair="+encodeURIComponent(f+"|"+t);
+    var to=setTimeout(function(){ to=null; fail(); }, 8000);
+    fetch(u).then(function(r){ return r.json(); }).then(function(d){
+      if(to===null) return; clearTimeout(to);
+      var x=d&&d.responseData&&d.responseData.translatedText;
+      if(x && !/MYMEMORY WARNING|INVALID|NO QUERY/i.test(x)) ok(String(x).trim()); else fail();
+    })["catch"](function(){ if(to===null) return; clearTimeout(to); fail(); });
+  }catch(e){ fail(); }
+}
+function trxAI(text, fromC, toC, done){
+  var has=false; try{ has=!!getKey(); }catch(e){}
+  if(!has){ done(""); return; }
+  var sys="You are a live interpreter for a small business. Translate the message from "+
+    trxName(fromC)+" into "+trxName(toC)+
+    ". Keep it natural spoken workplace language. Keep numbers, times, prices, product codes and proper names exactly as written. "+
+    "Return ONLY the translated sentence with no quotes and no explanation.";
+  try{
+    aiComplete({ system:sys, blocks:[{type:"text", text:text}], max_tokens:600, temperature:0 })
+      .then(function(t){ done(String(t||"").trim()); })["catch"](function(){ done(""); });
+  }catch(e){ done(""); }
+}
+
+/* ── 폰이 읽어주기 ── */
+function trxSay(text, langC){
+  if(!text || !window.speechSynthesis) return;
+  try{
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang=trxBcp(langC); u.rate=1.0;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ── 마이크 ① 폰 받아쓰기 ── */
+var trxRec=null;
+function trxMicSupported(){ return !!(window.SpeechRecognition||window.webkitSpeechRecognition); }
+function trxMicStop(){
+  if(trxRec){ try{ trxRec.stop(); }catch(e){} }
+  trxRec=null;
+  var b=document.getElementById("trxMic"); if(b) b.classList.remove("rec");
+  var h=document.getElementById("trxHint"); if(h) h.textContent="";
+}
+function trxMicStart(id){
+  var r=trxFind(id); if(!r) return;
+  if(trxMR){ trxSrvStop(); return; }
+  if(trxRec){ trxMicStop(); return; }
+  if(!trxMicSupported()){ trxSrvStart(id); return; }
+  var side=r.turn||"a";
+  var lang=(side==="a")?r.aLang:r.bLang;
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  try{
+    trxRec=new SR();
+    trxRec.lang=trxBcp(lang);
+    trxRec.interimResults=true;
+    trxRec.continuous=false;
+    var got="";
+    trxRec.onresult=function(ev){
+      var interim="";
+      for(var i=ev.resultIndex;i<ev.results.length;i++){
+        var t=ev.results[i][0].transcript;
+        if(ev.results[i].isFinal) got+=t; else interim+=t;
+      }
+      var inp=document.getElementById("trxInput"); if(inp) inp.value=(got+interim).trim();
+    };
+    trxRec.onerror=function(){ trxMicStop(); };
+    trxRec.onend=function(){
+      var inp=document.getElementById("trxInput");
+      var v=inp?(inp.value||"").trim():"";
+      trxMicStop();
+      if(v) trxSend(id);
+    };
+    trxRec.start();
+    var b=document.getElementById("trxMic"); if(b) b.classList.add("rec");
+    var h=document.getElementById("trxHint");
+    if(h) h.textContent="🎙️ "+trxFlag(lang)+" "+trxName(lang)+"로 듣는 중… 말이 끝나면 자동으로 보냅니다";
+  }catch(e){ trxMicStop(); say("마이크를 시작할 수 없어요"); }
+}
+
+/* ── 마이크 ② 포도랑 서버 (아이폰·사파리처럼 받아쓰기가 없는 기기) ── */
+var trxMR=null, trxChunks=[];
+function trxSrvStop(){
+  try{ if(trxMR && trxMR.state!=="inactive") trxMR.stop(); }catch(e){}
+  var b=document.getElementById("trxMic"); if(b) b.classList.remove("rec");
+}
+function trxSrvStart(id){
+  var r=trxFind(id); if(!r) return;
+  if(trxMR){ trxSrvStop(); return; }
+  if(!navigator.mediaDevices || !window.MediaRecorder){ say("이 브라우저는 녹음을 지원하지 않아요"); return; }
+  var side=r.turn||"a";
+  var from=(side==="a")?r.aLang:r.bLang;
+  var to  =(side==="a")?r.bLang:r.aLang;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+    trxChunks=[];
+    trxMR=new MediaRecorder(st);
+    trxMR.ondataavailable=function(e){ if(e.data && e.data.size) trxChunks.push(e.data); };
+    trxMR.onstop=function(){
+      try{ st.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+      var blob=new Blob(trxChunks,{type:"audio/webm"});
+      trxMR=null;
+      var b=document.getElementById("trxMic"); if(b) b.classList.remove("rec");
+      if(blob.size<1500){ var h0=document.getElementById("trxHint"); if(h0) h0.textContent=""; return; }
+      trxSrvSend(id, blob, side, from, to);
+    };
+    trxMR.start();
+    var b=document.getElementById("trxMic"); if(b) b.classList.add("rec");
+    var h=document.getElementById("trxHint");
+    if(h) h.textContent="🎙️ "+trxFlag(from)+" 녹음 중… 다 말했으면 🎙️ 를 다시 누르세요";
+  })["catch"](function(){ say("마이크 권한을 확인해주세요"); });
+}
+function trxSrvSend(id, blob, side, from, to){
+  var h=document.getElementById("trxHint"); if(h) h.textContent="🍇 포도랑이 알아듣는 중…";
+  var msgs=trxMsgs(id);
+  msgs.push({ side:side, src:"(음성)", dst:"", engine:"", pending:true, ts:Date.now() });
+  trxSaveMsgs(id, msgs);
+  var at=msgs.length-1;
+  trxRoom(id);
+  var fd=new FormData();
+  fd.append("audio", blob, "voice.webm");
+  fd.append("sourceLang", from);
+  fd.append("targetLang", to);
+  fetch(TRX_API+"/api/podolang", { method:"POST", body:fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.error) throw new Error(d.error);
+      var m2=trxMsgs(id);
+      if(m2[at]){
+        m2[at].src=d.original||"(음성)";
+        m2[at].dst=d.translated||"";
+        m2[at].engine="포도랑·"+(d.engine||"GPT");
+        m2[at].pending=false;
+        trxSaveMsgs(id,m2);
+      }
+      if(location.hash.indexOf("#/talk/trans/"+id)===0) trxRoom(id);
+      if(d.audioBase64){ try{ new Audio("data:audio/mpeg;base64,"+d.audioBase64).play(); }catch(e){} }
+      else if(d.translated){ trxSay(d.translated, to); }
+    })["catch"](function(e){
+      var m3=trxMsgs(id);
+      if(m3[at]){ m3.splice(at,1); trxSaveMsgs(id,m3); }
+      if(location.hash.indexOf("#/talk/trans/"+id)===0) trxRoom(id);
+      say((e&&e.message)||"음성을 알아듣지 못했어요");
+    });
+}
+
+/* ── 방 목록 ── */
+function trxList(){
+  var rs=trxRooms();
+  if(!rs.length){
+    trxPut({ id:"trx"+Date.now(), name:"우리 가게 통역방", aName:"사장님", bName:"직원",
+             aLang:"KO", bLang:"VI", turn:"a", ts:Date.now() });
+    rs=trxRooms();
+  }
+  rs.sort(function(a,b){
+    var am=trxMsgs(a.id), bm=trxMsgs(b.id);
+    return ((bm.length?bm[bm.length-1].ts:b.ts)-(am.length?am[am.length-1].ts:a.ts));
+  });
+  var rows=rs.map(function(r){
+    var m=trxMsgs(r.id), last=m.length?m[m.length-1]:null;
+    var lastText=last?(last.src||""):"두 사람의 언어를 고르고 바로 시작하세요";
+    var t=""; try{ t=last?relTime(last.ts):""; }catch(e){}
+    return '<div class="tk-room" data-action="trx-open" data-id="'+esc(r.id)+'">'+
+      '<div class="tk-av trx-av">🌍</div>'+
+      '<div class="tk-rmid"><div class="tk-rname">'+esc(r.name)+
+        '<span class="trx-pair">'+trxFlag(r.aLang)+"⇄"+trxFlag(r.bLang)+"</span></div>"+
+        '<div class="tk-rlast">'+esc(lastText.length>34?lastText.slice(0,34)+"…":lastText)+"</div></div>"+
+      '<div class="tk-rmeta"><span class="tk-rtime">'+esc(t)+"</span></div></div>";
+  }).join("");
+  var head=""; try{ head=tkHeader("통역톡","🌍 통역방"); }catch(e){}
+  document.querySelector("#view").innerHTML = head +
+    '<div class="trx-lead">한 방에서 <b>각자 자기 말로</b> 씁니다. 상대에게는 <b>그 사람 언어로</b> 번역돼 보여요.<br>'+
+    '마이크를 누르면 말한 대로 옮겨 보내고, 상대 말은 폰이 읽어줍니다.</div>'+
+    '<div class="tk-tools"><button class="tk-tool primary" data-action="trx-new">＋ 통역방 만들기</button></div>'+
+    '<div class="tk-list">'+rows+"</div>";
+  markTab("lang");
+}
+function trxNew(){
+  var id="trx"+Date.now();
+  trxPut({ id:id, name:"새 통역방", aName:"사장님", bName:"직원",
+           aLang:"KO", bLang:"VI", turn:"a", ts:Date.now() });
+  location.hash="#/talk/trans/"+id;
+}
+
+/* ── 방 화면 ── */
+function trxRoom(id){
+  var r=trxFind(id);
+  if(!r){ location.hash="#/talk/trans"; return; }
+  var flip=trxFlipOn();
+  var msgs=trxMsgs(id);
+  var rows=msgs.map(function(m,i){
+    var mine=(m.side==="a");
+    var who = mine ? r.aName : r.bName;
+    var srcL= mine ? r.aLang : r.bLang;
+    var dstL= mine ? r.bLang : r.aLang;
+    var big = m.dst || m.src;
+    var pend= m.pending ? '<span class="trx-dots">●●●</span>' : "";
+    var cls = "trx-row "+(mine?"a":"b")+((flip&&!mine)?" flip":"");
+    return '<div class="'+cls+'"><div class="trx-b">'+
+      '<div class="trx-who">'+esc(who)+' <span class="trx-lg">'+trxFlag(srcL)+"</span></div>"+
+      '<div class="trx-src">'+esc(m.src)+"</div>"+
+      '<div class="trx-dst">'+trxFlag(dstL)+" "+esc(big)+pend+"</div>"+
+      '<div class="trx-foot"><span>'+trxName(srcL)+" → "+trxName(dstL)+(m.engine?" · "+esc(m.engine):"")+"</span>"+
+        '<button class="trx-mini" data-action="trx-say" data-id="'+esc(id)+'" data-i="'+i+'">🔊 듣기</button>'+
+        '<button class="trx-mini" data-action="trx-copy" data-id="'+esc(id)+'" data-i="'+i+'">복사</button></div>'+
+      "</div></div>";
+  }).join("");
+  if(!rows) rows='<div class="trx-empty"><div class="trx-ee">🌍</div>아래에서 <b>말하는 사람</b>을 고르고<br>자기 말로 쓰거나 🎙️ 를 누르세요</div>';
+  var turn=r.turn||"a";
+  document.querySelector("#view").innerHTML =
+    '<div class="tk-rhead pt2-fixhead"><span class="tk-back" data-pt2="lang">‹</span>'+
+      '<div class="tk-savatar">🌍</div>'+
+      '<div class="tk-rh-mid"><div class="tk-hi">'+esc(r.name)+"</div>"+
+        '<div class="tk-hs">'+trxFlag(r.aLang)+" "+trxName(r.aLang)+" ⇄ "+trxFlag(r.bLang)+" "+trxName(r.bLang)+"</div></div>"+
+      '<div class="tk-racts">'+
+        '<button class="tk-ract'+(flip?" on":"")+'" data-action="trx-flip" data-id="'+esc(id)+'" title="마주보기">🔄</button>'+
+        '<button class="tk-ract" data-action="trx-set" data-id="'+esc(id)+'">⚙️</button>'+
+      "</div></div>"+
+    '<div class="trx-wrap" id="trxWrap">'+
+      '<div class="trx-langbar">'+
+        '<div class="trx-lsel a"><label>'+esc(r.aName)+"</label>"+
+          '<select id="trxA" data-action="trx-lang" data-id="'+esc(id)+'" data-w="a">'+trxOpts(r.aLang)+"</select></div>"+
+        '<button class="trx-swap" data-action="trx-swap" data-id="'+esc(id)+'">⇄</button>'+
+        '<div class="trx-lsel b"><label>'+esc(r.bName)+"</label>"+
+          '<select id="trxB" data-action="trx-lang" data-id="'+esc(id)+'" data-w="b">'+trxOpts(r.bLang)+"</select></div>"+
+      "</div>"+
+      '<div class="trx-engbar">'+
+        '<button class="trx-eng'+(trxEngine()==="podo"?" on":"")+'" data-action="trx-eng" data-v="podo" data-id="'+esc(id)+'">🍇 포도랑 정밀번역</button>'+
+        '<button class="trx-eng'+(trxEngine()==="free"?" on":"")+'" data-action="trx-eng" data-v="free" data-id="'+esc(id)+'">⚡ 무료 번역</button>'+
+      "</div>"+
+      '<div class="trx-msgs" id="trxMsgs">'+rows+"</div>"+
+    "</div>"+
+    '<div class="trx-bar">'+
+      '<div class="trx-turn">'+
+        '<button class="trx-t'+(turn==="a"?" on a":"")+'" data-action="trx-turn" data-id="'+esc(id)+'" data-w="a">'+trxFlag(r.aLang)+" "+esc(r.aName)+"</button>"+
+        '<button class="trx-t'+(turn==="b"?" on b":"")+'" data-action="trx-turn" data-id="'+esc(id)+'" data-w="b">'+trxFlag(r.bLang)+" "+esc(r.bName)+"</button>"+
+      "</div>"+
+      '<div class="trx-hint" id="trxHint"></div>'+
+      '<div class="trx-inrow">'+
+        '<input id="trxInput" autocomplete="off" placeholder="'+esc(turn==="a"?trxName(r.aLang):trxName(r.bLang))+'로 입력하세요">'+
+        '<button class="trx-mic" id="trxMic" data-action="trx-mic" data-id="'+esc(id)+'">🎙️</button>'+
+        '<button class="trx-send" data-action="trx-send" data-id="'+esc(id)+'">➤</button>'+
+      "</div></div>";
+  markTab("lang");
+  trxFit();
+  requestAnimationFrame(trxFit);
+  trxBottom();
+  var inp=document.getElementById("trxInput");
+  if(inp) inp.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); trxSend(id); } });
+}
+/* 위(헤더)와 아래(입력바)를 실제로 재서 가운데 목록 높이를 맞춘다 */
+function trxFit(){
+  var h=document.querySelector(".pt2-fixhead");
+  var w=document.getElementById("trxWrap");
+  var bar=document.querySelector(".trx-bar");
+  if(!h||!w) return;
+  w.style.top=h.offsetHeight+"px";
+  var vh=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+  if(bar){ var rc=bar.getBoundingClientRect(); w.style.bottom=Math.max(0,Math.round(vh-rc.top))+"px"; }
+}
+window.addEventListener("resize", function(){ if(location.hash.indexOf("#/talk/trans/")===0) trxFit(); });
+try{ if(window.visualViewport) window.visualViewport.addEventListener("resize", function(){
+  if(location.hash.indexOf("#/talk/trans/")===0) trxFit(); }); }catch(e){}
+function trxBottom(){ try{ var b=document.getElementById("trxMsgs"); if(b) b.scrollTop=b.scrollHeight; }catch(e){} }
+
+/* ── 보내기 ── */
+function trxSend(id){
+  var r=trxFind(id); if(!r) return;
+  var inp=document.getElementById("trxInput"); if(!inp) return;
+  var text=(inp.value||"").trim(); if(!text) return;
+  var side=r.turn||"a";
+  var from=(side==="a")?r.aLang:r.bLang;
+  var to  =(side==="a")?r.bLang:r.aLang;
+  var msgs=trxMsgs(id);
+  msgs.push({ side:side, src:text, dst:"", engine:"", pending:true, ts:Date.now() });
+  trxSaveMsgs(id, msgs);
+  inp.value="";
+  trxRoom(id);
+  var at=msgs.length-1;
+  trxTr(text, from, to, function(out, eng){
+    var m2=trxMsgs(id);
+    if(m2[at]){ m2[at].dst=out||text; m2[at].engine=eng||""; m2[at].pending=false; trxSaveMsgs(id,m2); }
+    if(location.hash.indexOf("#/talk/trans/"+id)===0) trxRoom(id);
+    if(out) trxSay(out, to);
+  });
+}
+
+/* ── 방 설정 ── */
+function trxSettings(id){
+  var r=trxFind(id); if(!r) return;
+  document.querySelector("#view").innerHTML =
+    '<div class="tk-rhead"><span class="tk-back" data-action="trx-open" data-id="'+esc(id)+'">‹</span>'+
+      '<div class="tk-rh-mid"><div class="tk-hi">통역방 설정</div><div class="tk-hs">'+esc(r.name)+"</div></div></div>"+
+    '<div class="trx-set">'+
+      "<label>방 이름</label><input id=\"trxSN\" value=\""+esc(r.name)+"\">"+
+      "<label>왼쪽 사람 이름</label><input id=\"trxAN\" value=\""+esc(r.aName)+"\">"+
+      "<label>오른쪽 사람 이름</label><input id=\"trxBN\" value=\""+esc(r.bName)+"\">"+
+      '<button class="cta grape" data-action="trx-save" data-id="'+esc(id)+'">저장</button>'+
+      '<button class="cta trx-ghost" data-action="trx-del" data-id="'+esc(id)+'">이 통역방 삭제</button>'+
+    "</div>";
+  markTab("lang");
+}
+
+/* ── 통역톡 클릭 ── */
+document.addEventListener("click", function(e){
+  var el=e.target && e.target.closest ? e.target.closest("[data-action]") : null;
+  if(!el) return;
+  var a=el.getAttribute("data-action");
+  if(!a || a.indexOf("trx-")!==0) return;
+  var id=el.getAttribute("data-id");
+  if(a==="trx-new"){ trxNew(); return; }
+  if(a==="trx-open"){ location.hash="#/talk/trans/"+id; return; }
+  if(a==="trx-send"){ trxSend(id); return; }
+  if(a==="trx-mic"){ trxMicStart(id); return; }
+  if(a==="trx-eng"){
+    var v=el.getAttribute("data-v");
+    LSS("pt2_trx_engine", v==="free"?"free":"podo");
+    trxRoom(id);
+    say(v==="podo" ? "🍇 포도랑 정밀번역으로 바꿨어요" : "⚡ 무료 번역으로 바꿨어요");
+    return;
+  }
+  if(a==="trx-set"){ location.hash="#/talk/transset/"+id; return; }
+  if(a==="trx-flip"){ LSS("pt2_trx_flip", trxFlipOn()?"0":"1"); trxRoom(id||(location.hash.split("/")[3]||"")); return; }
+  if(a==="trx-turn"){
+    var r=trxFind(id); if(!r) return;
+    r.turn=el.getAttribute("data-w"); trxPut(r); trxRoom(id);
+    var i2=document.getElementById("trxInput"); if(i2){ try{ i2.focus(); }catch(e2){} }
+    return;
+  }
+  if(a==="trx-swap"){
+    var r2=trxFind(id); if(!r2) return;
+    var t=r2.aLang; r2.aLang=r2.bLang; r2.bLang=t; trxPut(r2); trxRoom(id);
+    say("두 언어를 서로 바꿨어요"); return;
+  }
+  if(a==="trx-say"){
+    var r3=trxFind(id); if(!r3) return;
+    var m=trxMsgs(id)[parseInt(el.getAttribute("data-i"),10)]; if(!m) return;
+    trxSay(m.dst||m.src, m.side==="a"?r3.bLang:r3.aLang); return;
+  }
+  if(a==="trx-copy"){
+    var m2=trxMsgs(id)[parseInt(el.getAttribute("data-i"),10)]; if(!m2) return;
+    try{ copyText(m2.dst||m2.src); say("번역문을 복사했어요"); }catch(e3){}
+    return;
+  }
+  if(a==="trx-save"){
+    var r4=trxFind(id); if(!r4) return;
+    var n=document.getElementById("trxSN"), an=document.getElementById("trxAN"), bn=document.getElementById("trxBN");
+    r4.name=((n&&n.value)||"").trim()||r4.name;
+    r4.aName=((an&&an.value)||"").trim()||r4.aName;
+    r4.bName=((bn&&bn.value)||"").trim()||r4.bName;
+    trxPut(r4); say("저장했어요"); location.hash="#/talk/trans/"+id; return;
+  }
+  if(a==="trx-del"){
+    if(!confirm("이 통역방과 대화를 삭제할까요?")) return;
+    trxSaveRooms(trxRooms().filter(function(x){ return x.id!==id; }));
+    try{ localStorage.removeItem("pt2_trx_m_"+id); }catch(e4){}
+    location.hash="#/talk/trans"; return;
+  }
+});
+document.addEventListener("change", function(e){
+  var el=e.target;
+  if(!el || !el.getAttribute || el.getAttribute("data-action")!=="trx-lang") return;
+  var id=el.getAttribute("data-id"), w=el.getAttribute("data-w");
+  var r=trxFind(id); if(!r) return;
+  if(w==="a") r.aLang=el.value; else r.bLang=el.value;
+  trxPut(r); trxRoom(id);
+  say(trxFlag(r.aLang)+" "+trxName(r.aLang)+" ⇄ "+trxFlag(r.bLang)+" "+trxName(r.bLang));
+});
+/* 화면을 떠나면 마이크를 확실히 끈다 */
+window.addEventListener("hashchange", function(){
+  if(location.hash.indexOf("#/talk/trans")!==0){ trxMicStop(); trxSrvStop(); }
+});
+
 /* ══════════════ 클릭 처리 ══════════════ */
 document.addEventListener("click", function (e) {
   var el = e.target && e.target.closest ? e.target.closest("[data-pt2]") : null;
@@ -1036,6 +1614,17 @@ document.addEventListener("click", function (e) {
     });
     return;
   }
+
+  /* 탭 · 칸 나누기 */
+  if (a === "seg") {
+    LSS("pt2_seg", el.getAttribute("data-v") === "shop" ? "shop" : "open");
+    renderOpen();
+    if (on()) refreshRooms(function () {
+      if (location.hash.indexOf("#/talk/open") === 0 || location.hash === "#/talk") renderOpen();
+    });
+    return;
+  }
+  if (a === "lang") { location.hash = "#/talk/trans"; return; }
 
   /* STEP 2 */
   if (a === "new-sv")   { newRoomSheet(); return; }
@@ -1212,6 +1801,9 @@ if ("serviceWorker" in navigator) {
 }
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
+try { fixTabbar(); } catch (e) {}
+window.addEventListener("hashchange", function () { try { fixTabbar(); } catch (e) {} });
+
 if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
 
 })();
