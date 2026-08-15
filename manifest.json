@@ -8,7 +8,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FBF8FF",
-  "theme_color": "#7C3AED",
+  "theme_color": "#FFFFFF",
   "lang": "ko",
   "dir": "ltr",
   "categories": ["social", "productivity", "education"],
