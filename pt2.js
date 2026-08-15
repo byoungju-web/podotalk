@@ -6,8 +6,12 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=29"></script>
-              (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
+              <script src="/pt2.js?v=30"></script>
+              (고칠 때마다 v 숫자를 올리면 캐시가 안 물린다)
+
+   ★ 버전 규칙 : 아래 PT2_VER 과 index.html 의 ?v= 숫자를 항상 같게 둔다.
+                 어긋나면 설정 화면이 '캐시 불일치' 라고 직접 알려준다.
+                 index.html 쪽 도장은 window.PODOTALK_BUILD 한 곳에서만 고친다.
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
      1 = 뼈대 + 설정 화면 스위치 (켜기 전엔 지금과 100% 동일)
@@ -23,8 +27,8 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "29";
-var STEP = 6;                                            /* ← 1~7 */
+var PT2_VER = "30";
+var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
 var PFX = "sv_";                                          /* 서버 방 id 접두어 */
@@ -85,6 +89,37 @@ function LSJ(k, d)  { try { var v = JSON.parse(LS(k) || "null"); return v == nul
 })();
 
 function on()      { return STEP >= 1 && LS("pt2_on") === "1"; }
+/* ── 빌드 도장 ──────────────────────────────────────────────────
+   index.html 과 pt2.js 는 따로 캐시된다. 하나만 새로 받아지는 일이
+   잦아서, 화면만 보고는 어느 쪽이 옛 것인지 알 수가 없었다.
+   그래서 ① index.html 이 심어둔 PODOTALK_BUILD 와
+          ② 실제로 실행 중인 이 파일의 PT2_VER 과
+          ③ index.html 이 불러달라고 적어둔 ?v= 숫자
+   셋을 한 줄에 같이 보여준다. ②와 ③이 다르면 캐시가 물린 것이다.
+   ────────────────────────────────────────────────────────────── */
+var APP_BUILD = (function () { try { return window.PODOTALK_BUILD || ""; } catch (e) { return ""; } })();
+var TAG_VER = (function () {
+  try {
+    var s = document.currentScript;
+    if (!s) { var all = document.querySelectorAll('script[src*="pt2.js"]'); s = all[all.length - 1]; }
+    var m = s && /[?&]v=([^&"']+)/.exec(s.getAttribute("src") || "");
+    return m ? m[1] : "";
+  } catch (e) { return ""; }
+})();
+
+function stampHtml() {
+  var s = '앱 <b>' + esc(APP_BUILD || "?") + '</b> · 레이어 <b>PT2 v' + PT2_VER + '</b>';
+  if (TAG_VER && TAG_VER !== PT2_VER) {
+    s += '<div style="margin-top:4px;padding:6px 8px;border-radius:7px;background:#FFF4E5;color:#9A5B00;font-weight:700;line-height:1.45">' +
+         '⚠️ 캐시 불일치<br>index.html 은 <b>v' + esc(TAG_VER) + '</b> 를 불렀는데 ' +
+         '실제로 돈 건 <b>v' + PT2_VER + '</b> 입니다.<br>' +
+         '<span style="font-weight:600">둘 중 하나가 옛 파일이에요. 아래 버튼으로 새로 받아보세요.</span>' +
+         '<button class="cta" style="background:#fff;color:#9A5B00;border:1.5px solid #E9C88F;box-shadow:none;margin-top:7px" data-pt2="hardreload">🔄 캐시 비우고 새로 받기</button>' +
+         '</div>';
+  }
+  return s;
+}
+
 function apiBase() { return (LS("pt2_api") || DEF_API).replace(/\/+$/, ""); }
 function myUid()   { try { return mMe(); } catch (e) { return "u_anon"; } }
 function myNick()  { try { return talkNick() || "포도"; } catch (e) { return "포도"; } }
@@ -105,8 +140,18 @@ function api(path, opt) {
     method: opt.body ? "POST" : "GET",
     headers: h,
     body: opt.body ? JSON.stringify(opt.body) : undefined
-  }).then(function (r) { return r.json(); })
-    .catch(function () { return { ok: false, error: "서버에 연결하지 못했어요" }; });
+  }).then(function (r) {
+    /* 바로 .json() 을 부르면 서버가 그 길을 모를 때(404 HTML) 파싱이 터지고
+       '연결하지 못했어요' 라는 엉뚱한 말이 나온다. 글로 먼저 받아서 가른다. */
+    return r.text().then(function (t) {
+      var j = null;
+      try { j = JSON.parse(t); } catch (e) {}
+      if (j) return j;
+      if (r.status === 404) return { ok: false, error: "서버에 " + path + " 기능이 아직 없어요 (404)" };
+      if (r.status === 401 || r.status === 403) return { ok: false, error: "권한이 없어요 (" + r.status + ")" };
+      return { ok: false, error: "서버 응답을 읽지 못했어요 (" + r.status + ")" };
+    });
+  }).catch(function () { return { ok: false, error: "서버에 연결하지 못했어요" }; });
 }
 
 /* 링크와 @이름, **굵게**만 살리고 나머지는 전부 이스케이프한다.
@@ -254,7 +299,7 @@ function injectSettings() {
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
-    '<div class="pt2-sub" style="margin-top:4px">레이어 버전 <b>PT2 v' + PT2_VER + "</b></div>" +
+    '<div class="pt2-sub" style="margin-top:4px">' + stampHtml() + "</div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
@@ -2024,6 +2069,23 @@ document.addEventListener("click", function (e) {
     return;
   }
 
+  /* 캐시 불일치 경고에서 누르는 버튼.
+     서비스워커 캐시를 비우고, 주소에 시각을 붙여 서버에서 새로 받는다. */
+  if (a === "hardreload") {
+    var go = function () {
+      var u = location.href.split("#")[0].split("?")[0];
+      location.replace(u + "?nocache=" + Date.now() + (location.hash || ""));
+    };
+    try {
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (ks) {
+          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }).then(go, go);
+      } else go();
+    } catch (e) { go(); }
+    return;
+  }
+
   /* 탭 · 칸 나누기 */
   if (a === "seg") {
     LSS("pt2_seg", el.getAttribute("data-v") === "shop" ? "shop" : "open");
@@ -2325,6 +2387,14 @@ if ("serviceWorker" in navigator) {
     location.hash = "#/talk/room/" + PFX + e.data.room_id;
   });
 }
+
+/* 바로가기·북마크로 #/talk/trans 로 바로 들어온 경우.
+   index.html 의 라우터는 pt2.js 보다 먼저 돌기 때문에 'trans' 를 몰라서
+   기본값인 일반채팅 목록을 그려 놓는다. 여기서 한 번 다시 그려 맞춘다. */
+(function bootRoute() {
+  if ((location.hash || "").indexOf("#/talk/trans") !== 0) return;
+  try { window.renderTalk("trans", null); } catch (e) {}
+})();
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
 try { fixTabbar(); } catch (e) {}

@@ -18,9 +18,10 @@
     { "src": "/podotalk-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "채팅", "url": "/#/talk/direct" },
-    { "name": "오픈채팅", "url": "/#/talk/open" },
-    { "name": "설정", "url": "/#/talk/settings" }
+    { "name": "채팅", "short_name": "채팅", "description": "1:1 · 그룹 대화 목록", "url": "/#/talk/direct" },
+    { "name": "통역톡", "short_name": "통역톡", "description": "서로 다른 말로 대화하는 통역방", "url": "/#/talk/trans" },
+    { "name": "오픈채팅", "short_name": "오픈채팅", "description": "코드로 들어가는 열린 방", "url": "/#/talk/open" },
+    { "name": "설정", "short_name": "설정", "description": "알림 · 서버 · 내 정보", "url": "/#/talk/settings" }
   ],
   "launch_handler": { "client_mode": "focus-existing" }
 }

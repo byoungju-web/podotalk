@@ -13,6 +13,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="포도톡">
 <meta name="description" content="포도톡 — 사장님을 위한 1:1·오픈·일반 채팅. 포도다·포도야와 연동됩니다.">
+<!-- ── 빌드 도장 (여기 한 곳만 고치면 화면 어디서든 같은 값이 보인다) ──
+     index.html 을 고칠 때마다 v 숫자를 올린다.
+     아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
+     서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
+<script>window.PODOTALK_BUILD = "2026-08-16 v10";</script>
 <!-- 폰트만 CDN. 실패해도 시스템 폰트로 폴백되어 동작에 영향 없음 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- QRCode for JavaScript (davidshimjs/qrcodejs, MIT) — CDN 의존 제거를 위해 인라인 -->
@@ -4401,7 +4406,7 @@ function renderAdmin(){
     notiBanner(s)+
     pauseBar+
     adminStoreSwitcher(escapeHtml(s.slug))+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin:-4px 0 8px"><span style="font-size:10.5px;color:#b9b2c9">build 2026-08-11 v9 · 동기화·초대</span><button data-action="owner-logout" style="border:none;background:none;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔓 로그아웃</button></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin:-4px 0 8px"><span style="font-size:10.5px;color:#b9b2c9">build '+(window.PODOTALK_BUILD||"?")+'</span><button data-action="owner-logout" style="border:none;background:none;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔓 로그아웃</button></div>'+
     '<div class="tabseg"><button data-action="admin-tab" data-v="add" class="'+(view==="add"?"on":"")+'">메뉴 등록</button>'+
       '<button data-action="admin-tab" data-v="list" class="'+(view==="list"?"on":"")+'">내 메뉴 ('+s.menus.length+')</button>'+
       '<button data-action="admin-tab" data-v="reviews" class="'+(view==="reviews"?"on":"")+'">리뷰 ('+((s.reviews||[]).length)+')</button>'+
@@ -6735,6 +6740,6 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=29"></script>
+<script src="/pt2.js?v=30"></script>
 </body>
 </html>
