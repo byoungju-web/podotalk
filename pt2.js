@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=22"></script>
+              <script src="/pt2.js?v=23"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -728,7 +728,7 @@ function renderRoom(id) {
     P.room = Object.assign({}, cached || {}, d.room || {});
     var ttl = document.getElementById("pt2Title");
     var sub = document.getElementById("pt2Sub");
-    if (ttl) ttl.textContent = P.room.name || "";
+    if (ttl) ttl.textContent = roomLabel(bare(id), P.room.name);
     if (sub) sub.textContent = (P.room.members || 1) + "명 · 코드 " + (P.room.code || "-") +
       (trOn(id) ? " · 🌐 " + trxName(myLang()) : "");
     var tb = document.getElementById("pt2TaskBtn");
@@ -864,6 +864,13 @@ function liveAdd(sid){
   if (a.indexOf(sid) < 0) { a.push(sid); LSS("pt2_live_rooms", JSON.stringify(a)); }
 }
 function isLive(sid){ return liveRooms().indexOf(String(sid)) >= 0; }
+function aliasGet(sid){ return LSJ("pt2_alias", {})[String(sid)] || ""; }
+function aliasSet(sid, v){
+  var o = LSJ("pt2_alias", {});
+  if (v) o[String(sid)] = v; else delete o[String(sid)];
+  LSS("pt2_alias", JSON.stringify(o));
+}
+function roomLabel(sid, fallback){ return aliasGet(sid) || fallback || "통역방"; }
 
 function segBarHtml(cur){
   return '<div class="pt2-seg">' +
@@ -880,9 +887,10 @@ function renderLive(){
   var rows = mine.map(function (r) {
     var last = r.last_body ? ((r.last_nick ? r.last_nick + ": " : "") + r.last_body) : "아직 대화가 없어요";
     var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
+    var multi = (r.members || 1) > 2 || /다중|가족|여럿/.test(r.name || "");
     return '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
-      '<div class="tk-av trx-av">💬</div>' +
-      '<div class="tk-rmid"><div class="tk-rname">' + esc(r.name) +
+      '<div class="tk-av trx-av">' + (multi ? "👥" : "💬") + "</div>" +
+      '<div class="tk-rmid"><div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
         '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
         '<span class="trx-pair">' + esc(r.code || "") + "</span></div>" +
         '<div class="tk-rlast">' + esc(last) + "</div></div>" +
@@ -896,7 +904,10 @@ function renderLive(){
     '내 언어: <b>' + trxFlag(myLang()) + " " + trxName(myLang()) + '</b> · 아래에서 바꿀 수 있어요</div>' +
     '<div class="tk-field"><label>내 언어</label><select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + "</select></div>" +
     '<div class="tk-tools" style="margin-top:12px">' +
-      '<button class="tk-tool primary" data-pt2="live-new">＋ 1:1 동시통역 만들기</button>' +
+      '<button class="tk-tool primary" data-pt2="live-new" data-m="1">＋ 1:1 통역방</button>' +
+      '<button class="tk-tool primary" data-pt2="live-new" data-m="n">👥 다중 통역방</button>' +
+    "</div>" +
+    '<div class="tk-tools" style="margin-top:-6px">' +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
     "</div>" +
     (rows ? '<div class="tk-list">' + rows + "</div>"
@@ -905,12 +916,16 @@ function renderLive(){
 }
 
 /* 만들면 바로 자동번역이 켜진 방이 생긴다 */
-function liveNew(){
+function liveNew(multi){
   if (!on()) { say("설정에서 서버 연결을 먼저 켜주세요"); return; }
+  var def = multi ? "가족 통역방" : "1:1 통역방";
+  var nm = prompt("통역방 이름을 정해주세요\n(상대에게도 이 이름으로 보입니다)", def);
+  if (nm === null) return;
+  nm = (nm || "").trim() || def;
   say("통역방을 만드는 중…");
   api("/talk/room/create", { body: {
-    name: "1:1 동시통역", intro: "각자 자기 말로 쓰면 상대 언어로 번역됩니다",
-    type: "general", uid: myUid(), nick: myNick(), is_private: 1, emoji: "💬"
+    name: nm, intro: "각자 자기 말로 쓰면 상대 언어로 번역됩니다",
+    type: "general", uid: myUid(), nick: myNick(), is_private: 1, emoji: multi ? "👥" : "💬"
   }}).then(function (d) {
     if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
     saveToken(d.id, d.token);
@@ -1041,9 +1056,10 @@ function roomSetSheet() {
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>" + esc(r.name) + "</h3>" +
+    "<h3>" + esc(roomLabel(bare(id), r.name)) + "</h3>" +
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중</div>" +
     '<button class="cta grape" data-pt2="copy-code">초대 코드 복사</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
     '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
     '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
@@ -1872,7 +1888,7 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
-  if (a === "live-new") { liveNew(); return; }
+  if (a === "live-new") { liveNew(el.getAttribute("data-m") === "n"); return; }
   if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
@@ -1940,6 +1956,18 @@ document.addEventListener("click", function (e) {
     el.className = "tk-sw" + (nx ? " on" : "");
     say(nx ? ("🌐 자동번역을 켰어요 · " + trxFlag(myLang()) + " " + trxName(myLang())) : "자동번역을 껐어요");
     P.sig = ""; renderMsgs(P.list || [], false);
+    return;
+  }
+  if (a === "rename") {
+    var rid1 = bare(el.getAttribute("data-id") || P.id);
+    var cur = roomLabel(rid1, (P.room && P.room.name) || "");
+    var v = prompt("이 방을 뭐라고 부를까요?\n(내 기기에서만 바뀝니다)", cur);
+    if (v === null) return;
+    aliasSet(rid1, (v || "").trim());
+    var sb9 = document.querySelector(".sheet-bg"); if (sb9) sb9.remove();
+    var ttl9 = document.getElementById("pt2Title");
+    if (ttl9) ttl9.textContent = roomLabel(rid1, (P.room && P.room.name) || "");
+    say("이름을 바꿨어요");
     return;
   }
   if (a === "copy-code"){ try { copyText((P.room && P.room.code) || ""); say("초대 코드를 복사했어요"); } catch (_e) {} return; }
