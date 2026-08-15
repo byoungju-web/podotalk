@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=24"></script>
+              <script src="/pt2.js?v=25"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -150,7 +150,7 @@ function rich(s) {
     /* 방 헤더와 메시지 목록을 화면에 직접 고정한다.
        #view 스크롤 안에 두면 index5 의 자동 스크롤과 계속 부딪혀
        맨 위까지 올라가지 못한다. 목록에 자체 스크롤을 주면 그 싸움에서 빠진다. */
-    '.pt2-fixhead{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:var(--tk-bg);border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
+    '.pt2-fixhead{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:430px;box-sizing:border-box;top:0;z-index:30;display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0;background:#fff;border-bottom:1px solid var(--tk-line);box-shadow:0 2px 10px rgba(76,29,149,.06)}',
     '.pt2-fixhead .tk-rh-mid{min-width:0;flex:1 1 auto;overflow:hidden}',
     '.pt2-fixhead .tk-hi{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     /* 목록은 flex 가 아니라 일반 블록이다.
@@ -215,13 +215,14 @@ function rich(s) {
     '.trx-set .cta{margin-top:18px}',
     '.trx-set .cta.trx-ghost{background:#fff;color:#EF4444;border:1.5px solid #FCA5A5;box-shadow:none;margin-top:9px}',
     '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
-    '.pt2-seg3 button{font-size:12.5px;padding:10px 2px}',
+    '.pt2-seg3 button{font-size:11.5px;padding:8px 2px;line-height:1.35;white-space:normal}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
     '.pt2-mic.rec{background:#EF4444 !important;color:#fff !important;animation:trxpulse 1s infinite}',
     '.pt2-orig{margin-top:6px;padding-top:6px;border-top:1px dashed var(--tk-line);font-size:11.5px;color:var(--tk-sub);line-height:1.5;word-break:break-word}',
     '.pt2-langsel{width:100%;box-sizing:border-box;border:1.5px solid var(--tk-line);border-radius:10px;padding:11px;font-size:14px;font-family:inherit;background:#fff}',
+    'body.talk-mode #view{padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}',
     '.pt2-alarm{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}',
     '.tk-al{cursor:pointer}',
     '.tk-al:active{opacity:.7}',
@@ -887,6 +888,15 @@ function liveAdd(sid){
   if (a.indexOf(sid) < 0) { a.push(sid); LSS("pt2_live_rooms", JSON.stringify(a)); }
 }
 function isLive(sid){ return liveRooms().indexOf(String(sid)) >= 0; }
+function liveForget(sid){
+  sid = String(sid);
+  LSS("pt2_live_rooms", JSON.stringify(liveRooms().filter(function (x) { return x !== sid; })));
+  var m = liveMeta(); delete m[sid]; LSS("pt2_live_meta", JSON.stringify(m));
+  aliasSet(sid, ""); setMuted(sid, false);
+  try { localStorage.removeItem("pt2_tr_" + sid); } catch (e) {}
+  var c = svRooms().filter(function (r) { return r.id !== sid; });
+  saveSvRooms(c);
+}
 
 /* 방을 만들자마자 목록에 보이게 하려고 이 기기에도 한 벌 적어둔다.
    서버 목록이 도착하기 전까지의 빈 화면을 없앤다. */
@@ -906,9 +916,9 @@ function roomLabel(sid, fallback){ return aliasGet(sid) || fallback || "통역�
 
 function segBarHtml(cur){
   return '<div class="pt2-seg pt2-seg3">' +
-    '<button class="' + (cur === "one" ? "on" : "") + '" data-pt2="lseg" data-v="one">💬 1:1</button>' +
-    '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👥 다중</button>' +
-    '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기</button>' +
+    '<button class="' + (cur === "one" ? "on" : "") + '" data-pt2="lseg" data-v="one">💬 1:1<br>동시통역</button>' +
+    '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👥 다중<br>동시통역</button>' +
+    '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기<br>통역</button>' +
   "</div>";
 }
 
@@ -2069,22 +2079,26 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "leave") {
-    api("/talk/room/leave", { body: { room_id: bare(P.id), uid: myUid() } }).then(function () {
+    var lid = bare(P.id), wasLive = isLive(lid);
+    api("/talk/room/leave", { body: { room_id: lid, uid: myUid() } }).then(function () {
       var sb4 = document.querySelector(".sheet-bg"); if (sb4) sb4.remove();
+      if (wasLive) liveForget(lid);
       say("방에서 나왔어요");
       refreshRooms();
-      location.hash = "#/talk/open";
+      location.hash = wasLive ? "#/talk/trans" : "#/talk/open";
     });
     return;
   }
   if (a === "del-room") {
     if (!confirm("방과 모든 대화가 지워져요. 삭제할까요?")) return;
-    api("/talk/room/delete", { body: { room_id: bare(P.id) }, token: tokenOf(bare(P.id)) }).then(function (d) {
-      if (!d.ok) { say(d.error || "삭제하지 못했어요"); return; }
+    var did = bare(P.id), wasLive2 = isLive(did);
+    api("/talk/room/delete", { body: { room_id: did }, token: tokenOf(did) }).then(function (d) {
       var sb5 = document.querySelector(".sheet-bg"); if (sb5) sb5.remove();
+      if (!d.ok) { say(d.error || "삭제하지 못했어요"); return; }
+      if (wasLive2) liveForget(did);       /* 목록에 남지 않도록 이 기기 기록도 지운다 */
       say("방을 삭제했어요");
       refreshRooms();
-      location.hash = "#/talk/open";
+      location.hash = wasLive2 ? "#/talk/trans" : "#/talk/open";
     });
     return;
   }
