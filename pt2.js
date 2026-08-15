@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=28"></script>
+              <script src="/pt2.js?v=29"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -23,7 +23,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "28";
+var PT2_VER = "29";
 var STEP = 6;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -389,6 +389,7 @@ function renderOpen() {
     : empty;
 
   document.querySelector("#view").innerHTML = head + segBar + say_ + tools + body;
+  decorateList();
   markTab("open");
   var sy = document.getElementById("tkSay");
   if (sy) sy.addEventListener("keydown", function (e) {
@@ -419,7 +420,9 @@ window.renderTalkList = function (kind) {
     });
     return;
   }
-  return O.renderTalkList.apply(this, arguments);
+  var r0 = O.renderTalkList.apply(this, arguments);
+  try { decorateList(); } catch (e) {}
+  return r0;
 };
 
 /* ══════════════ STEP 3 · 서버 방 입장 · 전송 · 폴링 ══════════════ */
@@ -960,7 +963,7 @@ function renderLive(kind){
         '<div class="tk-rlast">' + esc(last) + "</div></div>" +
       '<div class="tk-rmeta"><span class="tk-rtime">' + esc(t) + "</span>" +
         (!muted(r.id) && svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>" +
-      '<button class="pt2-x" data-pt2="live-del" data-id="' + esc(r.id) + '" data-k="' + kind + '">\u2715</button></div>';
+      '<button class="pt2-x" data-pt2="rowmenu" data-id="' + esc(PFX + r.id) + '">\u22EE</button></div>';
   }).join("");
 
   var head = ""; try { head = tkHeader("통역톡", kind === "multi" ? "👥 다중" : "💬 1:1"); } catch (e) {}
@@ -1916,6 +1919,83 @@ window.addEventListener("hashchange", function(){
   if(location.hash.indexOf("#/talk/trans")!==0){ trxMicStop(); trxSrvStop(); }
 });
 
+
+/* ══════════════ 목록에서 바로 여는 방 메뉴 ══════════════
+   채팅·오픈채팅·상점톡·통역방 어디서든 방 오른쪽 ⋮ 를 누르면
+   알림 끄기와 삭제를 할 수 있다. 삭제는 두 가지로 나눈다.
+     · 나에게서 삭제 — 내 목록에서만 사라진다 (남은 사람은 그대로 대화)
+     · 모두에게서 삭제 — 서버에서 방을 없앤다 (내가 만든 방만) */
+function decorateList(){
+  var box = document.getElementById("tkList");
+  if (!box) return;
+  var rows = box.querySelectorAll(".tk-room[data-id]");
+  for (var i = 0; i < rows.length; i++) {
+    var el = rows[i];
+    if (el.parentNode && el.parentNode.className === "pt2-lrow") continue;
+    var id = el.getAttribute("data-id") || "";
+    if (id === "podo_bot") continue;                 /* 비서 방은 지우지 않는다 */
+    var wrap = document.createElement("div");
+    wrap.className = "pt2-lrow";
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    var b = document.createElement("button");
+    b.className = "pt2-x";
+    b.setAttribute("data-pt2", "rowmenu");
+    b.setAttribute("data-id", id);
+    b.textContent = "\u22EE";
+    wrap.appendChild(b);
+  }
+}
+function svRoomOf(sid){
+  var hit = null;
+  svRooms().forEach(function (r) { if (r.id === sid) hit = r; });
+  return hit;
+}
+function repaintList(){
+  var h = location.hash || "";
+  if (h.indexOf("#/talk/trans") === 0) { return lseg() === "trx" ? trxList() : renderLive(lseg()); }
+  if (h.indexOf("#/talk/direct") === 0) { window.renderTalkList("direct"); return; }
+  if (h.indexOf("#/talk/open") === 0 || h === "#/talk") { renderOpen(); return; }
+}
+function rowMenu(id){
+  var sv = isSv(id), sid = sv ? bare(id) : "";
+  var r = sv ? null : (function () { try { return findRoom(id); } catch (e) { return null; } })();
+  var sr = sv ? svRoomOf(sid) : null;
+  if (!sv && !r) return;
+  var name = sv ? roomLabel(sid, sr ? sr.name : "") : r.name;
+  var notiOn = sv ? !muted(sid) : (r.noti !== false);
+  var owner = sv ? !!tokenOf(sid) : !!r.owner;
+
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>" + esc(name) + "</h3>" +
+    '<div class="sd">' + (sv ? "서버 방 · 다른 기기와 함께 씁니다" : "이 기기에만 저장된 방입니다") + "</div>" +
+    '<div class="tk-toggle">🔔 알림 받기<span class="tk-sw' + (notiOn ? " on" : "") + '" data-pt2="row-noti" data-id="' + esc(id) + '"></span></div>' +
+    (!sv ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="row-pin" data-id="' + esc(id) + '">' + (r.pinned ? "📌 고정 해제" : "📌 맨 위 고정") + "</button>" : "") +
+    '<button class="cta" style="margin-top:10px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="row-delme" data-id="' + esc(id) + '">👤 나에게서 삭제</button>' +
+    '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요.' + (sv ? " 남은 사람들은 그대로 대화합니다." : "") + "</div>" +
+    (sv && owner
+      ? '<button class="cta" style="margin-top:10px;background:#fff;color:#c2410c;border:1.5px solid #c2410c;box-shadow:none" data-pt2="row-delall" data-id="' + esc(id) + '">🌐 모두에게서 삭제</button>' +
+        '<div class="pt2-sub" style="margin-top:6px">서버에서 방과 대화가 지워져요. 참여한 모든 사람에게서 사라집니다.</div>'
+      : (sv ? '<div class="pt2-sub" style="margin-top:10px">모두에게서 삭제는 <b>방을 만든 사람</b>만 할 수 있어요.</div>' : "")) +
+    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
+  "</div>";
+  document.body.appendChild(bg);
+}
+function forgetLocalRoom(id){
+  try {
+    saveTalkRooms(talkRooms().filter(function (x) { return x.id !== id; }));
+    DB.set("pododa_talk_msg_" + id, "");
+  } catch (e) {}
+}
+function forgetSvRoom(sid){
+  saveSvRooms(svRooms().filter(function (r) { return r.id !== sid; }));
+  if (isLive(sid)) liveForget(sid);
+}
+
 /* ══════════════ 클릭 처리 ══════════════ */
 document.addEventListener("click", function (e) {
   var el = e.target && e.target.closest ? e.target.closest("[data-pt2]") : null;
@@ -1961,6 +2041,51 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "live-new") { liveNew(el.getAttribute("data-m")); return; }
+  if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
+  if (a === "row-noti") {
+    var nid = el.getAttribute("data-id");
+    if (isSv(nid)) {
+      var nm = !muted(bare(nid)); setMuted(bare(nid), nm);
+      el.className = "tk-sw" + (nm ? "" : " on");
+      say(nm ? "알림을 껐어요 🔕" : "알림을 켰어요 🔔");
+    } else {
+      try { updateRoom(nid, function (r) { r.noti = (r.noti === false); }); } catch (e) {}
+      var rr = null; try { rr = findRoom(nid); } catch (e) {}
+      el.className = "tk-sw" + (rr && rr.noti === false ? "" : " on");
+      say(rr && rr.noti === false ? "알림을 껐어요 🔕" : "알림을 켰어요 🔔");
+    }
+    return;
+  }
+  if (a === "row-pin") {
+    var pid = el.getAttribute("data-id");
+    try { updateRoom(pid, function (r) { r.pinned = !r.pinned; }); } catch (e) {}
+    var sbp = document.querySelector(".sheet-bg"); if (sbp) sbp.remove();
+    repaintList(); return;
+  }
+  if (a === "row-delme") {
+    var mid = el.getAttribute("data-id");
+    if (!confirm("내 목록에서 지울까요?\n" + (isSv(mid) ? "남은 사람들은 그대로 대화합니다." : "이 기기의 대화 내용도 함께 지워집니다."))) return;
+    var sbm = document.querySelector(".sheet-bg"); if (sbm) sbm.remove();
+    if (isSv(mid)) {
+      var s1 = bare(mid);
+      var fin1 = function () { forgetSvRoom(s1); repaintList(); say("내 목록에서 지웠어요"); };
+      api("/talk/room/leave", { body: { room_id: s1, uid: myUid() } }).then(fin1, fin1);
+    } else {
+      forgetLocalRoom(mid); repaintList(); say("지웠어요");
+    }
+    return;
+  }
+  if (a === "row-delall") {
+    var aid = bare(el.getAttribute("data-id"));
+    if (!confirm("모두에게서 삭제할까요?\n참여한 모든 사람에게서 방과 대화가 사라집니다.")) return;
+    var sba = document.querySelector(".sheet-bg"); if (sba) sba.remove();
+    var fin2 = function () { forgetSvRoom(aid); repaintList(); refreshRooms(); say("모두에게서 삭제했어요"); };
+    api("/talk/room/delete", { body: { room_id: aid }, token: tokenOf(aid) }).then(function (d) {
+      if (d && !d.ok) say(d.error || "서버에서 지우지 못했어요");
+      fin2();
+    }, fin2);
+    return;
+  }
   if (a === "live-clear") {
     var kc = el.getAttribute("data-k") || lseg();
     var all = liveList(kc);
