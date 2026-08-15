@@ -1,5 +1,5 @@
 /* 포도톡 Service Worker (PT2 대응판) */
-const CACHE = "podotalk-v4";
+const CACHE = "podotalk-v5";
 const CORE = ["/", "/index.html", "/manifest.json", "/podotalk-192.png", "/podotalk-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -54,15 +54,26 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = { title: "포도톡", body: "새 메시지가 있습니다", room_id: "" };
   try { d = { ...d, ...e.data.json() }; } catch { if (e.data) d.body = e.data.text(); }
-  e.waitUntil(self.registration.showNotification(d.title, {
-    body: d.body,
-    icon: "/podotalk-192.png",
-    badge: "/podotalk-192.png",
-    tag: d.tag || "podotalk",
-    renotify: true,
-    data: { room_id: d.room_id || "" },
-    vibrate: [180, 80, 180],
-  }));
+  e.waitUntil((async () => {
+    // 앱에서 꺼둔 방이면 알리지 않는다 (목록은 캐시로 전달받는다)
+    try {
+      const c = await caches.open("pt2-cfg");
+      const r = await c.match("/__pt2_mute");
+      if (r) {
+        const list = await r.json();
+        if (d.room_id && Array.isArray(list) && list.indexOf(String(d.room_id)) >= 0) return;
+      }
+    } catch (err) {}
+    await self.registration.showNotification(d.title, {
+      body: d.body,
+      icon: "/podotalk-192.png",
+      badge: "/podotalk-192.png",
+      tag: d.tag || "podotalk",
+      renotify: true,
+      data: { room_id: d.room_id || "" },
+      vibrate: [180, 80, 180],
+    });
+  })());
 });
 
 self.addEventListener("notificationclick", (e) => {
