@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=23"></script>
+              <script src="/pt2.js?v=24"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -215,6 +215,7 @@ function rich(s) {
     '.trx-set .cta{margin-top:18px}',
     '.trx-set .cta.trx-ghost{background:#fff;color:#EF4444;border:1.5px solid #FCA5A5;box-shadow:none;margin-top:9px}',
     '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
+    '.pt2-seg3 button{font-size:12.5px;padding:10px 2px}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
@@ -591,6 +592,25 @@ function trFor(text){
   return { pending: true };
 }
 
+
+/* ── 방마다 알림 끄기 ──
+   서비스워커는 localStorage 를 못 읽는다. 그래서 꺼둔 방 목록을
+   캐시에 적어두고, 알림이 올 때 워커가 그걸 읽어 걸러낸다. */
+function mutedList(){ return LSJ("pt2_mute", []); }
+function muted(sid){ return mutedList().indexOf(String(sid)) >= 0; }
+function setMuted(sid, v){
+  var a = mutedList(), i = a.indexOf(String(sid));
+  if (v && i < 0) a.push(String(sid));
+  if (!v && i >= 0) a.splice(i, 1);
+  LSS("pt2_mute", JSON.stringify(a));
+  try {
+    if (window.caches) caches.open("pt2-cfg").then(function (c) {
+      c.put("/__pt2_mute", new Response(JSON.stringify(a), { headers: { "Content-Type": "application/json" } }));
+    });
+  } catch (e) {}
+}
+try { setMuted("", false); } catch (e) {}   /* 처음 실행 때 캐시에 목록을 한 번 써둔다 */
+
 function waitCard() {
   return '<div class="pt2-botcard wait"><div class="pt2-bothead"><span>🤖</span>' +
     '<span class="tag">@' + esc(P.waitNames || "bot") + '</span><span class="lbl">답하는 중</span></div>' +
@@ -857,13 +877,25 @@ function markTab(id) {
 /* ══════════════ 동시통역톡 (통역톡 안의 두 번째 칸) ══════════════
    서버 방인데 자동번역이 켜진 채로 태어난다.
    각자 자기 폰에서 자기 언어만 고르면 서로 자기 말로 쓰면 된다. */
-function lseg(){ return LS("pt2_lseg") === "live" ? "live" : "trx"; }
+function lseg(){
+  var v = LS("pt2_lseg");
+  return (v === "multi" || v === "trx") ? v : "one";
+}
 function liveRooms(){ return LSJ("pt2_live_rooms", []); }
 function liveAdd(sid){
   var a = liveRooms();
   if (a.indexOf(sid) < 0) { a.push(sid); LSS("pt2_live_rooms", JSON.stringify(a)); }
 }
 function isLive(sid){ return liveRooms().indexOf(String(sid)) >= 0; }
+
+/* 방을 만들자마자 목록에 보이게 하려고 이 기기에도 한 벌 적어둔다.
+   서버 목록이 도착하기 전까지의 빈 화면을 없앤다. */
+function liveMeta(){ return LSJ("pt2_live_meta", {}); }
+function liveMetaSet(sid, o){
+  var m = liveMeta(); m[String(sid)] = o; LSS("pt2_live_meta", JSON.stringify(m));
+}
+function liveKind(sid){ var m = liveMeta()[String(sid)]; return (m && m.kind) || "one"; }
+
 function aliasGet(sid){ return LSJ("pt2_alias", {})[String(sid)] || ""; }
 function aliasSet(sid, v){
   var o = LSJ("pt2_alias", {});
@@ -873,53 +905,66 @@ function aliasSet(sid, v){
 function roomLabel(sid, fallback){ return aliasGet(sid) || fallback || "통역방"; }
 
 function segBarHtml(cur){
-  return '<div class="pt2-seg">' +
+  return '<div class="pt2-seg pt2-seg3">' +
+    '<button class="' + (cur === "one" ? "on" : "") + '" data-pt2="lseg" data-v="one">💬 1:1</button>' +
+    '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👥 다중</button>' +
     '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기</button>' +
-    '<button class="' + (cur === "live" ? "on" : "") + '" data-pt2="lseg" data-v="live">💬 동시통역톡</button>' +
   "</div>";
 }
 
-function renderLive(){
-  var ids = liveRooms();
-  var mine = svRooms().filter(function (r) { return ids.indexOf(r.id) >= 0; });
-  mine.sort(function (a, b) { return (b.last_ts || b.ts || 0) - (a.last_ts || a.ts || 0); });
+/* 서버에서 받은 목록과 이 기기 기록을 합친다 */
+function liveList(kind){
+  var ids = liveRooms(), meta = liveMeta(), byId = {};
+  svRooms().forEach(function (r) { if (ids.indexOf(r.id) >= 0) byId[r.id] = r; });
+  ids.forEach(function (id) {
+    var m = meta[id] || {};
+    if (!byId[id]) byId[id] = { id: id, name: m.name || "통역방", code: m.code || "", members: 1, ts: m.ts || 0 };
+  });
+  var out = [];
+  Object.keys(byId).forEach(function (id) {
+    if (liveKind(id) !== kind) return;
+    out.push(byId[id]);
+  });
+  out.sort(function (a, b) { return (b.last_ts || b.ts || 0) - (a.last_ts || a.ts || 0); });
+  return out;
+}
 
+function renderLive(kind){
+  var mine = liveList(kind);
   var rows = mine.map(function (r) {
     var last = r.last_body ? ((r.last_nick ? r.last_nick + ": " : "") + r.last_body) : "아직 대화가 없어요";
     var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
-    var multi = (r.members || 1) > 2 || /다중|가족|여럿/.test(r.name || "");
     return '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
-      '<div class="tk-av trx-av">' + (multi ? "👥" : "💬") + "</div>" +
+      '<div class="tk-av trx-av">' + (kind === "multi" ? "👥" : "💬") + "</div>" +
       '<div class="tk-rmid"><div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
         '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
-        '<span class="trx-pair">' + esc(r.code || "") + "</span></div>" +
+        (r.code ? '<span class="trx-pair">' + esc(r.code) + "</span>" : "") +
+        (muted(r.id) ? '<span class="tk-lock">🔕</span>' : "") + "</div>" +
         '<div class="tk-rlast">' + esc(last) + "</div></div>" +
       '<div class="tk-rmeta"><span class="tk-rtime">' + esc(t) + "</span>" +
-        (svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>";
+        (!muted(r.id) && svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>";
   }).join("");
 
-  var head = ""; try { head = tkHeader("통역톡", "💬 동시통역"); } catch (e) {}
-  document.querySelector("#view").innerHTML = head + segBarHtml("live") +
-    '<div class="trx-lead">서로 <b>떨어져 있을 때</b> 쓰는 통역입니다. 각자 자기 폰에서 <b>자기 말로만</b> 쓰면, 상대 화면에는 그 사람 언어로 번역돼 보여요.<br>' +
-    '내 언어: <b>' + trxFlag(myLang()) + " " + trxName(myLang()) + '</b> · 아래에서 바꿀 수 있어요</div>' +
+  var head = ""; try { head = tkHeader("통역톡", kind === "multi" ? "👥 다중" : "💬 1:1"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head + segBarHtml(kind) +
+    '<div class="trx-lead">서로 <b>떨어져 있을 때</b> 쓰는 통역이에요. 각자 자기 폰에서 <b>자기 말로만</b> 쓰면, 상대 화면에는 그 사람 언어로 번역돼 보입니다.' +
+    (kind === "multi" ? "<br>여러 명이 각각 다른 언어를 골라도 됩니다." : "") + "</div>" +
     '<div class="tk-field"><label>내 언어</label><select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + "</select></div>" +
     '<div class="tk-tools" style="margin-top:12px">' +
-      '<button class="tk-tool primary" data-pt2="live-new" data-m="1">＋ 1:1 통역방</button>' +
-      '<button class="tk-tool primary" data-pt2="live-new" data-m="n">👥 다중 통역방</button>' +
-    "</div>" +
-    '<div class="tk-tools" style="margin-top:-6px">' +
+      '<button class="tk-tool primary" data-pt2="live-new" data-m="' + kind + '">＋ ' + (kind === "multi" ? "다중 통역방" : "1:1 통역방") + " 만들기</button>" +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
     "</div>" +
     (rows ? '<div class="tk-list">' + rows + "</div>"
-          : '<div class="tk-empty"><div class="ee">💬</div>아직 통역방이 없어요.<br>＋ 를 눌러 바로 만드세요. 초대 코드만 알려주면 상대가 들어옵니다.</div>');
+          : '<div class="tk-empty"><div class="ee">' + (kind === "multi" ? "👥" : "💬") + "</div>아직 통역방이 없어요.<br>＋ 를 누르면 바로 만들어집니다.</div>");
   markTab("lang");
 }
 
-/* 만들면 바로 자동번역이 켜진 방이 생긴다 */
-function liveNew(multi){
+/* 만들면 목록에 바로 쌓인다. 초대는 나중에 코드만 알려주면 된다 */
+function liveNew(kind){
   if (!on()) { say("설정에서 서버 연결을 먼저 켜주세요"); return; }
+  var multi = (kind === "multi");
   var def = multi ? "가족 통역방" : "1:1 통역방";
-  var nm = prompt("통역방 이름을 정해주세요\n(상대에게도 이 이름으로 보입니다)", def);
+  var nm = prompt("통역방 이름을 정해주세요\n(초대받은 사람에게도 이 이름으로 보입니다)", def);
   if (nm === null) return;
   nm = (nm || "").trim() || def;
   say("통역방을 만드는 중…");
@@ -930,10 +975,13 @@ function liveNew(multi){
     if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
     saveToken(d.id, d.token);
     liveAdd(d.id);
+    liveMetaSet(d.id, { kind: multi ? "multi" : "one", name: nm, code: d.code || "", ts: Date.now() });
     trSetOn(PFX + d.id, true);            /* 자동번역을 켠 채로 시작 */
-    refreshRooms();
-    location.hash = "#/talk/room/" + PFX + d.id;
-    setTimeout(function () { say("초대 코드를 상대에게 알려주면 바로 들어와요"); }, 900);
+    say("‘" + nm + "’ 방을 만들었어요");
+    renderLive(multi ? "multi" : "one");   /* 방으로 들어가지 않고 목록에 남는다 */
+    refreshRooms(function () {
+      if (location.hash.indexOf("#/talk/trans") === 0 && lseg() !== "trx") renderLive(lseg());
+    });
   });
 }
 
@@ -960,7 +1008,7 @@ function renderAlarm() {
   } catch (e) {}
 
   svRooms().forEach(function (r) {
-    if (!r.last_body) return;
+    if (!r.last_body || muted(r.id)) return;
     items.push({
       ic: r.emoji || "🍇", t: r.name,
       b: (r.last_nick ? r.last_nick + ": " : "") + r.last_body,
@@ -994,10 +1042,11 @@ function renderAlarm() {
 window.renderTalk = function (sub, arg) {
   if (sub === "trans") {
     if (arg) return trxRoom(arg);
-    if (lseg() === "live") {
-      renderLive();
+    var k = lseg();
+    if (k !== "trx") {
+      renderLive(k);
       if (on()) refreshRooms(function () {
-        if (location.hash.indexOf("#/talk/trans") === 0 && lseg() === "live") renderLive();
+        if (location.hash.indexOf("#/talk/trans") === 0 && lseg() !== "trx") renderLive(lseg());
       });
       return;
     }
@@ -1060,6 +1109,7 @@ function roomSetSheet() {
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중</div>" +
     '<button class="cta grape" data-pt2="copy-code">초대 코드 복사</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
+    '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
     '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
     '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
     '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
@@ -1883,12 +1933,12 @@ document.addEventListener("click", function (e) {
   }
   if (a === "lang") { location.hash = "#/talk/trans"; return; }
   if (a === "lseg") {
-    LSS("pt2_lseg", el.getAttribute("data-v") === "live" ? "live" : "trx");
+    LSS("pt2_lseg", el.getAttribute("data-v"));
     if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
     else location.hash = "#/talk/trans";
     return;
   }
-  if (a === "live-new") { liveNew(el.getAttribute("data-m") === "n"); return; }
+  if (a === "live-new") { liveNew(el.getAttribute("data-m")); return; }
   if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
@@ -1956,6 +2006,14 @@ document.addEventListener("click", function (e) {
     el.className = "tk-sw" + (nx ? " on" : "");
     say(nx ? ("🌐 자동번역을 켰어요 · " + trxFlag(myLang()) + " " + trxName(myLang())) : "자동번역을 껐어요");
     P.sig = ""; renderMsgs(P.list || [], false);
+    return;
+  }
+  if (a === "noti-toggle") {
+    var rid2 = bare(el.getAttribute("data-id") || P.id);
+    var nowMuted = !muted(rid2);
+    setMuted(rid2, nowMuted);
+    el.className = "tk-sw" + (nowMuted ? "" : " on");
+    say(nowMuted ? "이 방 알림을 껐어요 🔕" : "이 방 알림을 켰어요 🔔");
     return;
   }
   if (a === "rename") {
