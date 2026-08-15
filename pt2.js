@@ -6,7 +6,7 @@
    결정 : ① 서버 방은 "오픈채팅" 탭 안에서 로컬 방과 섞는다
           ② 웹푸시는 podotalk-api 하나만 쓴다
    붙이는 법 : index.html 의 </body> 바로 위에
-              <script src="/pt2.js?v=25"></script>
+              <script src="/pt2.js?v=28"></script>
               (고칠 때마다 v=2, v=3 … 으로 올리면 캐시가 안 물린다)
 
    STEP 로 기능을 단계별로 켠다. 1부터 올리면서 확인하세요.
@@ -23,6 +23,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
+var PT2_VER = "28";
 var STEP = 6;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -215,6 +216,10 @@ function rich(s) {
     '.trx-set .cta{margin-top:18px}',
     '.trx-set .cta.trx-ghost{background:#fff;color:#EF4444;border:1.5px solid #FCA5A5;box-shadow:none;margin-top:9px}',
     '.pt2-seg{display:flex;background:var(--tk-soft);border-radius:13px;padding:4px;margin:0 0 12px}',
+    '.pt2-lrow{display:flex;align-items:center;background:transparent}',
+    '.pt2-lrow .tk-room{flex:1;min-width:0}',
+    '.pt2-x{flex:0 0 auto;width:34px;height:34px;margin-right:8px;border-radius:11px;background:#F6F1FD;color:#9B8BBE;font-size:14px;font-weight:800}',
+    '.pt2-x:active{background:#EFE6FA}',
     '.pt2-seg3 button{font-size:11.5px;padding:8px 2px;line-height:1.35;white-space:normal}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
@@ -249,6 +254,7 @@ function injectSettings() {
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
+    '<div class="pt2-sub" style="margin-top:4px">레이어 버전 <b>PT2 v' + PT2_VER + "</b></div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
@@ -944,7 +950,8 @@ function renderLive(kind){
   var rows = mine.map(function (r) {
     var last = r.last_body ? ((r.last_nick ? r.last_nick + ": " : "") + r.last_body) : "아직 대화가 없어요";
     var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
-    return '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
+    return '<div class="pt2-lrow">' +
+      '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
       '<div class="tk-av trx-av">' + (kind === "multi" ? "👥" : "💬") + "</div>" +
       '<div class="tk-rmid"><div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
         '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
@@ -952,7 +959,8 @@ function renderLive(kind){
         (muted(r.id) ? '<span class="tk-lock">🔕</span>' : "") + "</div>" +
         '<div class="tk-rlast">' + esc(last) + "</div></div>" +
       '<div class="tk-rmeta"><span class="tk-rtime">' + esc(t) + "</span>" +
-        (!muted(r.id) && svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>";
+        (!muted(r.id) && svUnread(r) ? '<span class="pt2-dot"></span>' : "") + "</div></div>" +
+      '<button class="pt2-x" data-pt2="live-del" data-id="' + esc(r.id) + '" data-k="' + kind + '">\u2715</button></div>';
   }).join("");
 
   var head = ""; try { head = tkHeader("통역톡", kind === "multi" ? "👥 다중" : "💬 1:1"); } catch (e) {}
@@ -964,6 +972,10 @@ function renderLive(kind){
       '<button class="tk-tool primary" data-pt2="live-new" data-m="' + kind + '">＋ ' + (kind === "multi" ? "다중 통역방" : "1:1 통역방") + " 만들기</button>" +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
     "</div>" +
+    (mine.length ? '<div class="tk-tools" style="margin-top:-6px">' +
+      '<button class="tk-tool" data-pt2="live-clear" data-k="' + kind + '">🧹 이 목록 비우기 (' + mine.length + '개)</button>' +
+    "</div>" : "") +
+    '<div class="pt2-sub" style="text-align:center;margin:10px 0 0">PT2 v' + PT2_VER + "</div>" +
     (rows ? '<div class="tk-list">' + rows + "</div>"
           : '<div class="tk-empty"><div class="ee">' + (kind === "multi" ? "👥" : "💬") + "</div>아직 통역방이 없어요.<br>＋ 를 누르면 바로 만들어집니다.</div>");
   markTab("lang");
@@ -1949,6 +1961,32 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "live-new") { liveNew(el.getAttribute("data-m")); return; }
+  if (a === "live-clear") {
+    var kc = el.getAttribute("data-k") || lseg();
+    var all = liveList(kc);
+    if (!all.length) return;
+    if (!confirm("이 목록의 통역방 " + all.length + "개를 모두 지울까요?\n내가 만든 방은 서버에서도 삭제됩니다.")) return;
+    say("정리하는 중…");
+    var n = 0;
+    var fin = function () { n++; if (n >= all.length) { renderLive(kc); say("목록을 비웠어요"); } };
+    all.forEach(function (r) {
+      var tk2 = tokenOf(r.id);
+      var go = function () { liveForget(r.id); fin(); };
+      if (tk2) api("/talk/room/delete", { body: { room_id: r.id }, token: tk2 }).then(go, go);
+      else api("/talk/room/leave", { body: { room_id: r.id, uid: myUid() } }).then(go, go);
+    });
+    return;
+  }
+  if (a === "live-del") {
+    var sid = el.getAttribute("data-id"), kk = el.getAttribute("data-k") || lseg();
+    var mt = liveMeta()[sid] || {};
+    if (!confirm("‘" + roomLabel(sid, mt.name) + "’ 을(를) 목록에서 지울까요?\n내가 만든 방이면 서버에서도 삭제됩니다.")) return;
+    var tk = tokenOf(sid);
+    var done = function () { liveForget(sid); renderLive(kk); say("지웠어요"); };
+    if (tk) api("/talk/room/delete", { body: { room_id: sid }, token: tk }).then(done, done);
+    else api("/talk/room/leave", { body: { room_id: sid, uid: myUid() } }).then(done, done);
+    return;
+  }
   if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
@@ -2094,8 +2132,13 @@ document.addEventListener("click", function (e) {
     var did = bare(P.id), wasLive2 = isLive(did);
     api("/talk/room/delete", { body: { room_id: did }, token: tokenOf(did) }).then(function (d) {
       var sb5 = document.querySelector(".sheet-bg"); if (sb5) sb5.remove();
-      if (!d.ok) { say(d.error || "삭제하지 못했어요"); return; }
-      if (wasLive2) liveForget(did);       /* 목록에 남지 않도록 이 기기 기록도 지운다 */
+      if (wasLive2) liveForget(did);       /* 서버가 실패해도 내 목록에는 남기지 않는다 */
+      if (!d.ok) {
+        say((d.error || "서버에서 지우지 못했어요") + " · 내 목록에서는 지웠어요");
+        refreshRooms();
+        location.hash = "#/talk/trans";
+        return;
+      }       /* 목록에 남지 않도록 이 기기 기록도 지운다 */
       say("방을 삭제했어요");
       refreshRooms();
       location.hash = wasLive2 ? "#/talk/trans" : "#/talk/open";
