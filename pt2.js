@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "38";
+var PT2_VER = "42";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -177,11 +177,15 @@ function rich(s) {
 /* ── 레이어 전용 CSS ── */
 (function style() {
   var css = [
+    '.pt2-inline-ic{display:inline-block;width:15px;height:15px;vertical-align:-3px;border-radius:4px;overflow:hidden}',
     '.pt2-av-img{display:block;width:100%;height:100%;background-size:cover;background-position:center;border-radius:inherit}',
     '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
     '.pt2-pick{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--tk-line);border-radius:12px;padding:10px 12px}',
     '.pt2-pick.joined{border-color:var(--tk-grape);background:var(--tk-soft)}',
-    '.pt2-pick input{width:20px;height:20px;accent-color:var(--tk-grape);flex:0 0 auto}',
+    '.pt2-pick{position:relative}',
+    '.pt2-pick input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}',
+    '.pt2-ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--tk-line);background:#fff;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:transparent;transition:background .12s,border-color .12s}',
+    '.pt2-pick input:checked ~ .pt2-ck{background:var(--tk-grape);border-color:var(--tk-grape);color:#fff}',
     '.pt2-pick-av{width:34px;height:34px;border-radius:11px;background:#fff;border:1px solid var(--tk-line);display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}',
     '.pt2-pick-mid{flex:1;min-width:0;display:flex;flex-direction:column}',
     '.pt2-pick-nm{font-weight:800;font-size:14px;color:#241436}',
@@ -456,6 +460,10 @@ function shopItems() {
 /* 1:1 방인지. 만든 기기는 표시를 갖고 있고, 초대받아 들어온 기기는
    그 표시가 없으므로 방을 만들 때 붙인 💬 이모지로도 알아본다. */
 function isDirectRoom(sid) {
+  /* 1:1 통역방도 만들 때 💬 를 쓴다. 이모지만 보고 판단하면 통역방을
+     그냥 1:1 채팅방으로 착각해서, 통역방 설정에 있어야 할 자동번역과
+     내 언어 고르기가 사라진다. 통역방이면 여기서 먼저 걸러낸다. */
+  if (isLive(sid)) return false;
   try { if (LSJ("pt2_direct", {})[sid]) return true; } catch (e) {}
   var r = svRoomOf(sid);
   return !!(r && r.emoji === "💬");
@@ -1345,13 +1353,34 @@ function pickContacts(sid, code, name) {
   }
   navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (list) {
     if (!list || !list.length) return;
-    var nums = [];
+    var picked = [];
     list.forEach(function (c) {
-      var t = (c.tel || []).filter(Boolean);
-      if (t.length) nums.push(String(t[0]).replace(/[^0-9+]/g, ""));
+      var t = (c.tel || []).filter(Boolean)[0];
+      if (!t) return;
+      picked.push({ name: (c.name || []).filter(Boolean)[0] || String(t), tel: String(t), uid: "", hash: "" });
     });
-    if (!nums.length) { say("고른 분들의 전화번호가 없어요"); return; }
-    smsTo(nums, inviteText(name, sid, code));
+    if (!picked.length) { say("고른 분들의 전화번호가 없어요"); return; }
+
+    say("확인하는 중…");
+    matchContacts(picked, function (arr) {
+      var uids = arr.filter(function (c) { return c.uid; }).map(function (c) { return c.uid; });
+      var rest = arr.filter(function (c) { return !c.uid; });
+      var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+
+      /* 예전에는 고르자마자 문자 앱으로 넘어갔다. 이제는 넘어가지 않는다.
+         포도톡을 쓰는 분은 그대로 방에 넣고, 안 쓰는 분만 보내기 화면을 띄운다. */
+      var after = function () {
+        if (rest.length) smsSheet(rest, name, sid, code);
+      };
+      if (!uids.length) { after(); return; }
+
+      api("/talk/room/invite", { token: tokenOf(sid), body: { room_id: sid, uids: uids } })
+        .then(function (r) {
+          if (r && r.ok) { say(uids.length + "분을 방에 초대했어요 🍇"); refreshRooms(); }
+          else { rest = rest.concat(arr.filter(function (c) { return c.uid; })); }
+          after();
+        });
+    });
   }).catch(function () { say("연락처를 불러오지 못했어요"); });
 }
 
@@ -1423,21 +1452,15 @@ function newScreen(kind) {
 }
 
 function pickRow(c, i) {
+  /* 이름만 보여준다. 전화번호나 '문자로 초대' 같은 군더더기는 빼고,
+     오른쪽 끝 동그라미로 고르고 푼다. 1:1 이든 여러 명이든 같은 모양이다. */
   var joined = !!c.uid;
-  /* 1:1 은 어차피 한 명이라 체크박스가 켜졌다 꺼졌다 하는 게 무슨 뜻인지
-     알기 어렵다. 고른 사람만 보여주고 체크는 그룹방에서만 쓴다. */
-  if (NEWC.kind === "direct") {
-    return '<div class="pt2-pick' + (joined ? " joined" : "") + '">' +
-      '<span class="pt2-pick-av">' + (joined ? "🍇" : "👤") + "</span>" +
-      '<span class="pt2-pick-mid"><span class="pt2-pick-nm">' + esc(c.name || c.tel) + "</span>" +
-        '<span class="pt2-pick-sub">' + (joined ? "포도톡 사용 중 · 바로 초대돼요" : esc(c.tel) + " · 문자로 초대") + "</span></span>" +
-      "</div>";
-  }
   return '<label class="pt2-pick' + (joined ? " joined" : "") + '">' +
     '<input type="checkbox" data-pt2="pick-ck" data-i="' + i + '"' + (c.on ? " checked" : "") + ">" +
-    '<span class="pt2-pick-av">' + (joined ? "🍇" : "👤") + "</span>" +
+    '<span class="pt2-pick-av">' + (joined ? podoAv() : "👤") + "</span>" +
     '<span class="pt2-pick-mid"><span class="pt2-pick-nm">' + esc(c.name || c.tel) + "</span>" +
-      '<span class="pt2-pick-sub">' + (joined ? "포도톡 사용 중 · 바로 초대돼요" : esc(c.tel) + " · 문자로 초대") + "</span></span>" +
+      (joined ? '<span class="pt2-pick-sub">포도톡 사용 중</span>' : "") + "</span>" +
+    '<span class="pt2-ck">✓</span>' +
     "</label>";
 }
 
@@ -1445,7 +1468,7 @@ function renderNew() {
   var isD = NEWC.kind === "direct";
   var picks = NEWC.picked;
   var list = picks.length
-    ? (isD ? "" : '<div class="pt2-sub" style="margin:10px 0 -2px">체크한 사람만 초대돼요.</div>') +
+    ? '<div class="pt2-sub" style="margin:10px 0 -2px">동그라미를 눌러 고르세요. 체크한 사람만 초대돼요.</div>' +
       '<div class="pt2-picklist">' + picks.map(pickRow).join("") + "</div>"
     : '<div class="pt2-sub" style="margin:8px 0 2px">아직 고른 사람이 없어요. 위 버튼으로 연락처에서 고르세요.</div>';
 
@@ -1476,7 +1499,8 @@ function renderNew() {
 
       '<button class="cta grape" style="margin-top:16px" data-pt2="new-go">' +
         (isD ? "1:1 채팅 만들기" : "그룹방 만들기") + "</button>" +
-      '<div class="pt2-sub" style="margin-top:8px">🍇 표시가 있는 분은 방에 바로 들어와요. 나머지는 만든 뒤 문자로 초대 링크가 나갑니다.</div>' +
+      '<div class="pt2-sub" style="margin-top:8px"><span class="pt2-inline-ic">' + podoAv() +
+        '</span> 표시가 있는 분은 방에 바로 들어와요. 나머지는 만든 뒤 문자로 초대 링크가 나갑니다.</div>' +
     "</div>";
   markTab(NEWC.kind === "direct" ? "direct" : "open");
   var el = document.getElementById("pt2CName");
@@ -1530,7 +1554,7 @@ function newGo() {
   var nm = (NEWC.name || "").trim();
   if (isD && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
   if (!nm) { say(isD ? "연락처에서 상대를 골라 주세요" : "방 이름을 입력해 주세요"); return; }
-  var on = isD ? NEWC.picked.slice(0, 1) : NEWC.picked.filter(function (c) { return c.on; });
+  var on = NEWC.picked.filter(function (c) { return c.on; });
 
   say("방을 만드는 중…");
   api("/talk/room/create", { body: {
