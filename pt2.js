@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "47";
+var PT2_VER = "48";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -178,6 +178,12 @@ function rich(s) {
 (function style() {
   var css = [
     '.pt2-inline-ic{display:inline-block;width:15px;height:15px;vertical-align:-3px;border-radius:4px;overflow:hidden}',
+    '.pt2-mem{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:190px;overflow-y:auto}',
+    '.pt2-mem-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--tk-line);border-radius:11px;padding:8px 11px}',
+    '.pt2-mem-av{width:30px;height:30px;border-radius:10px;overflow:hidden;flex:0 0 auto;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
+    '.pt2-mem-ini{font-weight:900;font-size:13px;color:var(--tk-grape)}',
+    '.pt2-mem-nm{flex:1;min-width:0;font-weight:700;font-size:13.5px;color:#241436;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.pt2-mem-tag{font-size:10.5px;font-weight:800;color:var(--tk-grape);background:var(--tk-soft);border-radius:6px;padding:2px 6px;flex:0 0 auto}',
     '.pt2-av-img{display:block;width:100%;height:100%;background-size:cover;background-position:center;border-radius:inherit}',
     '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
     '.pt2-pick{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--tk-line);border-radius:12px;padding:10px 12px}',
@@ -1157,7 +1163,7 @@ function renderLive(kind){
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
     "</div>" +
     (mine.length ? '<div class="tk-tools" style="margin-top:-6px">' +
-      '<button class="tk-tool" data-pt2="live-clear" data-k="' + kind + '">🧹 이 목록 비우기 (' + mine.length + '개)</button>' +
+
     "</div>" : "") +
     '<div class="pt2-sub" style="text-align:center;margin:10px 0 0">PT2 v' + PT2_VER + "</div>" +
     (rows ? '<div class="tk-list">' + rows + "</div>"
@@ -1688,6 +1694,31 @@ function matchContacts(list, cb) {
   });
 }
 
+/* 참여자 한 줄. 프로필 사진은 각자 자기 폰에만 있고 서버로 오지 않는다.
+   그래서 나는 내 사진, 남은 이름 첫 글자를 딴 동그라미로 보여준다. */
+function memRow(m) {
+  var me = m.uid && m.uid === myUid();
+  var nm = m.nick || "익명";
+  var face = (me && myPhoto()) ? imgAv(myPhoto())
+    : '<span class="pt2-mem-ini">' + esc(nm.slice(0, 1)) + "</span>";
+  return '<div class="pt2-mem-row">' +
+    '<span class="pt2-mem-av">' + face + "</span>" +
+    '<span class="pt2-mem-nm">' + esc(nm) + (me ? " (나)" : "") + "</span>" +
+    (m.owner ? '<span class="pt2-mem-tag">방장</span>' : "") +
+    "</div>";
+}
+
+/* 서버에 참여자 목록 기능이 아직 없으면(404) 방장 한 줄만 그대로 남는다 */
+function loadMembers(sid) {
+  api("/talk/room/members?room_id=" + encodeURIComponent(sid)).then(function (d) {
+    if (!d || !d.ok || !d.members || !d.members.length) return;
+    var box = document.getElementById("pt2Mem");
+    var cnt = document.getElementById("pt2MemN");
+    if (box) box.innerHTML = d.members.map(memRow).join("");
+    if (cnt) cnt.textContent = "(" + d.members.length + ")";
+  });
+}
+
 function roomSetSheet() {
   if (!P.room) return;
   var id = P.id, r = P.room;
@@ -1702,7 +1733,9 @@ function roomSetSheet() {
     "<h3>" + esc(roomLabel(bare(id), r.name)) + "</h3>" +
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중" +
       (r.owner_nick ? "<br>만든 사람 · <b>" + esc(r.owner_nick) + "</b>" + (owner ? " (나)" : "") : "") + "</div>" +
-    '<button class="cta grape" data-pt2="inv-open">👥 친구 초대</button>' +
+    '<div class="tk-sec" style="margin-top:12px">참여자 <span id="pt2MemN">(' + (r.members || 1) + ')</span></div>' +
+    '<div class="pt2-mem" id="pt2Mem">' + memRow({ nick: r.owner_nick || myNick(), owner: 1, uid: r.owner_uid || (owner ? myUid() : "") }) + "</div>" +
+    '<button class="cta grape" style="margin-top:12px" data-pt2="inv-open">👥 친구 초대</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
     /* 자동번역은 통역방·여러 나라 사람이 섞인 그룹방에서 쓰는 기능이다.
@@ -1726,6 +1759,7 @@ function roomSetSheet() {
     "</div>";
   document.body.appendChild(bg);
   bg.setAttribute("data-room", id);
+  try { loadMembers(bare(id)); } catch (e) {}
 }
 
 function newRoomSheet() {
