@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-16 v10";</script>
+<script>window.PODOTALK_BUILD = "2026-08-16 v11";</script>
 <!-- 폰트만 CDN. 실패해도 시스템 폰트로 폴백되어 동작에 영향 없음 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- QRCode for JavaScript (davidshimjs/qrcodejs, MIT) — CDN 의존 제거를 위해 인라인 -->
@@ -5563,7 +5563,7 @@ function openNewRoomSheet(mode){
     '<h3>'+(isD?"새 1:1 채팅 만들기":"새 그룹방 만들기")+'</h3>'+
     '<div class="sd">'+(isD?"1:1 채팅방이 만들어져요. 초대 링크·코드로 상대 한 명을 초대할 수 있어요.":"그룹(다중) 오픈채팅방을 만들어요. 초대 링크·코드로 여러 명을 초대할 수 있어요.")+'</div>'+
     '<div class="tk-field"><label>방 이름</label><input id="nrName" placeholder="'+(isD?"예: 홍길동님과 1:1":"예: 우리가게 단골방")+'" autocomplete="off"></div>'+
-    '<div class="tk-field"><label>입장 코드 (선택)</label><input id="nrPw" placeholder="비우면 자동 코드 생성 · 초대 링크 받은 사람이 이 코드로 입장" autocomplete="off" autocapitalize="characters"></div>'+
+    (isD ? '' : '<div class="tk-field"><label>입장 코드 (선택)</label><input id="nrPw" placeholder="비우면 자동 코드 생성 · 초대 링크 받은 사람이 이 코드로 입장" autocomplete="off" autocapitalize="characters"></div>')+
     '<button class="cta grape" data-action="talk-create">'+(isD?"1:1 채팅 만들기":"그룹방 만들기")+'</button>'+
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">취소</button>'+
   '</div>';
@@ -5727,7 +5727,7 @@ function renderRoomSettings(id){
   if(!r){ location.hash="#/talk"; return; }
   var owner=!!r.owner;
   var noti=(r.noti!==false);
-  var memberRows='<div class="tk-mem tap" data-action="talk-tab" data-v="settings"><div class="tk-mem-av">'+avInner(talkAvatar())+'</div><div class="tk-mem-nm">'+escapeHtml(talkNick())+' <span class="tk-me-tag">나</span>'+(owner?' <span class="tk-own-tag">방장</span>':'')+'</div><span class="tk-mem-go">›</span></div>';
+  var memberRows='<div class="tk-mem tap" data-action="talk-tab" data-v="settings"><div class="tk-mem-av">'+avInner(talkAvatar())+'</div><div class="tk-mem-nm">'+escapeHtml(talkNick())+' <span class="tk-me-tag">나</span></div><span class="tk-mem-go">›</span></div>';
   (r.members||[]).forEach(function(m){ memberRows+='<div class="tk-mem tap" data-action="talk-member" data-id="'+id+'" data-mid="'+escapeHtml(m.id||"")+'"><div class="tk-mem-av">'+avInner(m.avatar)+'</div><div class="tk-mem-nm">'+escapeHtml(m.name)+(m.phone?' <span class="tk-ph-tag">📞</span>':'')+'</div><span class="tk-mem-go">›</span></div>'; });
 
   var nameBlock = owner
@@ -5772,9 +5772,11 @@ function renderRoomSettings(id){
       inviteBlock+
       '<div class="tk-sec">멤버 '+((r.type==="open"&&r.mode==="group")?("("+roomCount(r)+")"):"")+'</div>'+
       '<div class="tk-memlist">'+memberRows+'</div>'+
-      '<button class="cta" data-action="talk-leave" data-id="'+id+'" style="margin-top:14px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none">방 나가기</button>'+
-      (owner?'<button class="cta" data-action="talk-delete" data-id="'+id+'" style="margin-top:8px;background:#fff;color:#c2410c;border:1.5px solid #c2410c;box-shadow:none">방 삭제 (방장)</button>':'')+
-      '<div class="tip" style="margin-top:6px">🍇 포도톡 대화·방은 이 기기(localStorage)에만 저장돼요. 초대 링크는 방 정보를 담아 전달됩니다.</div>'+
+      /* 버튼은 하나만 둔다. 만든 사람이면 삭제, 아니면 나가기.
+         둘을 나란히 두면 뭘 눌러야 하는지 헷갈린다. */
+      (owner
+        ? '<button class="cta" data-action="talk-delete" data-id="'+id+'" style="margin-top:14px;background:#fff;color:#c2410c;border:1.5px solid #c2410c;box-shadow:none">🗑 방 삭제하기</button>'
+        : '<button class="cta" data-action="talk-leave" data-id="'+id+'" style="margin-top:14px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none">🚪 방 나가기</button>')+
     '</div>';
   setTalkTab("open");
 }
@@ -6740,6 +6742,6 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=30"></script>
+<script src="/pt2.js?v=31"></script>
 </body>
 </html>

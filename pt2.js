@@ -27,12 +27,13 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "30";
+var PT2_VER = "31";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
 var PFX = "sv_";                                          /* 서버 방 id 접두어 */
 var POLL_MS = 3000;
+var LOCAL_ROOMS = false;   /* 이 기기에만 저장되는 방을 쓸지. false = 모든 방이 서버 방 */
 
 /* ── 원본 보관 (PT 레이어가 이미 감싼 것도 그대로 이어받는다) ── */
 var O = {
@@ -118,6 +119,16 @@ function stampHtml() {
          '</div>';
   }
   return s;
+}
+
+/* 아직 서버로 안 옮긴 옛날 방이 남아 있는지 */
+function hasLocalRooms() {
+  try {
+    var up = upMap();
+    return talkRooms().some(function (r) {
+      return r.type === "open" && !up[r.id];
+    });
+  } catch (e) { return false; }
 }
 
 function apiBase() { return (LS("pt2_api") || DEF_API).replace(/\/+$/, ""); }
@@ -295,7 +306,7 @@ function injectSettings() {
   wrap.innerHTML =
     '<div class="tk-sec">🌐 서버 연결 (포도톡 방·봇)</div>' +
     '<div class="tk-toggle">서버 방 사용<span class="tk-sw' + (on() ? " on" : "") + '" data-pt2="toggle"></span></div>' +
-    '<div class="pt2-sub" style="margin-top:6px">켜면 <b>오픈채팅</b> 탭에서 다른 기기·다른 사람과 실제로 대화하는 방이 함께 보여요. 이 기기에만 저장되는 방에는 <b>📱 이 기기</b> 표시가 붙어요.</div>' +
+    '<div class="pt2-sub" style="margin-top:6px">포도톡의 모든 방은 서버에 저장돼요. 폰을 바꿔도 대화가 그대로 있고, 다른 사람과 실제로 같은 방에서 이야기할 수 있어요.</div>' +
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
@@ -305,9 +316,11 @@ function injectSettings() {
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
         '<div class="pt2-sub" style="margin-top:6px">이 기기의 알림은 포도톡 서버 하나만 씁니다. 포도다 주문 알림은 pododa.kr 에서 받으세요.</div>'
       : "") +
-    (STEP >= 7
-      ? '<div class="tk-sec" style="margin-top:14px">📤 이 기기 대화 옮기기</div>' +
-        '<div class="pt2-sub">기기에만 저장된 그룹방을 서버로 올리면 다른 기기에서도 같은 방이 보여요. 사진은 올라가지 않습니다.</div>' +
+    /* 옮길 방이 하나도 없으면 이 칸 자체를 안 보여준다.
+       할 일이 없는데 버튼만 있으면 그게 더 헷갈린다. */
+    ((STEP >= 7 && hasLocalRooms())
+      ? '<div class="tk-sec" style="margin-top:14px">📤 예전 대화 옮기기</div>' +
+        '<div class="pt2-sub">이 폰에만 남아 있는 옛날 방이 있어요. 서버로 옮기면 폰을 바꿔도 그대로 있습니다. 사진은 옮겨지지 않아요.</div>' +
         '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="up-open">옮길 방 고르기</button>'
       : "");
   box.appendChild(wrap);
@@ -392,7 +405,7 @@ function shopItems() {
 
 function renderOpen() {
   var cur = seg();
-  var items = (cur === "shop") ? shopItems() : localOpenItems();
+  var items = (cur === "shop") ? shopItems() : (LOCAL_ROOMS ? localOpenItems() : []);
   if (cur === "open") {
     svRooms().forEach(function (r) {
       if (isLive(r.id)) return;          /* 동시통역방은 통역톡 탭에서만 보인다 */
@@ -422,10 +435,12 @@ function renderOpen() {
       '<button class="tk-tool primary" data-pt2="new-sv">＋ 방 만들기</button>' +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
     "</div>" +
-    '<div class="tk-tools" style="margin-top:-6px">' +
-      '<button class="tk-tool" data-action="talk-new" data-mode="group">📱 이 기기에만 만들기</button>' +
-      '<button class="tk-tool" data-action="talk-join-code">🔑 초대 링크로 입장</button>' +
-    "</div>";
+    (LOCAL_ROOMS
+      ? '<div class="tk-tools" style="margin-top:-6px">' +
+          '<button class="tk-tool" data-action="talk-new" data-mode="group">📱 이 기기에만 만들기</button>' +
+          '<button class="tk-tool" data-action="talk-join-code">🔑 초대 링크로 입장</button>' +
+        "</div>"
+      : "");
   var empty = (cur === "shop")
     ? '<div class="tk-empty"><div class="ee">🏪</div>가게와 나눈 대화가 없어요.<br>상점에서 문의하기를 누르면 여기에 생겨요.</div>'
     : '<div class="tk-empty"><div class="ee">💬</div>방이 없어요. 새로 만들어보세요!</div>';
@@ -1110,6 +1125,25 @@ function renderAlarm() {
 
 /* ══════════════ STEP 5 · 과제 · 방 설정 ══════════════ */
 window.renderTalk = function (sub, arg) {
+  /* 초대 링크로 들어온 경우. 코드를 물어보지 않고 그 방으로 바로 넣는다.
+     받은 사람 입장에서 링크를 누른 것 자체가 이미 초대의 증거다. */
+  if (sub === "join" && arg && on()) {
+    var key = String(arg).trim();
+    try { document.querySelector("#view").innerHTML = '<div class="tk-empty"><div class="ee">🍇</div>방을 여는 중…</div>'; } catch (e) {}
+    api("/talk/room?code=" + encodeURIComponent(key.toUpperCase())).then(function (d) {
+      if (d && d.ok && d.room) { location.replace("#/talk/room/" + PFX + d.room.id); return; }
+      /* 코드가 아니라 방 id 를 그대로 담아 보낸 링크일 수도 있다 */
+      api("/talk/room?id=" + encodeURIComponent(key)).then(function (e2) {
+        if (e2 && e2.ok && e2.room) { location.replace("#/talk/room/" + PFX + e2.room.id); return; }
+        try {
+          document.querySelector("#view").innerHTML =
+            '<div class="tk-empty"><div class="ee">⚠️</div>초대 링크가 만료됐거나 잘못됐어요<br>' +
+            '<span style="font-size:12px">보낸 분에게 새 링크를 받아주세요</span></div>';
+        } catch (e3) {}
+      });
+    });
+    return;
+  }
   if (sub === "trans") {
     if (arg) return trxRoom(arg);
     var k = lseg();
@@ -1164,6 +1198,88 @@ function drawTasks(id) {
   });
 }
 
+/* ══════════════ 친구 초대 ══════════════
+   솔직히 짚고 갈 것 : 연락처에서 사람을 고른다고 그 사람이 방에 들어와지지는
+   않는다. 남의 폰을 이쪽에서 조작할 방법은 없다. 그래서 여기서 하는 일은
+   "고른 사람에게 초대 링크를 문자로 쏘는 것" 까지다. 상대가 그 링크를 누르면
+   코드를 입력할 필요 없이 바로 방으로 들어온다.
+
+   연락처 읽기는 Contact Picker API 를 쓴다. 안드로이드 크롬에서만 동작하고
+   아이폰·PC 에는 없다. 없으면 공유하기(카톡·문자)로 자연스럽게 넘어간다. */
+function hasPicker() {
+  try { return !!(navigator.contacts && navigator.contacts.select && window.ContactsManager); }
+  catch (e) { return false; }
+}
+function inviteLink(sid, code) {
+  var base = location.origin || "https://podotalk.kr";
+  return base + "/#/talk/join/" + encodeURIComponent(code || sid);
+}
+function inviteText(name, sid, code) {
+  return "🍇 포도톡 『" + (name || "대화방") + "』에 초대합니다.\n" +
+         "아래 링크를 누르면 바로 들어와져요.\n" + inviteLink(sid, code);
+}
+
+/* 문자 앱을 연다. 안드로이드는 sms:번호?body=내용 을 알아듣는다 */
+function smsTo(nums, body) {
+  var to = (nums || []).join(",");
+  try { location.href = "sms:" + to + "?body=" + encodeURIComponent(body); }
+  catch (e) { say("문자 앱을 열지 못했어요"); }
+}
+
+function pickContacts(sid, code, name) {
+  if (!hasPicker()) {
+    say("이 기기에서는 연락처를 직접 열 수 없어요. 공유하기로 보내주세요");
+    shareInvite(sid, code, name);
+    return;
+  }
+  navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (list) {
+    if (!list || !list.length) return;
+    var nums = [];
+    list.forEach(function (c) {
+      var t = (c.tel || []).filter(Boolean);
+      if (t.length) nums.push(String(t[0]).replace(/[^0-9+]/g, ""));
+    });
+    if (!nums.length) { say("고른 분들의 전화번호가 없어요"); return; }
+    smsTo(nums, inviteText(name, sid, code));
+  }).catch(function () { say("연락처를 불러오지 못했어요"); });
+}
+
+function shareInvite(sid, code, name) {
+  var txt = inviteText(name, sid, code);
+  if (navigator.share) {
+    navigator.share({ title: "포도톡 초대", text: txt }).catch(function () {});
+    return;
+  }
+  try { navigator.clipboard.writeText(txt); say("초대 문구를 복사했어요. 카톡에 붙여넣으세요 📋"); }
+  catch (e) { prompt("이 내용을 복사해서 보내세요", txt); }
+}
+
+function inviteSheet(sid, code, name) {
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>친구 초대</h3>" +
+    '<div class="sd">초대 링크를 받은 사람은 <b>코드를 입력하지 않고</b> 바로 들어와요.</div>' +
+    (hasPicker()
+      ? '<button class="cta grape" data-pt2="inv-pick" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '" data-name="' + esc(name || "") + '">📇 연락처에서 고르기</button>'
+      : '<div class="pt2-sub" style="margin-bottom:8px">📇 연락처 열기는 안드로이드 크롬에서만 됩니다. 아래 공유하기를 쓰세요.</div>') +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-grape);box-shadow:none" data-pt2="inv-share" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '" data-name="' + esc(name || "") + '">💬 카톡·문자로 보내기</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="inv-copy" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '" data-name="' + esc(name || "") + '">🔗 초대 링크 복사</button>' +
+    (code ? '<div class="tk-code" style="margin-top:10px">초대 코드 <b>' + esc(code) + "</b></div>" : "") +
+    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
+    "</div>";
+  document.body.appendChild(bg);
+}
+
+/* index.html 의 가짜 친구 목록(민지·준호…)을 진짜 초대로 갈아끼운다 */
+window.openInviteFriends = function (id) {
+  var nm = "", cd = "";
+  try { var r = findRoom(id); if (r) { nm = r.name || ""; cd = r.pw || r.code || ""; } } catch (e) {}
+  inviteSheet(id, cd, nm);
+};
+
 function roomSetSheet() {
   if (!P.room) return;
   var id = P.id, r = P.room;
@@ -1177,7 +1293,7 @@ function roomSetSheet() {
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
     "<h3>" + esc(roomLabel(bare(id), r.name)) + "</h3>" +
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중</div>" +
-    '<button class="cta grape" data-pt2="copy-code">초대 코드 복사</button>' +
+    '<button class="cta grape" data-pt2="inv-open">👥 친구 초대</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
     '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
@@ -1187,8 +1303,13 @@ function roomSetSheet() {
     (r.type === "study" ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="tasks">✓ 과제 보기</button>' : "") +
     (owner && STEP >= 5 ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="new-agent">🤖 이 방 전용 봇 만들기</button>' : "") +
     (!owner && STEP >= 5 ? '<div class="pt2-sub" style="margin-top:8px">방 전용 봇은 이 방을 만든 기기에서만 추가할 수 있어요.</div>' : "") +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="leave">방 나가기</button>' +
-    (owner ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none" data-pt2="del-room">방 삭제하기</button>' : "") +
+    /* 나가기와 삭제를 나란히 두면 뭘 눌러야 할지 헷갈린다.
+       방을 만든 사람에게는 삭제 하나만, 나머지에게는 나가기 하나만 보여준다. */
+    (owner
+      ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none" data-pt2="del-room">🗑 방 삭제하기</button>' +
+        '<div class="pt2-sub" style="margin-top:6px">내가 만든 방이라, 지우면 참여한 모든 사람에게서 사라져요.</div>'
+      : '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="leave">🚪 방 나가기</button>' +
+        '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요. 남은 사람들은 그대로 대화합니다.</div>') +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
@@ -1207,11 +1328,15 @@ function newRoomSheet() {
     '<div class="tk-field"><label>방 이름</label><input id="pt2NName" maxlength="40" placeholder="예: 부산 사장님 모임" autocomplete="off"></div>' +
     '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2NIntro" maxlength="120" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
     '<div class="tk-tools" id="pt2NType">' +
-      '<button class="tk-tool primary" data-pt2="ntype" data-v="general">일반</button>' +
-      '<button class="tk-tool" data-pt2="ntype" data-v="study">스터디</button>' +
-      '<button class="tk-tool" data-pt2="ntype" data-v="creator">크리에이터</button>' +
+      '<button class="tk-tool" data-pt2="ntype" data-v="direct">💬 1:1</button>' +
+      '<button class="tk-tool primary" data-pt2="ntype" data-v="general">👥 일반</button>' +
+      '<button class="tk-tool" data-pt2="ntype" data-v="study">📚 스터디</button>' +
+      '<button class="tk-tool" data-pt2="ntype" data-v="creator">✨ 크리에이터</button>' +
     "</div>" +
-    '<div class="tk-toggle">코드로만 입장<span class="tk-sw" id="pt2NPriv" data-pt2="npriv"></span></div>' +
+    /* 1:1 은 둘만 쓰는 방이라 코드를 따로 걸 이유가 없다.
+       초대 링크를 받은 사람이 곧바로 들어오는 게 맞다. */
+    '<div id="pt2NPrivBox"><div class="tk-toggle">코드로만 입장<span class="tk-sw" id="pt2NPriv" data-pt2="npriv"></span></div></div>' +
+    '<div class="pt2-sub" id="pt2NDirect" style="display:none;margin-top:6px">1:1 방은 입장 코드가 없어요. 초대 링크를 받은 사람이 바로 들어옵니다.</div>' +
     '<button class="cta grape" style="margin-top:10px" data-pt2="create-sv">방 만들기</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">취소</button>' +
     "</div>";
@@ -2017,15 +2142,15 @@ function rowMenu(id){
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
     "<h3>" + esc(name) + "</h3>" +
-    '<div class="sd">' + (sv ? "서버 방 · 다른 기기와 함께 씁니다" : "이 기기에만 저장된 방입니다") + "</div>" +
+    '<div class="sd">' + (sv ? "다른 기기·다른 사람과 함께 쓰는 방이에요" : "옮기기 전이라 이 폰에만 남아 있는 방이에요") + "</div>" +
     '<div class="tk-toggle">🔔 알림 받기<span class="tk-sw' + (notiOn ? " on" : "") + '" data-pt2="row-noti" data-id="' + esc(id) + '"></span></div>' +
     (!sv ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="row-pin" data-id="' + esc(id) + '">' + (r.pinned ? "📌 고정 해제" : "📌 맨 위 고정") + "</button>" : "") +
-    '<button class="cta" style="margin-top:10px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="row-delme" data-id="' + esc(id) + '">👤 나에게서 삭제</button>' +
-    '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요.' + (sv ? " 남은 사람들은 그대로 대화합니다." : "") + "</div>" +
+    /* 버튼은 하나만. 방을 만든 사람이면 삭제, 아니면 나가기다. */
     (sv && owner
-      ? '<button class="cta" style="margin-top:10px;background:#fff;color:#c2410c;border:1.5px solid #c2410c;box-shadow:none" data-pt2="row-delall" data-id="' + esc(id) + '">🌐 모두에게서 삭제</button>' +
-        '<div class="pt2-sub" style="margin-top:6px">서버에서 방과 대화가 지워져요. 참여한 모든 사람에게서 사라집니다.</div>'
-      : (sv ? '<div class="pt2-sub" style="margin-top:10px">모두에게서 삭제는 <b>방을 만든 사람</b>만 할 수 있어요.</div>' : "")) +
+      ? '<button class="cta" style="margin-top:10px;background:#fff;color:#c2410c;border:1.5px solid #c2410c;box-shadow:none" data-pt2="row-delall" data-id="' + esc(id) + '">🗑 방 삭제</button>' +
+        '<div class="pt2-sub" style="margin-top:6px">내가 만든 방이라, 지우면 참여한 모든 사람에게서 사라져요.</div>'
+      : '<button class="cta" style="margin-top:10px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="row-delme" data-id="' + esc(id) + '">🚪 방 나가기</button>' +
+        '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요.' + (sv ? " 남은 사람들은 그대로 대화합니다." : "") + "</div>") +
     '<button class="cta" style="margin-top:12px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
   "</div>";
   document.body.appendChild(bg);
@@ -2180,9 +2305,19 @@ document.addEventListener("click", function (e) {
   if (a === "new-sv")   { newRoomSheet(); return; }
   if (a === "ntype")    {
     window._pt2New = window._pt2New || {};
-    window._pt2New.type = el.getAttribute("data-v");
+    var nv = el.getAttribute("data-v");
+    window._pt2New.type = nv;
     var box = document.getElementById("pt2NType");
     if (box) [].forEach.call(box.children, function (b) { b.className = "tk-tool" + (b === el ? " primary" : ""); });
+    var pbx = document.getElementById("pt2NPrivBox");
+    var dtx = document.getElementById("pt2NDirect");
+    if (pbx) pbx.style.display = (nv === "direct") ? "none" : "";
+    if (dtx) dtx.style.display = (nv === "direct") ? "" : "none";
+    if (nv === "direct") {
+      window._pt2New.priv = false;
+      var swp = document.getElementById("pt2NPriv");
+      if (swp) swp.className = "tk-sw";
+    }
     return;
   }
   if (a === "npriv")    {
@@ -2195,18 +2330,25 @@ document.addEventListener("click", function (e) {
     var nm = ((document.getElementById("pt2NName") || {}).value || "").trim();
     if (!nm) { say("방 이름을 입력해 주세요"); return; }
     var cfg = window._pt2New || { type: "general", priv: false };
+    var isDirect = cfg.type === "direct";
+    /* 서버가 모르는 종류를 보내면 거절당할 수 있어서, 1:1 도 서버에는 general 로 만든다.
+       1:1 이라는 사실은 이 기기에만 표시로 남긴다. */
+    var sendType = isDirect ? "general" : cfg.type;
     api("/talk/room/create", { body: {
       name: nm,
       intro: ((document.getElementById("pt2NIntro") || {}).value || "").trim(),
-      type: cfg.type, uid: myUid(), nick: myNick(),
-      is_private: cfg.priv ? 1 : 0,
-      emoji: ({ general: "🍇", study: "📚", creator: "✨" })[cfg.type] || "🍇"
+      type: sendType, uid: myUid(), nick: myNick(),
+      is_private: (isDirect ? 0 : (cfg.priv ? 1 : 0)),
+      emoji: isDirect ? "💬" : (({ general: "🍇", study: "📚", creator: "✨" })[cfg.type] || "🍇")
     }}).then(function (d) {
       if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
       saveToken(d.id, d.token);
+      if (isDirect) { try { var dm = LSJ("pt2_direct", {}); dm[d.id] = 1; LSS("pt2_direct", JSON.stringify(dm)); } catch (_e) {} }
       var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
-      say("방을 만들었어요 🍇");
+      say(isDirect ? "1:1 방을 만들었어요 💬" : "방을 만들었어요 🍇");
       refreshRooms();
+      /* 만들자마자 초대할 수 있게 초대 시트를 바로 띄운다 */
+      setTimeout(function () { inviteSheet(d.id, d.code || "", nm); }, 350);
       location.hash = "#/talk/room/" + PFX + d.id;
     });
     return;
@@ -2234,6 +2376,19 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "inv-open") {
+    if (!P.room) return;
+    inviteSheet(bare(P.id), P.room.code || "", roomLabel(bare(P.id), P.room.name));
+    return;
+  }
+  if (a === "inv-pick")  { pickContacts(el.getAttribute("data-id"), el.getAttribute("data-code"), el.getAttribute("data-name")); return; }
+  if (a === "inv-share") { shareInvite(el.getAttribute("data-id"), el.getAttribute("data-code"), el.getAttribute("data-name")); return; }
+  if (a === "inv-copy")  {
+    var lk = inviteLink(el.getAttribute("data-id"), el.getAttribute("data-code"));
+    try { navigator.clipboard.writeText(lk); say("초대 링크를 복사했어요 🔗"); }
+    catch (e) { prompt("이 링크를 복사해서 보내세요", lk); }
+    return;
+  }
   if (a === "tr-toggle") {
     var rid0 = el.getAttribute("data-id") || P.id;
     var nx = !trOn(rid0);
