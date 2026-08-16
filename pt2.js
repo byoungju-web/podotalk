@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "34";
+var PT2_VER = "35";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -849,7 +849,9 @@ function renderRoom(id) {
   try { head = ""; } catch (e) {}
   var backTo = isLive(bare(id))
     ? '<span class="tk-back" data-pt2="lang">‹</span>'
-    : '<span class="tk-back" data-action="talk-tab" data-v="open">‹</span>';
+    : (isDirectRoom(bare(id))
+      ? '<span class="tk-back" data-action="talk-tab" data-v="direct">‹</span>'
+      : '<span class="tk-back" data-action="talk-tab" data-v="open">‹</span>');
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead pt2-fixhead">' + backTo +
       '<div class="tk-savatar">🍇</div>' +
@@ -857,6 +859,10 @@ function renderRoom(id) {
         '<div class="tk-hs" id="pt2Sub">서버 방</div></div>' +
       '<div class="tk-racts">' +
         '<button class="tk-ract" data-pt2="top" title="맨 위로">⤒</button>' +
+        /* 알림 켜고 끄기는 대화 중에 가장 자주 누르는 것이라 헤더에 둔다.
+           설정 시트까지 들어가야 했던 게 불편했다. */
+        '<button class="tk-ract" id="pt2BellBtn" data-pt2="noti-toggle" data-id="' + esc(id) + '" title="이 방 알림">' +
+          (muted(bare(id)) ? "🔕" : "🔔") + "</button>" +
         (STEP >= 5 ? '<button class="tk-ract" id="pt2TaskBtn" data-pt2="tasks" style="display:none">✓</button>' : "") +
         '<button class="tk-ract" data-pt2="roomset">⚙️</button>' +
       "</div></div>" +
@@ -1361,6 +1367,7 @@ var NEWC = { kind: "direct", picked: [] };
 function newScreen(kind) {
   NEWC.kind = (kind === "group") ? "group" : "direct";
   NEWC.picked = [];
+  NEWC.name = ""; NEWC.intro = ""; NEWC.priv = false;
   location.hash = "#/talk/new";
 }
 
@@ -1381,21 +1388,22 @@ function renderNew() {
     ? '<div class="pt2-picklist">' + picks.map(pickRow).join("") + "</div>"
     : '<div class="pt2-sub" style="margin:8px 0 2px">아직 고른 사람이 없어요. 위 버튼으로 연락처에서 고르세요.</div>';
 
+  /* 1:1 은 고른 사람 이름이 곧 방 이름이라 입력칸이 필요 없다.
+     연락처를 못 여는 기기(아이폰·PC)에서만 이름을 직접 받는다. */
+  var needName = !isD || !hasPicker();
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead"><span class="tk-back" data-pt2="new-back">‹</span>' +
-      '<div class="tk-rh-mid"><div class="tk-hi">새 채팅 만들기</div>' +
+      '<div class="tk-rh-mid"><div class="tk-hi">' + (isD ? "새 1:1 채팅" : "새 그룹방") + "</div>" +
       '<div class="tk-hs">' + (isD ? "둘이서 이야기해요" : "여러 명이 함께 이야기해요") + "</div></div></div>" +
     '<div class="tk-set">' +
-      '<div class="pt2-seg" style="margin-bottom:12px">' +
-        '<button class="' + (isD ? "on" : "") + '" data-pt2="new-kind" data-v="direct">💬 1:1</button>' +
-        '<button class="' + (isD ? "" : "on") + '" data-pt2="new-kind" data-v="group">👥 그룹</button>' +
-      "</div>" +
-      '<div class="tk-field"><label>방 이름</label><input id="pt2CName" maxlength="40" placeholder="' +
-        (isD ? "예: 홍길동님과 1:1" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>' +
+      (needName
+        ? '<div class="tk-field"><label>방 이름</label><input id="pt2CName" maxlength="40" value="' + esc(NEWC.name || "") + '" placeholder="' +
+            (isD ? "상대 이름" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>'
+        : "") +
       (isD ? "" :
-        '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
+        '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
         '<div class="tk-toggle">코드로만 입장<span class="tk-sw' + (NEWC.priv ? " on" : "") + '" data-pt2="new-priv"></span></div>') +
-      (isD ? '<div class="pt2-sub" style="margin-top:2px">1:1 방은 입장 코드가 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "") +
+      (isD ? '<div class="pt2-sub" style="margin-top:2px">고른 분의 이름이 그대로 방 이름이 돼요. 입장 코드는 없고, 초대받은 사람이 바로 들어옵니다.</div>' : "") +
 
       '<div class="tk-sec" style="margin-top:16px">초대할 사람</div>' +
       (hasPicker()
@@ -1413,8 +1421,18 @@ function renderNew() {
 }
 
 /* 연락처 고르기 → 누가 가입자인지 확인 → 체크 목록에 쌓기 */
+/* 화면을 다시 그리면 입력칸이 새로 만들어져 적어둔 글자가 날아간다.
+   그리기 전에 항상 값을 챙겨 둔다. */
+function newKeep() {
+  var a = document.getElementById("pt2CName");
+  var b = document.getElementById("pt2CIntro");
+  if (a) NEWC.name = a.value;
+  if (b) NEWC.intro = b.value;
+}
+
 function newPick() {
   if (!hasPicker()) { say("이 기기에서는 연락처를 열 수 없어요"); return; }
+  newKeep();
   navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (out) {
     if (!out || !out.length) return;
     var add = [];
@@ -1430,9 +1448,12 @@ function newPick() {
       var have = {};
       NEWC.picked.forEach(function (c) { have[normPhone(c.tel)] = 1; });
       arr.forEach(function (c) { if (!have[normPhone(c.tel)]) NEWC.picked.push(c); });
-      if (NEWC.kind === "direct" && NEWC.picked.length > 1) {
-        NEWC.picked = NEWC.picked.slice(0, 1);
-        say("1:1 방은 한 분만 초대할 수 있어요");
+      if (NEWC.kind === "direct") {
+        if (NEWC.picked.length > 1) {
+          NEWC.picked = NEWC.picked.slice(0, 1);
+          say("1:1 방은 한 분만 초대할 수 있어요");
+        }
+        if (NEWC.picked[0]) NEWC.name = NEWC.picked[0].name;   /* 이름이 곧 방 이름 */
       }
       renderNew();
     });
@@ -1441,15 +1462,17 @@ function newPick() {
 
 /* 만들기 : 방 생성 → 가입자는 서버가 바로 넣고 → 나머지는 문자 한 통으로 */
 function newGo() {
-  var nm = ((document.getElementById("pt2CName") || {}).value || "").trim();
-  if (!nm) { say("방 이름을 입력해 주세요"); return; }
+  newKeep();
   var isD = NEWC.kind === "direct";
+  var nm = (NEWC.name || "").trim();
+  if (isD && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
+  if (!nm) { say(isD ? "연락처에서 상대를 골라 주세요" : "방 이름을 입력해 주세요"); return; }
   var on = NEWC.picked.filter(function (c) { return c.on; });
 
   say("방을 만드는 중…");
   api("/talk/room/create", { body: {
     name: nm,
-    intro: ((document.getElementById("pt2CIntro") || {}).value || "").trim(),
+    intro: (NEWC.intro || "").trim(),
     type: "general", uid: myUid(), nick: myNick(),
     /* 1:1 은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의 오픈채팅
        목록에 뜬다. 코드를 입력받지 않는 것과 목록에 안 보이는 것은 다른 얘기다. */
@@ -1568,10 +1591,13 @@ function roomSetSheet() {
     '<button class="cta grape" data-pt2="inv-open">👥 친구 초대</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
-    '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
-    '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
-    '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
-      '<select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + '</select></div>' +
+    /* 자동번역은 통역방·여러 나라 사람이 섞인 그룹방에서 쓰는 기능이다.
+       1:1 설정에까지 얹으면 화면만 길어지고 무슨 방인지 헷갈린다. */
+    (isDirectRoom(bare(id)) ? "" :
+      '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
+      '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
+      '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
+        '<select class="pt2-langsel" data-pt2-lang="1">' + trxOpts(myLang()) + '</select></div>') +
     (r.type === "study" ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="tasks">✓ 과제 보기</button>' : "") +
     (owner && STEP >= 5 ? '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="new-agent">🤖 이 방 전용 봇 만들기</button>' : "") +
     (!owner && STEP >= 5 ? '<div class="pt2-sub" style="margin-top:8px">방 전용 봇은 이 방을 만든 기기에서만 추가할 수 있어요.</div>' : "") +
@@ -1600,7 +1626,6 @@ function newRoomSheet() {
     '<div class="tk-field"><label>방 이름</label><input id="pt2NName" maxlength="40" placeholder="예: 부산 사장님 모임" autocomplete="off"></div>' +
     '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2NIntro" maxlength="120" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
     '<div class="tk-tools" id="pt2NType">' +
-      '<button class="tk-tool" data-pt2="ntype" data-v="direct">💬 1:1</button>' +
       '<button class="tk-tool primary" data-pt2="ntype" data-v="general">👥 일반</button>' +
       '<button class="tk-tool" data-pt2="ntype" data-v="study">📚 스터디</button>' +
       '<button class="tk-tool" data-pt2="ntype" data-v="creator">✨ 크리에이터</button>' +
@@ -2671,11 +2696,6 @@ document.addEventListener("click", function (e) {
     location.hash = (NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open";
     return;
   }
-  if (a === "new-kind") {
-    NEWC.kind = el.getAttribute("data-v");
-    if (NEWC.kind === "direct" && NEWC.picked.length > 1) NEWC.picked = NEWC.picked.slice(0, 1);
-    renderNew(); return;
-  }
   if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
   if (a === "new-pick") { newPick(); return; }
   if (a === "new-go")   { newGo(); return; }
@@ -2705,7 +2725,14 @@ document.addEventListener("click", function (e) {
     var rid2 = bare(el.getAttribute("data-id") || P.id);
     var nowMuted = !muted(rid2);
     setMuted(rid2, nowMuted);
-    el.className = "tk-sw" + (nowMuted ? "" : " on");
+    /* 헤더의 종 버튼과 설정 시트의 스위치가 같은 동작을 공유한다.
+       스위치일 때만 색을 바꾼다. 종이면 아래에서 아이콘을 갈아 끼운다. */
+    if (el.classList.contains("tk-sw")) el.className = "tk-sw" + (nowMuted ? "" : " on");
+    else el.textContent = nowMuted ? "🔕" : "🔔";
+    var sw2 = document.querySelector('.tk-sw[data-pt2="noti-toggle"]');
+    if (sw2) sw2.className = "tk-sw" + (nowMuted ? "" : " on");
+    var bell = document.getElementById("pt2BellBtn");
+    if (bell) bell.textContent = nowMuted ? "🔕" : "🔔";
     say(nowMuted ? "이 방 알림을 껐어요 🔕" : "이 방 알림을 켰어요 🔔");
     return;
   }
@@ -2850,7 +2877,8 @@ document.addEventListener("change", function (e) {
   if (NEWC.picked[i]) NEWC.picked[i].on = !!el.checked;
   if (NEWC.kind === "direct" && el.checked) {
     NEWC.picked.forEach(function (c, j) { if (j !== i) c.on = false; });
-    renderNew();
+    NEWC.name = NEWC.picked[i] ? NEWC.picked[i].name : NEWC.name;
+    newKeep(); renderNew();
   }
 });
 
