@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "46";
+var PT2_VER = "47";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1107,7 +1107,7 @@ function roomLabel(sid, fallback){ return aliasGet(sid) || fallback || "통역�
 function segBarHtml(cur){
   return '<div class="pt2-seg pt2-seg3">' +
     '<button class="' + (cur === "one" ? "on" : "") + '" data-pt2="lseg" data-v="one">💬 1:1<br>동시통역</button>' +
-    '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👥 다중<br>동시통역</button>' +
+    '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👪 다중<br>동시통역</button>' +
     '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기<br>통역</button>' +
   "</div>";
 }
@@ -1136,7 +1136,7 @@ function renderLive(kind){
     var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
     return '<div class="pt2-lrow">' +
       '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
-      '<div class="tk-av trx-av">' + (kind === "multi" ? "👥" : "💬") + "</div>" +
+      '<div class="tk-av trx-av">' + (kind === "multi" ? "👪" : "💬") + "</div>" +
       '<div class="tk-rmid"><div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
         '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
         (r.code ? '<span class="trx-pair">' + esc(r.code) + "</span>" : "") +
@@ -1147,7 +1147,7 @@ function renderLive(kind){
       '<button class="pt2-x" data-pt2="rowmenu" data-id="' + esc(PFX + r.id) + '">\u22EE</button></div>';
   }).join("");
 
-  var head = ""; try { head = tkHeader("통역톡", kind === "multi" ? "👥 다중" : "💬 1:1"); } catch (e) {}
+  var head = ""; try { head = tkHeader("통역톡", kind === "multi" ? "👪 다중" : "💬 1:1"); } catch (e) {}
   document.querySelector("#view").innerHTML = head + segBarHtml(kind) +
     '<div class="trx-lead">서로 <b>떨어져 있을 때</b> 쓰는 통역이에요. 각자 자기 폰에서 <b>자기 말로만</b> 쓰면, 상대 화면에는 그 사람 언어로 번역돼 보입니다.' +
     (kind === "multi" ? "<br>여러 명이 각각 다른 언어를 골라도 됩니다." : "") + "</div>" +
@@ -1161,7 +1161,7 @@ function renderLive(kind){
     "</div>" : "") +
     '<div class="pt2-sub" style="text-align:center;margin:10px 0 0">PT2 v' + PT2_VER + "</div>" +
     (rows ? '<div class="tk-list">' + rows + "</div>"
-          : '<div class="tk-empty"><div class="ee">' + (kind === "multi" ? "👥" : "💬") + "</div>아직 통역방이 없어요.<br>＋ 를 누르면 바로 만들어집니다.</div>");
+          : '<div class="tk-empty"><div class="ee">' + (kind === "multi" ? "👪" : "💬") + "</div>아직 통역방이 없어요.<br>＋ 를 누르면 바로 만들어집니다.</div>");
   markTab("lang");
 }
 
@@ -1176,7 +1176,7 @@ function liveNew(kind){
   say("통역방을 만드는 중…");
   api("/talk/room/create", { body: {
     name: nm, intro: "각자 자기 말로 쓰면 상대 언어로 번역됩니다",
-    type: "general", uid: myUid(), nick: myNick(), is_private: 1, emoji: multi ? "👥" : "💬"
+    type: "general", uid: myUid(), nick: myNick(), is_private: 1, emoji: multi ? "👪" : "💬"
   }}).then(function (d) {
     if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
     saveToken(d.id, d.token);
@@ -1582,7 +1582,7 @@ function newGo() {
     /* 1:1 과 통역방은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의
        오픈채팅 목록에 뜬다. 코드를 안 받는 것과 목록에 안 뜨는 것은 다른 얘기다. */
     is_private: ((isD || lv) ? 1 : (NEWC.priv ? 1 : 0)),
-    emoji: lv ? (multi ? "👥" : "💬") : (isD ? "💬" : "🍇")
+    emoji: lv ? (multi ? "👪" : "💬") : (isD ? "💬" : "🍇")
   }}).then(function (d) {
     if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
     saveToken(d.id, d.token);
