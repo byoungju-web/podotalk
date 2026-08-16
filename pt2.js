@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "45";
+var PT2_VER = "46";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1448,7 +1448,10 @@ window.openInviteFriends = function (id) {
 var NEWC = { kind: "direct", picked: [] };
 
 function newScreen(kind) {
-  NEWC.kind = (kind === "group") ? "group" : "direct";
+  /* direct = 1:1 채팅 · group = 그룹방 · live1 = 1:1 통역방 · livemulti = 다중 통역방
+     통역방도 만드는 절차는 같다. 그런데 지금까지 통역방만 브라우저 기본
+     입력창(prompt)을 써서, 주소가 그대로 뜨는 낯선 화면이 나왔다. */
+  NEWC.kind = ({ group: 1, live1: 1, livemulti: 1 })[kind] ? kind : "direct";
   NEWC.picked = [];
   NEWC.name = ""; NEWC.intro = ""; NEWC.priv = false;
   location.hash = "#/talk/new";
@@ -1467,8 +1470,16 @@ function pickRow(c, i) {
     "</label>";
 }
 
+function newIsLive() { return NEWC.kind === "live1" || NEWC.kind === "livemulti"; }
+function newIsSolo() { return NEWC.kind === "direct" || NEWC.kind === "live1"; }
+
 function renderNew() {
-  var isD = NEWC.kind === "direct";
+  var isD = newIsSolo();
+  var lv = newIsLive();
+  var TT = { direct: ["새 1:1 채팅", "둘이서 이야기해요"],
+             group: ["새 그룹방", "여러 명이 함께 이야기해요"],
+             live1: ["새 1:1 동시통역톡", "서로 다른 말로 둘이 이야기해요"],
+             livemulti: ["새 다중동시통역방", "여러 나라 사람이 함께 이야기해요"] }[NEWC.kind];
   var picks = NEWC.picked;
   var list = picks.length
     ? '<div class="pt2-sub" style="margin:10px 0 -2px">동그라미를 눌러 고르세요. 체크한 사람만 초대돼요.</div>' +
@@ -1480,17 +1491,19 @@ function renderNew() {
   var needName = true;
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead"><span class="tk-back" data-pt2="new-back">‹</span>' +
-      '<div class="tk-rh-mid"><div class="tk-hi">' + (isD ? "새 1:1 채팅" : "새 그룹방") + "</div>" +
-      '<div class="tk-hs">' + (isD ? "둘이서 이야기해요" : "여러 명이 함께 이야기해요") + "</div></div></div>" +
+      '<div class="tk-rh-mid"><div class="tk-hi">' + TT[0] + "</div>" +
+      '<div class="tk-hs">' + TT[1] + "</div></div></div>" +
     '<div class="tk-set">' +
       (needName
         ? '<div class="tk-field"><label>방 이름</label><input id="pt2CName" maxlength="40" value="' + esc(NEWC.name || "") + '" placeholder="' +
-            (isD ? "연락처를 고르면 자동으로 채워져요" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>'
+            (lv ? (isD ? "예: 사장님과 통역방" : "예: 가족 통역방")
+                : (isD ? "연락처를 고르면 자동으로 채워져요" : "예: 부산 사장님 모임")) + '" autocomplete="off"></div>'
         : "") +
-      (isD ? "" :
+      (isD || lv ? "" :
         '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
         '<div class="tk-toggle">코드로만 입장<span class="tk-sw' + (NEWC.priv ? " on" : "") + '" data-pt2="new-priv"></span></div>') +
-      (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "") +
+      (lv ? '<div class="pt2-sub" style="margin-top:2px">각자 자기 말로 쓰면 상대 화면에는 그 사람 언어로 번역돼 보여요. 자동번역이 켜진 채로 시작합니다.</div>'
+          : (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "")) +
 
       '<div class="tk-sec" style="margin-top:16px">초대할 사람</div>' +
       (hasPicker()
@@ -1505,7 +1518,7 @@ function renderNew() {
       '<div class="pt2-sub" style="margin-top:8px"><span class="pt2-inline-ic">' + podoAv() +
         '</span> 표시가 있는 분은 방에 바로 들어와요. 나머지는 만든 뒤 문자로 초대 링크가 나갑니다.</div>' +
     "</div>";
-  markTab(NEWC.kind === "direct" ? "direct" : "open");
+  markTab(newIsLive() ? "trans" : (NEWC.kind === "direct" ? "direct" : "open"));
   /* 예전에는 방 이름 칸에 저절로 커서를 넣었다. 그러면 화면을 열자마자
      자판이 올라와 아래 절반을 덮어버린다. 칸을 눌렀을 때만 올라오게 둔다. */
 }
@@ -1538,12 +1551,12 @@ function newPick() {
       var have = {};
       NEWC.picked.forEach(function (c) { have[normPhone(c.tel)] = 1; });
       arr.forEach(function (c) { if (!have[normPhone(c.tel)]) NEWC.picked.push(c); });
-      if (NEWC.kind === "direct") {
+      if (newIsSolo()) {
         if (NEWC.picked.length > 1) {
           NEWC.picked = NEWC.picked.slice(0, 1);
           say("1:1 방은 한 분만 초대할 수 있어요");
         }
-        if (NEWC.picked[0]) NEWC.name = NEWC.picked[0].name;   /* 이름이 곧 방 이름 */
+        if (NEWC.picked[0] && NEWC.kind === "direct") NEWC.name = NEWC.picked[0].name;
       }
       renderNew();
     });
@@ -1553,32 +1566,43 @@ function newPick() {
 /* 만들기 : 방 생성 → 가입자는 서버가 바로 넣고 → 나머지는 문자 한 통으로 */
 function newGo() {
   newKeep();
-  var isD = NEWC.kind === "direct";
+  var isD = newIsSolo();
+  var lv = newIsLive();
+  var multi = NEWC.kind === "livemulti";
   var nm = (NEWC.name || "").trim();
-  if (isD && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
+  if (NEWC.kind === "direct" && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
   if (!nm) { say("방 이름을 입력해 주세요"); return; }
   var on = NEWC.picked.filter(function (c) { return c.on; });
 
-  say("방을 만드는 중…");
+  say(lv ? "통역방을 만드는 중…" : "방을 만드는 중…");
   api("/talk/room/create", { body: {
     name: nm,
-    intro: (NEWC.intro || "").trim(),
+    intro: lv ? "각자 자기 말로 쓰면 상대 언어로 번역됩니다" : (NEWC.intro || "").trim(),
     type: "general", uid: myUid(), nick: myNick(),
-    /* 1:1 은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의 오픈채팅
-       목록에 뜬다. 코드를 입력받지 않는 것과 목록에 안 보이는 것은 다른 얘기다. */
-    is_private: (isD ? 1 : (NEWC.priv ? 1 : 0)),
-    emoji: isD ? "💬" : "🍇"
+    /* 1:1 과 통역방은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의
+       오픈채팅 목록에 뜬다. 코드를 안 받는 것과 목록에 안 뜨는 것은 다른 얘기다. */
+    is_private: ((isD || lv) ? 1 : (NEWC.priv ? 1 : 0)),
+    emoji: lv ? (multi ? "👥" : "💬") : (isD ? "💬" : "🍇")
   }}).then(function (d) {
     if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
     saveToken(d.id, d.token);
-    if (isD) { try { var dm = LSJ("pt2_direct", {}); dm[d.id] = 1; LSS("pt2_direct", JSON.stringify(dm)); } catch (e) {} }
+    if (lv) {
+      /* 통역방으로 등록해 둬야 통역톡 탭에 뜨고, 설정에도 자동번역이 나온다 */
+      liveAdd(d.id);
+      liveMetaSet(d.id, { kind: multi ? "multi" : "one", name: nm, code: d.code || "", ts: Date.now() });
+      trSetOn(PFX + d.id, true);
+    } else if (NEWC.kind === "direct") {
+      try { var dm = LSJ("pt2_direct", {}); dm[d.id] = 1; LSS("pt2_direct", JSON.stringify(dm)); } catch (e) {}
+    }
 
     var uids = on.filter(function (c) { return c.uid; }).map(function (c) { return c.uid; });
     var sms  = on.filter(function (c) { return !c.uid; });
 
     var finish = function () {
       refreshRooms();
-      location.hash = "#/talk/room/" + PFX + d.id;
+      /* 통역방은 목록에 남는 편이 낫다. 상대가 들어오기 전에는 할 일이 없다. */
+      if (lv) { location.hash = "#/talk/trans"; try { renderLive(multi ? "multi" : "one"); } catch (e) {} }
+      else location.hash = "#/talk/room/" + PFX + d.id;
       /* 예전에는 여기서 문자 앱을 저절로 열었다. 그런데 화면을 옮긴 뒤
          저절로 여는 sms: 이동은 크롬이 막는다. 그래서 문자가 안 갔다.
          이제는 눌러서 보내도록 화면을 띄운다. 누르는 동작이 있어야 열린다. */
@@ -2617,7 +2641,7 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
-  if (a === "live-new") { liveNew(el.getAttribute("data-m")); return; }
+  if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
   if (a === "row-noti") {
     var nid = el.getAttribute("data-id");
@@ -2783,7 +2807,8 @@ document.addEventListener("click", function (e) {
   }
   if (a === "new-direct") { newScreen("direct"); return; }
   if (a === "new-back") {
-    location.hash = (NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open";
+    location.hash = newIsLive() ? "#/talk/trans"
+      : ((NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open");
     return;
   }
   if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
@@ -2985,7 +3010,7 @@ document.addEventListener("change", function (e) {
   if (!el || el.getAttribute("data-pt2") !== "pick-ck") return;
   var i = parseInt(el.getAttribute("data-i"), 10);
   if (NEWC.picked[i]) NEWC.picked[i].on = !!el.checked;
-  if (NEWC.kind === "direct" && el.checked) {
+  if (newIsSolo() && el.checked) {
     NEWC.picked.forEach(function (c, j) { if (j !== i) c.on = false; });
     NEWC.name = NEWC.picked[i] ? NEWC.picked[i].name : NEWC.name;
     newKeep(); renderNew();
