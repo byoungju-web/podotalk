@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "42";
+var PT2_VER = "43";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -301,7 +301,10 @@ function rich(s) {
     '.tk-al{cursor:pointer}',
     '.tk-al:active{opacity:.7}',
     /* 설정 맨 아래 버튼이 하단 탭바에 가리지 않도록 여백을 준다 */
-    '.tk-set{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}'
+    '.tk-set{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}',
+    /* 통역방처럼 항목이 많은 설정은 시트가 화면보다 길어진다. 지금까지는
+       넘친 만큼 위가 잘려서 방 이름조차 안 보였다. 안에서 넘기게 한다. */
+    '.sheet{max-height:86vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}'
   ].join("\n");
   var el = document.createElement("style");
   el.setAttribute("data-pt2", "css");
