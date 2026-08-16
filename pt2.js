@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "48";
+var PT2_VER = "49";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -183,6 +183,10 @@ function rich(s) {
     '.pt2-mem-av{width:30px;height:30px;border-radius:10px;overflow:hidden;flex:0 0 auto;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
     '.pt2-mem-ini{font-weight:900;font-size:13px;color:var(--tk-grape)}',
     '.pt2-mem-nm{flex:1;min-width:0;font-weight:700;font-size:13.5px;color:#241436;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.pt2-mem-row{cursor:pointer}',
+    '.pt2-mem-row:active{background:var(--tk-soft)}',
+    '.pt2-mem-go{color:#c9bfd8;font-size:18px;font-weight:700;flex:0 0 auto;margin-left:2px}',
+    '.pt2-prof-av{width:82px;height:82px;border-radius:26px;overflow:hidden;margin:2px auto 0;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
     '.pt2-mem-tag{font-size:10.5px;font-weight:800;color:var(--tk-grape);background:var(--tk-soft);border-radius:6px;padding:2px 6px;flex:0 0 auto}',
     '.pt2-av-img{display:block;width:100%;height:100%;background-size:cover;background-position:center;border-radius:inherit}',
     '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
@@ -1142,7 +1146,9 @@ function renderLive(kind){
     var t = ""; try { t = r.last_ts ? relTime(r.last_ts) : ""; } catch (e) {}
     return '<div class="pt2-lrow">' +
       '<div class="tk-room" data-action="talk-open" data-id="' + esc(PFX + r.id) + '">' +
-      '<div class="tk-av trx-av">' + (kind === "multi" ? "👪" : "💬") + "</div>" +
+      /* 여기만 이모지를 글자로 박아 둬서 프로필 사진이 안 나왔다.
+         채팅·오픈채팅 목록과 같은 규칙을 쓰게 맞춘다. */
+      '<div class="tk-av trx-av">' + roomAv(kind === "multi" ? "👪" : "💬") + "</div>" +
       '<div class="tk-rmid"><div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
         '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" +
         (r.code ? '<span class="trx-pair">' + esc(r.code) + "</span>" : "") +
@@ -1701,10 +1707,13 @@ function memRow(m) {
   var nm = m.nick || "익명";
   var face = (me && myPhoto()) ? imgAv(myPhoto())
     : '<span class="pt2-mem-ini">' + esc(nm.slice(0, 1)) + "</span>";
-  return '<div class="pt2-mem-row">' +
+  return '<div class="pt2-mem-row" data-pt2="mem-open"' +
+      ' data-nick="' + esc(nm) + '" data-uid="' + esc(m.uid || "") + '"' +
+      ' data-owner="' + (m.owner ? 1 : 0) + '" data-joined="' + (m.joined || "") + '">' +
     '<span class="pt2-mem-av">' + face + "</span>" +
     '<span class="pt2-mem-nm">' + esc(nm) + (me ? " (나)" : "") + "</span>" +
     (m.owner ? '<span class="pt2-mem-tag">방장</span>' : "") +
+    '<span class="pt2-mem-go">›</span>' +
     "</div>";
 }
 
@@ -1717,6 +1726,39 @@ function loadMembers(sid) {
     if (box) box.innerHTML = d.members.map(memRow).join("");
     if (cnt) cnt.textContent = "(" + d.members.length + ")";
   });
+}
+
+/* 참여자를 누르면 뜨는 프로필.
+   서버가 갖고 있는 건 이름·들어온 때·방장 여부뿐이다. 사진은 각자 폰에만
+   있어서, 내 것 말고는 보여줄 수가 없다. 없는 걸 있는 척하지 않는다. */
+function memSheet(m) {
+  var me = m.uid && m.uid === myUid();
+  var nm = m.nick || "익명";
+  var face = (me && myPhoto()) ? imgAv(myPhoto())
+    : '<span class="pt2-mem-ini" style="font-size:30px">' + esc(nm.slice(0, 1)) + "</span>";
+  var when = "";
+  if (m.joined) {
+    var t = new Date(parseInt(m.joined, 10));
+    if (!isNaN(t.getTime())) {
+      when = t.getFullYear() + "년 " + (t.getMonth() + 1) + "월 " + t.getDate() + "일부터";
+    }
+  }
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop" style="text-align:center">' +
+    '<div class="pt2-prof-av">' + face + "</div>" +
+    '<h3 style="margin:10px 0 2px">' + esc(nm) + (me ? " (나)" : "") + "</h3>" +
+    '<div class="sd" style="text-align:center">' +
+      (m.owner === "1" || m.owner === 1 ? "이 방을 만든 사람" : "참여자") +
+      (when ? "<br>" + when : "") + "</div>" +
+    (me
+      ? '<button class="cta grape" data-action="talk-tab" data-v="settings">내 프로필 바꾸기</button>'
+      : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요. 사진은 각자 폰에만 저장돼서 여기서는 보이지 않습니다.</div>') +
+    '<button class="cta" style="margin-top:10px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
+    "</div>";
+  document.body.appendChild(bg);
 }
 
 function roomSetSheet() {
@@ -2867,6 +2909,13 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "new-go")   { newGo(); return; }
+  if (a === "mem-open") {
+    memSheet({
+      nick: el.getAttribute("data-nick"), uid: el.getAttribute("data-uid"),
+      owner: el.getAttribute("data-owner"), joined: el.getAttribute("data-joined")
+    });
+    return;
+  }
   if (a === "inv-open") {
     if (!P.room) return;
     inviteSheet(bare(P.id), P.room.code || "", roomLabel(bare(P.id), P.room.name));
