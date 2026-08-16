@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "36";
+var PT2_VER = "38";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -177,6 +177,7 @@ function rich(s) {
 /* ── 레이어 전용 CSS ── */
 (function style() {
   var css = [
+    '.pt2-av-img{display:block;width:100%;height:100%;background-size:cover;background-position:center;border-radius:inherit}',
     '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
     '.pt2-pick{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--tk-line);border-radius:12px;padding:10px 12px}',
     '.pt2-pick.joined{border-color:var(--tk-grape);background:var(--tk-soft)}',
@@ -362,6 +363,35 @@ function svUnread(r) {
   return (r.last_ts || 0) > ra;
 }
 
+/* ── 아바타 ────────────────────────────────────────────────
+   지금까지 목록·헤더에 🍇 라는 글자를 그대로 박아 뒀다. 설정에서 프로필
+   사진을 넣어도 그 글자가 계속 보인 이유다.
+   ① 프로필 사진이 있으면 그 사진
+   ② 없으면 포도톡 앱 아이콘 이미지 (🍇 글자 대신)
+   ③ 방이 따로 정한 이모지가 있으면 그 이모지
+   ────────────────────────────────────────────────────────── */
+var PODO_IMG = "/podotalk-192.png";
+
+function myPhoto() {
+  try {
+    var a = window.talkAvatar ? window.talkAvatar() : "";
+    if (a && window.isPhoto && window.isPhoto(a)) return a;
+  } catch (e) {}
+  return "";
+}
+function imgAv(url) {
+  return '<span class="pt2-av-img" style="background-image:url(\'' + String(url).replace(/'/g, "%27") + '\')"></span>';
+}
+function podoAv() { return imgAv(PODO_IMG); }
+
+/* 목록에 쓰는 아바타. 사진 > 방 이모지 > 포도톡 아이콘 */
+function roomAv(emoji) {
+  var ph = myPhoto();
+  if (ph) return imgAv(ph);
+  if (emoji && emoji !== "🍇") return esc(emoji);
+  return podoAv();
+}
+
 function svRoomItem(r) {
   var id = PFX + r.id;
   var last = r.last_body
@@ -373,7 +403,7 @@ function svRoomItem(r) {
   var chips = (kind ? '<span class="pt2-chip">' + kind + "</span>" : "") +
     (r.is_paid ? '<span class="pt2-chip paid">월 ' + Number(r.price || 0).toLocaleString() + "원</span>" : "");
   return '<div class="tk-room" data-action="talk-open" data-id="' + esc(id) + '">' +
-      '<div class="tk-av">' + esc(r.emoji || "🍇") + "</div>" +
+      '<div class="tk-av">' + roomAv(r.emoji) + "</div>" +
       '<div class="tk-rmid">' +
         /* 방 이름을 바꾸면 방 안 제목만 바뀌고 목록은 서버 이름 그대로였다.
            목록도 같은 roomLabel 을 쓰게 맞춘다. */
@@ -856,7 +886,7 @@ function renderRoom(id) {
       : '<span class="tk-back" data-action="talk-tab" data-v="open">‹</span>');
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead pt2-fixhead">' + backTo +
-      '<div class="tk-savatar">🍇</div>' +
+      '<div class="tk-savatar">' + roomAv((P.room && P.room.emoji) || "") + "</div>" +
       '<div class="tk-rh-mid"><div class="tk-hi" id="pt2Title">불러오는 중…</div>' +
         '<div class="tk-hs" id="pt2Sub">서버 방</div></div>' +
       '<div class="tk-racts">' +
@@ -1175,7 +1205,7 @@ function renderAlarm() {
   svRooms().forEach(function (r) {
     if (!r.last_body || muted(r.id)) return;
     items.push({
-      ic: r.emoji || "🍇", t: r.name,
+      ic: r.emoji || "", t: r.name, av: 1,
       b: (r.last_nick ? r.last_nick + ": " : "") + r.last_body,
       ts: r.last_ts || 0, id: PFX + r.id, local: false, unread: svUnread(r)
     });
@@ -1188,7 +1218,7 @@ function renderAlarm() {
         var t = "";
         try { t = it.ts ? relTime(it.ts) : ""; } catch (e) {}
         return '<div class="tk-al" data-action="talk-open" data-id="' + esc(it.id) + '">' +
-          '<div class="tk-ai">' + esc(it.ic) + "</div>" +
+          '<div class="tk-ai">' + (it.av ? roomAv(it.ic) : esc(it.ic)) + "</div>" +
           '<div class="tk-at"><div class="tk-att">' + esc(it.t) +
             (it.local ? ' <span class="pt2-badge">📱 이 기기</span>' : "") + "</div>" +
           '<div class="tk-ab">' + esc(it.b) + "</div></div>" +
@@ -1335,6 +1365,25 @@ function shareInvite(sid, code, name) {
   catch (e) { prompt("이 내용을 복사해서 보내세요", txt); }
 }
 
+/* 초대 문자를 눌러서 보내는 화면.
+   문자 앱을 저절로 여는 것은 브라우저가 막기 때문에 버튼이 반드시 필요하다. */
+function smsSheet(list, name, sid, code) {
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var nums = list.map(function (c) { return normPhone(c.tel); });
+  var who = list.map(function (c) { return esc(c.name || c.tel); }).join(", ");
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>문자로 초대하기</h3>" +
+    '<div class="sd">' + who + " · 아직 포도톡을 안 쓰는 분이에요.<br>아래를 누르면 문자 앱이 초대 링크까지 채워진 채로 열립니다.</div>" +
+    '<button class="cta grape" data-pt2="sms-go" data-nums="' + esc(nums.join(",")) + '" data-name="' + esc(name || "") + '" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '">📩 문자 앱 열기</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="inv-copy" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '">🔗 초대 링크만 복사</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">나중에</button>' +
+    "</div>";
+  document.body.appendChild(bg);
+}
+
 function inviteSheet(sid, code, name) {
   var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
   var bg = document.createElement("div");
@@ -1402,7 +1451,7 @@ function renderNew() {
 
   /* 1:1 은 고른 사람 이름이 곧 방 이름이라 입력칸이 필요 없다.
      연락처를 못 여는 기기(아이폰·PC)에서만 이름을 직접 받는다. */
-  var needName = !isD || !hasPicker();
+  var needName = true;
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead"><span class="tk-back" data-pt2="new-back">‹</span>' +
       '<div class="tk-rh-mid"><div class="tk-hi">' + (isD ? "새 1:1 채팅" : "새 그룹방") + "</div>" +
@@ -1410,17 +1459,19 @@ function renderNew() {
     '<div class="tk-set">' +
       (needName
         ? '<div class="tk-field"><label>방 이름</label><input id="pt2CName" maxlength="40" value="' + esc(NEWC.name || "") + '" placeholder="' +
-            (isD ? "상대 이름" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>'
+            (isD ? "연락처를 고르면 자동으로 채워져요" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>'
         : "") +
       (isD ? "" :
         '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
         '<div class="tk-toggle">코드로만 입장<span class="tk-sw' + (NEWC.priv ? " on" : "") + '" data-pt2="new-priv"></span></div>') +
-      (isD ? '<div class="pt2-sub" style="margin-top:2px">고른 분의 이름이 그대로 방 이름이 돼요. 입장 코드는 없고, 초대받은 사람이 바로 들어옵니다.</div>' : "") +
+      (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "") +
 
       '<div class="tk-sec" style="margin-top:16px">초대할 사람</div>' +
       (hasPicker()
         ? '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-grape);box-shadow:none" data-pt2="new-pick">📇 연락처에서 고르기</button>'
-        : '<div class="pt2-sub">📇 연락처 열기는 안드로이드 크롬에서만 됩니다. 방을 만든 뒤 초대 링크를 공유해 주세요.</div>') +
+        : '<div class="pt2-sub">📇 연락처 열기는 안드로이드 크롬에서만 됩니다.</div>') +
+      /* 연락처에 없는 사람도 부를 수 있어야 한다. 방을 만든 뒤 링크를 건네는 길. */
+      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="new-link">🔗 연락처 없이 · 초대 링크로 부르기</button>' +
       list +
 
       '<button class="cta grape" style="margin-top:16px" data-pt2="new-go">' +
@@ -1500,15 +1551,14 @@ function newGo() {
 
     var finish = function () {
       refreshRooms();
-      if (sms.length) {
-        /* 문자 앱은 화면 전환을 잡아먹으므로 방으로 옮긴 뒤에 연다 */
-        location.hash = "#/talk/room/" + PFX + d.id;
-        setTimeout(function () {
-          smsTo(sms.map(function (c) { return normPhone(c.tel); }), inviteText(nm, d.id, d.code || ""));
-        }, 600);
-      } else {
-        location.hash = "#/talk/room/" + PFX + d.id;
-      }
+      location.hash = "#/talk/room/" + PFX + d.id;
+      /* 예전에는 여기서 문자 앱을 저절로 열었다. 그런데 화면을 옮긴 뒤
+         저절로 여는 sms: 이동은 크롬이 막는다. 그래서 문자가 안 갔다.
+         이제는 눌러서 보내도록 화면을 띄운다. 누르는 동작이 있어야 열린다. */
+      setTimeout(function () {
+        if (sms.length) smsSheet(sms, nm, d.id, d.code || "");
+        else if (!uids.length) inviteSheet(d.id, d.code || "", nm);
+      }, 400);
     };
 
     if (!uids.length) { say("방을 만들었어요 🍇"); finish(); return; }
@@ -2711,6 +2761,12 @@ document.addEventListener("click", function (e) {
   }
   if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
   if (a === "new-pick") { newPick(); return; }
+  if (a === "new-link") { newKeep(); NEWC.picked = []; newGo(); return; }
+  if (a === "sms-go") {
+    var ns = (el.getAttribute("data-nums") || "").split(",").filter(Boolean);
+    smsTo(ns, inviteText(el.getAttribute("data-name"), el.getAttribute("data-id"), el.getAttribute("data-code")));
+    return;
+  }
   if (a === "new-go")   { newGo(); return; }
   if (a === "inv-open") {
     if (!P.room) return;
