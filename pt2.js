@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "35";
+var PT2_VER = "36";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -375,7 +375,9 @@ function svRoomItem(r) {
   return '<div class="tk-room" data-action="talk-open" data-id="' + esc(id) + '">' +
       '<div class="tk-av">' + esc(r.emoji || "🍇") + "</div>" +
       '<div class="tk-rmid">' +
-        '<div class="tk-rname">' + esc(r.name) +
+        /* 방 이름을 바꾸면 방 안 제목만 바뀌고 목록은 서버 이름 그대로였다.
+           목록도 같은 roomLabel 을 쓰게 맞춘다. */
+        '<div class="tk-rname">' + esc(roomLabel(r.id, r.name)) +
           '<span class="tk-cnt">👥 ' + (r.members || 1) + "</span>" + chips + "</div>" +
         '<div class="tk-rlast">' + esc(last) + "</div>" +
       "</div>" +
@@ -1373,6 +1375,15 @@ function newScreen(kind) {
 
 function pickRow(c, i) {
   var joined = !!c.uid;
+  /* 1:1 은 어차피 한 명이라 체크박스가 켜졌다 꺼졌다 하는 게 무슨 뜻인지
+     알기 어렵다. 고른 사람만 보여주고 체크는 그룹방에서만 쓴다. */
+  if (NEWC.kind === "direct") {
+    return '<div class="pt2-pick' + (joined ? " joined" : "") + '">' +
+      '<span class="pt2-pick-av">' + (joined ? "🍇" : "👤") + "</span>" +
+      '<span class="pt2-pick-mid"><span class="pt2-pick-nm">' + esc(c.name || c.tel) + "</span>" +
+        '<span class="pt2-pick-sub">' + (joined ? "포도톡 사용 중 · 바로 초대돼요" : esc(c.tel) + " · 문자로 초대") + "</span></span>" +
+      "</div>";
+  }
   return '<label class="pt2-pick' + (joined ? " joined" : "") + '">' +
     '<input type="checkbox" data-pt2="pick-ck" data-i="' + i + '"' + (c.on ? " checked" : "") + ">" +
     '<span class="pt2-pick-av">' + (joined ? "🍇" : "👤") + "</span>" +
@@ -1385,7 +1396,8 @@ function renderNew() {
   var isD = NEWC.kind === "direct";
   var picks = NEWC.picked;
   var list = picks.length
-    ? '<div class="pt2-picklist">' + picks.map(pickRow).join("") + "</div>"
+    ? (isD ? "" : '<div class="pt2-sub" style="margin:10px 0 -2px">체크한 사람만 초대돼요.</div>') +
+      '<div class="pt2-picklist">' + picks.map(pickRow).join("") + "</div>"
     : '<div class="pt2-sub" style="margin:8px 0 2px">아직 고른 사람이 없어요. 위 버튼으로 연락처에서 고르세요.</div>';
 
   /* 1:1 은 고른 사람 이름이 곧 방 이름이라 입력칸이 필요 없다.
@@ -1467,7 +1479,7 @@ function newGo() {
   var nm = (NEWC.name || "").trim();
   if (isD && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
   if (!nm) { say(isD ? "연락처에서 상대를 골라 주세요" : "방 이름을 입력해 주세요"); return; }
-  var on = NEWC.picked.filter(function (c) { return c.on; });
+  var on = isD ? NEWC.picked.slice(0, 1) : NEWC.picked.filter(function (c) { return c.on; });
 
   say("방을 만드는 중…");
   api("/talk/room/create", { body: {
@@ -1587,7 +1599,8 @@ function roomSetSheet() {
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
     "<h3>" + esc(roomLabel(bare(id), r.name)) + "</h3>" +
-    '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중</div>" +
+    '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중" +
+      (r.owner_nick ? "<br>만든 사람 · <b>" + esc(r.owner_nick) + "</b>" + (owner ? " (나)" : "") : "") + "</div>" +
     '<button class="cta grape" data-pt2="inv-open">👥 친구 초대</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
@@ -2745,6 +2758,7 @@ document.addEventListener("click", function (e) {
     var sb9 = document.querySelector(".sheet-bg"); if (sb9) sb9.remove();
     var ttl9 = document.getElementById("pt2Title");
     if (ttl9) ttl9.textContent = roomLabel(rid1, (P.room && P.room.name) || "");
+    try { repaintList(); } catch (e9) {}
     say("이름을 바꿨어요");
     return;
   }
