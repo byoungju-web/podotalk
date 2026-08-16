@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "44";
+var PT2_VER = "45";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1506,8 +1506,8 @@ function renderNew() {
         '</span> 표시가 있는 분은 방에 바로 들어와요. 나머지는 만든 뒤 문자로 초대 링크가 나갑니다.</div>' +
     "</div>";
   markTab(NEWC.kind === "direct" ? "direct" : "open");
-  var el = document.getElementById("pt2CName");
-  if (el) setTimeout(function () { try { el.focus(); } catch (e) {} }, 60);
+  /* 예전에는 방 이름 칸에 저절로 커서를 넣었다. 그러면 화면을 열자마자
+     자판이 올라와 아래 절반을 덮어버린다. 칸을 눌렀을 때만 올라오게 둔다. */
 }
 
 /* 연락처 고르기 → 누가 가입자인지 확인 → 체크 목록에 쌓기 */
