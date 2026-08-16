@@ -1,6 +1,22 @@
-/* 포도톡 Service Worker (PT2 대응판) */
-const CACHE = "podotalk-v5";
-const CORE = ["/", "/index.html", "/manifest.json", "/podotalk-192.png", "/podotalk-512.png"];
+/* 포도톡 Service Worker (PT2 대응판)
+   ──────────────────────────────────────────────────────────────
+   v6 에서 바뀐 것
+   ① /manifest.json 을 캐시에서 뺐다.
+      크롬은 앱을 설치·갱신할 때 이 파일을 다시 읽는데, 캐시 우선으로
+      돌려주면 옛 숏컷 목록이 계속 살아나 홈화면 메뉴가 안 바뀐다.
+   ② pt2-cfg 캐시는 지우지 않는다.
+      방별 알림 끄기 목록이 여기 들어 있어서, 지금까지는 서비스워커가
+      갱신될 때마다 꺼둔 방이 도로 켜졌다.
+   ③ 오프라인일 때 빈 응답이 나가던 곳을 막았다.
+   ────────────────────────────────────────────────────────────── */
+const CACHE = "podotalk-v6";
+const KEEP = [CACHE, "pt2-cfg"];               /* 알림 설정 캐시는 건드리지 않는다 */
+
+/* manifest.json 은 일부러 뺐다. 넣으면 숏컷이 옛 것으로 굳는다. */
+const CORE = ["/", "/index.html", "/podotalk-192.png", "/podotalk-512.png"];
+
+/* 항상 서버를 먼저 보는 것들 — 새 버전이 바로 반영되어야 하는 파일 */
+const FRESH = ["/pt2.js", "/manifest.json", "/sw.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
@@ -14,7 +30,9 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => !KEEP.includes(k)).map((k) => caches.delete(k)));
+    // 옛 버전이 캐시에 넣어둔 manifest 가 남아 있으면 확실히 뽑아낸다
+    try { const c = await caches.open(CACHE); await c.delete("/manifest.json"); } catch (err) {}
     await self.clients.claim();
   })());
 });
@@ -25,29 +43,42 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;  // Worker API·CDN은 캐싱하지 않음
 
-  // HTML과 레이어 스크립트는 네트워크 우선(새 버전 즉시 반영), 실패 시 캐시
-  const isLayer = url.pathname === "/pt2.js";
-  if (req.mode === "navigate" || isLayer) {
+  // HTML·레이어 스크립트·manifest 는 네트워크 우선(새 버전 즉시 반영), 실패 시 캐시
+  const fresh = FRESH.includes(url.pathname);
+  if (req.mode === "navigate" || fresh) {
+    const key = req.mode === "navigate" ? "/index.html" : url.pathname;
     e.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(isLayer ? "/pt2.js" : "/index.html", copy));
+        // manifest 는 오프라인 대비로만 복사해 둔다. 읽을 때는 늘 네트워크가 먼저다.
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(key, copy)).catch(() => {});
+        }
         return res;
-      }).catch(() => caches.match(isLayer ? "/pt2.js" : "/index.html"))
+      }).catch(async () => {
+        const hit = await caches.match(key);
+        return hit || new Response("", { status: 504, statusText: "offline" });
+      })
     );
     return;
   }
 
   // 나머지 정적 파일은 캐시 우선
-  e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+  e.respondWith((async () => {
+    const hit = await caches.match(req);
+    if (hit) return hit;
+    try {
+      const res = await fetch(req);
       if (res.ok && res.type === "basic") {
         const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
       }
       return res;
-    }).catch(() => hit))
-  );
+    } catch (err) {
+      // 여기서 hit 은 반드시 undefined 다. 빈 응답 대신 제대로 된 오류를 돌려준다.
+      return new Response("", { status: 504, statusText: "offline" });
+    }
+  })());
 });
 
 /* 웹푸시 — 발송자는 podotalk-api 하나뿐 */
