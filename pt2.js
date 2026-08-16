@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "43";
+var PT2_VER = "44";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1556,7 +1556,7 @@ function newGo() {
   var isD = NEWC.kind === "direct";
   var nm = (NEWC.name || "").trim();
   if (isD && !nm && NEWC.picked[0]) nm = NEWC.picked[0].name;
-  if (!nm) { say(isD ? "연락처에서 상대를 골라 주세요" : "방 이름을 입력해 주세요"); return; }
+  if (!nm) { say("방 이름을 입력해 주세요"); return; }
   var on = NEWC.picked.filter(function (c) { return c.on; });
 
   say("방을 만드는 중…");
@@ -2788,7 +2788,20 @@ document.addEventListener("click", function (e) {
   }
   if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
   if (a === "new-pick") { newPick(); return; }
-  if (a === "new-link") { newKeep(); NEWC.picked = []; newGo(); return; }
+  if (a === "new-link") {
+    newKeep();
+    /* 연락처를 안 쓰는 길이라 방 이름을 자동으로 채울 곳이 없다.
+       이름이 비어 있으면 만들지 말고 그 칸으로 데려간다. */
+    if (!(NEWC.name || "").trim()) {
+      say("방 이름을 먼저 입력해 주세요");
+      var nf = document.getElementById("pt2CName");
+      if (nf) { try { nf.focus(); nf.scrollIntoView({ block: "center" }); } catch (e) {} }
+      return;
+    }
+    NEWC.picked = [];
+    newGo();
+    return;
+  }
   if (a === "sms-go") {
     var ns = (el.getAttribute("data-nums") || "").split(",").filter(Boolean);
     smsTo(ns, inviteText(el.getAttribute("data-name"), el.getAttribute("data-id"), el.getAttribute("data-code")));
