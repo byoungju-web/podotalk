@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "31";
+var PT2_VER = "34";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -177,6 +177,14 @@ function rich(s) {
 /* ── 레이어 전용 CSS ── */
 (function style() {
   var css = [
+    '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
+    '.pt2-pick{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--tk-line);border-radius:12px;padding:10px 12px}',
+    '.pt2-pick.joined{border-color:var(--tk-grape);background:var(--tk-soft)}',
+    '.pt2-pick input{width:20px;height:20px;accent-color:var(--tk-grape);flex:0 0 auto}',
+    '.pt2-pick-av{width:34px;height:34px;border-radius:11px;background:#fff;border:1px solid var(--tk-line);display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}',
+    '.pt2-pick-mid{flex:1;min-width:0;display:flex;flex-direction:column}',
+    '.pt2-pick-nm{font-weight:800;font-size:14px;color:#241436}',
+    '.pt2-pick-sub{font-size:11.5px;color:var(--tk-sub);margin-top:1px}',
     '.pt2-badge{font-size:10px;font-weight:800;color:#8B7BAE;background:#F1ECFA;padding:1px 5px;border-radius:5px;margin-right:4px}',
     '.pt2-dot{width:8px;height:8px;border-radius:50%;background:#EA580C;display:inline-block}',
     '.pt2-chip{font-size:10.5px;font-weight:800;color:var(--tk-grape);background:var(--tk-soft);padding:2px 6px;border-radius:6px}',
@@ -310,7 +318,17 @@ function injectSettings() {
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
-    '<div class="pt2-sub" style="margin-top:4px">' + stampHtml() + "</div>" +
+    /* 내 번호를 올려두면 남이 연락처에서 나를 찾아 바로 초대할 수 있다.
+       번호 자체는 서버에 가지 않는다. 폰에서 해시로 바꿔 보낸다. */
+    '<div class="tk-sec" style="margin-top:14px">📇 연락처로 찾기</div>' +
+    '<div class="pt2-sub">내 번호를 올려두면, 내 번호를 저장한 사람이 연락처에서 나를 골라 바로 방에 초대할 수 있어요. 번호는 서버에 그대로 저장되지 않고 알아볼 수 없는 값으로 바뀌어 저장됩니다.</div>' +
+    '<div class="tk-field" style="margin-top:8px"><label>내 전화번호</label>' +
+      '<input id="pt2Phone" type="tel" inputmode="tel" placeholder="010-0000-0000" value="' + esc(LS("pt2_ph_show") || "") + '"></div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="ph-save">' +
+      (myPhoneHash() ? "번호 다시 등록" : "번호 등록하기") + "</button>" +
+    (myPhoneHash() ? '<div class="pt2-sub" style="margin-top:6px">✅ 등록돼 있어요. 지우려면 아래를 누르세요.</div>' +
+        '<button class="cta" style="margin-top:6px;background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="ph-del">번호 등록 지우기</button>' : "") +
+    '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
@@ -403,12 +421,55 @@ function shopItems() {
   return out;
 }
 
+/* 1:1 방인지. 만든 기기는 표시를 갖고 있고, 초대받아 들어온 기기는
+   그 표시가 없으므로 방을 만들 때 붙인 💬 이모지로도 알아본다. */
+function isDirectRoom(sid) {
+  try { if (LSJ("pt2_direct", {})[sid]) return true; } catch (e) {}
+  var r = svRoomOf(sid);
+  return !!(r && r.emoji === "💬");
+}
+
+/* 방을 나가거나 지운 뒤 돌아갈 목록.
+   1:1 을 지웠는데 오픈채팅으로 튀면 내가 어디 있는지 알 수가 없다. */
+function backList(sid) {
+  if (isLive(sid)) return "#/talk/trans";
+  if (isDirectRoom(sid)) return "#/talk/direct";
+  return "#/talk/open";
+}
+
+/* ── 💬 채팅 탭 : 서버 1:1 방 목록 ── */
+function renderDirect() {
+  var items = [];
+  svRooms().forEach(function (r) {
+    if (isLive(r.id)) return;
+    if (!isDirectRoom(r.id)) return;
+    items.push({ ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
+  });
+  items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+
+  var head = "";
+  try { head = tkHeader("채팅", "1:1"); } catch (e) {}
+  var tools =
+    '<div class="tk-tools">' +
+      '<button class="tk-tool primary" data-pt2="new-direct">＋ 1:1 채팅 만들기</button>' +
+      '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
+    "</div>";
+  var body = items.length
+    ? '<div class="tk-list" id="tkList">' + items.map(function (x) { return x.html; }).join("") + "</div>"
+    : '<div class="tk-empty"><div class="ee">💬</div>1:1 대화가 없어요.<br>연락처에서 골라 초대해 보세요!</div>';
+
+  document.querySelector("#view").innerHTML = head + tools + body;
+  decorateList();
+  markTab("direct");
+}
+
 function renderOpen() {
   var cur = seg();
   var items = (cur === "shop") ? shopItems() : (LOCAL_ROOMS ? localOpenItems() : []);
   if (cur === "open") {
     svRooms().forEach(function (r) {
       if (isLive(r.id)) return;          /* 동시통역방은 통역톡 탭에서만 보인다 */
+      if (isDirectRoom(r.id)) return;    /* 1:1 은 💬 채팅 탭에서만 보인다 */
       items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
     });
   }
@@ -458,10 +519,13 @@ function renderOpen() {
 }
 
 function refreshRooms(cb) {
+  /* type=mine 을 꼭 같이 받아야 한다. 나머지 셋은 공개방만 돌려주므로
+     1:1 처럼 비공개로 만든 방은 내가 들어가 있어도 목록에서 사라진다. */
+  api("/talk/rooms?type=mine&uid=" + encodeURIComponent(myUid())).then(function (m) {
   api("/talk/rooms?type=general").then(function (a) {
     api("/talk/rooms?type=study").then(function (b) {
       api("/talk/rooms?type=creator").then(function (c) {
-        var all = [].concat(a.rooms || [], b.rooms || [], c.rooms || []);
+        var all = [].concat(m.rooms || [], a.rooms || [], b.rooms || [], c.rooms || []);
         var seen = {}, out = [];
         all.forEach(function (r) { if (r && r.id && !seen[r.id]) { seen[r.id] = 1; out.push(r); } });
         saveSvRooms(out);
@@ -469,9 +533,17 @@ function refreshRooms(cb) {
       });
     });
   });
+  });
 }
 
 window.renderTalkList = function (kind) {
+  if (STEP >= 2 && kind === "direct" && on()) {
+    renderDirect();
+    if (on()) refreshRooms(function () {
+      if (location.hash.indexOf("#/talk/direct") === 0) renderDirect();
+    });
+    return;
+  }
   if (STEP >= 2 && (kind === "open" || kind === "general")) {
     if (kind === "general") LSS("pt2_seg", "shop");   /* 옛 '일반채팅' 진입 → 상점톡 칸 */
     renderOpen();                                    /* 캐시로 즉시 그리고 */
@@ -1144,6 +1216,7 @@ window.renderTalk = function (sub, arg) {
     });
     return;
   }
+  if (sub === "new") { renderNew(); return; }
   if (sub === "trans") {
     if (arg) return trxRoom(arg);
     var k = lseg();
@@ -1279,6 +1352,205 @@ window.openInviteFriends = function (id) {
   try { var r = findRoom(id); if (r) { nm = r.name || ""; cd = r.pw || r.code || ""; } } catch (e) {}
   inviteSheet(id, cd, nm);
 };
+
+/* ══════════════ 새 채팅 만들기 (전체 화면) ══════════════
+   작은 시트에 방 이름 한 칸만 있으면, 만들고 나서 초대를 또 찾아가야 한다.
+   여기서 종류·이름·초대할 사람까지 한 화면에서 정하고 한 번에 만든다. */
+var NEWC = { kind: "direct", picked: [] };
+
+function newScreen(kind) {
+  NEWC.kind = (kind === "group") ? "group" : "direct";
+  NEWC.picked = [];
+  location.hash = "#/talk/new";
+}
+
+function pickRow(c, i) {
+  var joined = !!c.uid;
+  return '<label class="pt2-pick' + (joined ? " joined" : "") + '">' +
+    '<input type="checkbox" data-pt2="pick-ck" data-i="' + i + '"' + (c.on ? " checked" : "") + ">" +
+    '<span class="pt2-pick-av">' + (joined ? "🍇" : "👤") + "</span>" +
+    '<span class="pt2-pick-mid"><span class="pt2-pick-nm">' + esc(c.name || c.tel) + "</span>" +
+      '<span class="pt2-pick-sub">' + (joined ? "포도톡 사용 중 · 바로 초대돼요" : esc(c.tel) + " · 문자로 초대") + "</span></span>" +
+    "</label>";
+}
+
+function renderNew() {
+  var isD = NEWC.kind === "direct";
+  var picks = NEWC.picked;
+  var list = picks.length
+    ? '<div class="pt2-picklist">' + picks.map(pickRow).join("") + "</div>"
+    : '<div class="pt2-sub" style="margin:8px 0 2px">아직 고른 사람이 없어요. 위 버튼으로 연락처에서 고르세요.</div>';
+
+  document.querySelector("#view").innerHTML =
+    '<div class="tk-rhead"><span class="tk-back" data-pt2="new-back">‹</span>' +
+      '<div class="tk-rh-mid"><div class="tk-hi">새 채팅 만들기</div>' +
+      '<div class="tk-hs">' + (isD ? "둘이서 이야기해요" : "여러 명이 함께 이야기해요") + "</div></div></div>" +
+    '<div class="tk-set">' +
+      '<div class="pt2-seg" style="margin-bottom:12px">' +
+        '<button class="' + (isD ? "on" : "") + '" data-pt2="new-kind" data-v="direct">💬 1:1</button>' +
+        '<button class="' + (isD ? "" : "on") + '" data-pt2="new-kind" data-v="group">👥 그룹</button>' +
+      "</div>" +
+      '<div class="tk-field"><label>방 이름</label><input id="pt2CName" maxlength="40" placeholder="' +
+        (isD ? "예: 홍길동님과 1:1" : "예: 부산 사장님 모임") + '" autocomplete="off"></div>' +
+      (isD ? "" :
+        '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
+        '<div class="tk-toggle">코드로만 입장<span class="tk-sw' + (NEWC.priv ? " on" : "") + '" data-pt2="new-priv"></span></div>') +
+      (isD ? '<div class="pt2-sub" style="margin-top:2px">1:1 방은 입장 코드가 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "") +
+
+      '<div class="tk-sec" style="margin-top:16px">초대할 사람</div>' +
+      (hasPicker()
+        ? '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-grape);box-shadow:none" data-pt2="new-pick">📇 연락처에서 고르기</button>'
+        : '<div class="pt2-sub">📇 연락처 열기는 안드로이드 크롬에서만 됩니다. 방을 만든 뒤 초대 링크를 공유해 주세요.</div>') +
+      list +
+
+      '<button class="cta grape" style="margin-top:16px" data-pt2="new-go">' +
+        (isD ? "1:1 채팅 만들기" : "그룹방 만들기") + "</button>" +
+      '<div class="pt2-sub" style="margin-top:8px">🍇 표시가 있는 분은 방에 바로 들어와요. 나머지는 만든 뒤 문자로 초대 링크가 나갑니다.</div>' +
+    "</div>";
+  markTab(NEWC.kind === "direct" ? "direct" : "open");
+  var el = document.getElementById("pt2CName");
+  if (el) setTimeout(function () { try { el.focus(); } catch (e) {} }, 60);
+}
+
+/* 연락처 고르기 → 누가 가입자인지 확인 → 체크 목록에 쌓기 */
+function newPick() {
+  if (!hasPicker()) { say("이 기기에서는 연락처를 열 수 없어요"); return; }
+  navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (out) {
+    if (!out || !out.length) return;
+    var add = [];
+    out.forEach(function (c) {
+      var tel = (c.tel || []).filter(Boolean)[0];
+      if (!tel) return;
+      var nm = (c.name || []).filter(Boolean)[0] || tel;
+      add.push({ name: nm, tel: String(tel), on: true, uid: "", hash: "" });
+    });
+    if (!add.length) { say("고른 분들의 전화번호가 없어요"); return; }
+    say("확인하는 중…");
+    matchContacts(add, function (arr) {
+      var have = {};
+      NEWC.picked.forEach(function (c) { have[normPhone(c.tel)] = 1; });
+      arr.forEach(function (c) { if (!have[normPhone(c.tel)]) NEWC.picked.push(c); });
+      if (NEWC.kind === "direct" && NEWC.picked.length > 1) {
+        NEWC.picked = NEWC.picked.slice(0, 1);
+        say("1:1 방은 한 분만 초대할 수 있어요");
+      }
+      renderNew();
+    });
+  }).catch(function () { say("연락처를 불러오지 못했어요"); });
+}
+
+/* 만들기 : 방 생성 → 가입자는 서버가 바로 넣고 → 나머지는 문자 한 통으로 */
+function newGo() {
+  var nm = ((document.getElementById("pt2CName") || {}).value || "").trim();
+  if (!nm) { say("방 이름을 입력해 주세요"); return; }
+  var isD = NEWC.kind === "direct";
+  var on = NEWC.picked.filter(function (c) { return c.on; });
+
+  say("방을 만드는 중…");
+  api("/talk/room/create", { body: {
+    name: nm,
+    intro: ((document.getElementById("pt2CIntro") || {}).value || "").trim(),
+    type: "general", uid: myUid(), nick: myNick(),
+    /* 1:1 은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의 오픈채팅
+       목록에 뜬다. 코드를 입력받지 않는 것과 목록에 안 보이는 것은 다른 얘기다. */
+    is_private: (isD ? 1 : (NEWC.priv ? 1 : 0)),
+    emoji: isD ? "💬" : "🍇"
+  }}).then(function (d) {
+    if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
+    saveToken(d.id, d.token);
+    if (isD) { try { var dm = LSJ("pt2_direct", {}); dm[d.id] = 1; LSS("pt2_direct", JSON.stringify(dm)); } catch (e) {} }
+
+    var uids = on.filter(function (c) { return c.uid; }).map(function (c) { return c.uid; });
+    var sms  = on.filter(function (c) { return !c.uid; });
+
+    var finish = function () {
+      refreshRooms();
+      if (sms.length) {
+        /* 문자 앱은 화면 전환을 잡아먹으므로 방으로 옮긴 뒤에 연다 */
+        location.hash = "#/talk/room/" + PFX + d.id;
+        setTimeout(function () {
+          smsTo(sms.map(function (c) { return normPhone(c.tel); }), inviteText(nm, d.id, d.code || ""));
+        }, 600);
+      } else {
+        location.hash = "#/talk/room/" + PFX + d.id;
+      }
+    };
+
+    if (!uids.length) { say("방을 만들었어요 🍇"); finish(); return; }
+    api("/talk/room/invite", { token: d.token, body: { room_id: d.id, uids: uids } })
+      .then(function (r) {
+        if (r && r.ok) say(uids.length + "분을 방에 초대했어요 🍇");
+        else {
+          /* 워커에 초대 기능이 아직 없으면 그분들도 문자로 돌린다 */
+          sms = sms.concat(on.filter(function (c) { return c.uid; }));
+          say("바로 초대는 아직 준비 중이라 문자로 보낼게요");
+        }
+        finish();
+      });
+  });
+}
+
+/* ══════════════ 전화번호 명부 (카톡식 초대의 뿌리) ══════════════
+   카톡은 주소록을 통째로 서버에 올려서 "이 번호는 가입자"를 가려낸다.
+   웹은 주소록 전체를 못 읽으므로, 사용자가 고른 번호만 그때그때 확인한다.
+
+   번호를 날것으로 서버에 보내지 않는다. 폰에서 해시로 바꿔 보내고
+   서버는 해시끼리만 맞춰본다. 명부가 새도 번호가 새지 않는다.
+   ────────────────────────────────────────────────────────────── */
+function normPhone(x) {
+  var d = String(x || "").replace(/[^0-9+]/g, "");
+  if (d.indexOf("+") === 0) return d;
+  d = d.replace(/[^0-9]/g, "");
+  if (d.indexOf("82") === 0 && d.length >= 11) return "+" + d;
+  if (d.indexOf("0") === 0) return "+82" + d.slice(1);      /* 010… → +8210… */
+  return d ? "+" + d : "";
+}
+function sha256hex(txt) {
+  try {
+    if (!(window.crypto && crypto.subtle)) return Promise.resolve("");
+    var b = new TextEncoder().encode(txt);
+    return crypto.subtle.digest("SHA-256", b).then(function (buf) {
+      return [].map.call(new Uint8Array(buf), function (v) {
+        return ("0" + v.toString(16)).slice(-2);
+      }).join("");
+    });
+  } catch (e) { return Promise.resolve(""); }
+}
+function myPhoneHash() { return LS("pt2_ph") || ""; }
+
+/* 내 번호를 명부에 올린다. 이걸 해둔 사람만 남이 연락처에서 찾을 수 있다 */
+function registerPhone(raw, cb) {
+  var n = normPhone(raw);
+  if (!n || n.length < 8) { say("전화번호를 다시 확인해 주세요"); if (cb) cb(false); return; }
+  sha256hex(n).then(function (h) {
+    if (!h) { say("이 브라우저에서는 번호 등록을 쓸 수 없어요"); if (cb) cb(false); return; }
+    api("/talk/contacts/register", { body: { uid: myUid(), nick: myNick(), hash: h } })
+      .then(function (d) {
+        if (d && d.ok) { LSS("pt2_ph", h); LSS("pt2_ph_show", n); say("번호를 등록했어요 📇"); if (cb) cb(true); }
+        else { say((d && d.error) || "등록하지 못했어요"); if (cb) cb(false); }
+      });
+  });
+}
+
+/* 고른 연락처 중 누가 포도톡 사용자인지 서버에 물어본다.
+   서버에 기능이 없으면(404) 조용히 전부 '미가입'으로 본다. */
+function matchContacts(list, cb) {
+  var jobs = list.map(function (c) {
+    return sha256hex(normPhone(c.tel)).then(function (h) { c.hash = h; return c; });
+  });
+  Promise.all(jobs).then(function (arr) {
+    var hs = arr.map(function (c) { return c.hash; }).filter(Boolean);
+    if (!hs.length) { cb(arr); return; }
+    api("/talk/contacts/match", { body: { hashes: hs } }).then(function (d) {
+      var m = (d && d.ok && d.matches) ? d.matches : {};
+      arr.forEach(function (c) {
+        var hit = c.hash && m[c.hash];
+        if (hit) { c.uid = hit.uid || ""; c.nick = hit.nick || ""; }
+      });
+      cb(arr);
+    });
+  });
+}
 
 function roomSetSheet() {
   if (!P.room) return;
@@ -2124,7 +2396,7 @@ function svRoomOf(sid){
 function repaintList(){
   var h = location.hash || "";
   if (h.indexOf("#/talk/trans") === 0) { return lseg() === "trx" ? trxList() : renderLive(lseg()); }
-  if (h.indexOf("#/talk/direct") === 0) { window.renderTalkList("direct"); return; }
+  if (h.indexOf("#/talk/direct") === 0) { if (on()) renderDirect(); else window.renderTalkList("direct"); return; }
   if (h.indexOf("#/talk/open") === 0 || h === "#/talk") { renderOpen(); return; }
 }
 function rowMenu(id){
@@ -2160,6 +2432,9 @@ function forgetLocalRoom(id){
     saveTalkRooms(talkRooms().filter(function (x) { return x.id !== id; }));
     DB.set("pododa_talk_msg_" + id, "");
   } catch (e) {}
+}
+function forgetDirect(sid){
+  try { var m = LSJ("pt2_direct", {}); delete m[sid]; LSS("pt2_direct", JSON.stringify(m)); } catch (e) {}
 }
 function forgetSvRoom(sid){
   saveSvRooms(svRooms().filter(function (r) { return r.id !== sid; }));
@@ -2255,7 +2530,7 @@ document.addEventListener("click", function (e) {
     var sbm = document.querySelector(".sheet-bg"); if (sbm) sbm.remove();
     if (isSv(mid)) {
       var s1 = bare(mid);
-      var fin1 = function () { forgetSvRoom(s1); repaintList(); say("내 목록에서 지웠어요"); };
+      var fin1 = function () { forgetSvRoom(s1); forgetDirect(s1); repaintList(); say("내 목록에서 지웠어요"); };
       api("/talk/room/leave", { body: { room_id: s1, uid: myUid() } }).then(fin1, fin1);
     } else {
       forgetLocalRoom(mid); repaintList(); say("지웠어요");
@@ -2266,7 +2541,7 @@ document.addEventListener("click", function (e) {
     var aid = bare(el.getAttribute("data-id"));
     if (!confirm("모두에게서 삭제할까요?\n참여한 모든 사람에게서 방과 대화가 사라집니다.")) return;
     var sba = document.querySelector(".sheet-bg"); if (sba) sba.remove();
-    var fin2 = function () { forgetSvRoom(aid); repaintList(); refreshRooms(); say("모두에게서 삭제했어요"); };
+    var fin2 = function () { forgetSvRoom(aid); forgetDirect(aid); repaintList(); refreshRooms(); say("모두에게서 삭제했어요"); };
     api("/talk/room/delete", { body: { room_id: aid }, token: tokenOf(aid) }).then(function (d) {
       if (d && !d.ok) say(d.error || "서버에서 지우지 못했어요");
       fin2();
@@ -2302,7 +2577,7 @@ document.addEventListener("click", function (e) {
   if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
-  if (a === "new-sv")   { newRoomSheet(); return; }
+  if (a === "new-sv")   { newScreen("group"); return; }
   if (a === "ntype")    {
     window._pt2New = window._pt2New || {};
     var nv = el.getAttribute("data-v");
@@ -2338,7 +2613,7 @@ document.addEventListener("click", function (e) {
       name: nm,
       intro: ((document.getElementById("pt2NIntro") || {}).value || "").trim(),
       type: sendType, uid: myUid(), nick: myNick(),
-      is_private: (isDirect ? 0 : (cfg.priv ? 1 : 0)),
+      is_private: (isDirect ? 1 : (cfg.priv ? 1 : 0)),
       emoji: isDirect ? "💬" : (({ general: "🍇", study: "📚", creator: "✨" })[cfg.type] || "🍇")
     }}).then(function (d) {
       if (!d.ok) { say(d.error || "방을 만들지 못했어요"); return; }
@@ -2376,6 +2651,34 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "ph-save") {
+    var pv = ((document.getElementById("pt2Phone") || {}).value || "").trim();
+    registerPhone(pv, function (ok2) { if (ok2) try { renderTalkSettings(); } catch (e) {} });
+    return;
+  }
+  if (a === "ph-del") {
+    if (!confirm("번호 등록을 지울까요?\n다른 사람이 연락처에서 나를 찾을 수 없게 됩니다.")) return;
+    var h0 = myPhoneHash();
+    var done0 = function () {
+      try { localStorage.removeItem("pt2_ph"); localStorage.removeItem("pt2_ph_show"); } catch (e) {}
+      say("지웠어요"); try { renderTalkSettings(); } catch (e) {}
+    };
+    api("/talk/contacts/register", { body: { uid: myUid(), hash: h0, remove: 1 } }).then(done0, done0);
+    return;
+  }
+  if (a === "new-direct") { newScreen("direct"); return; }
+  if (a === "new-back") {
+    location.hash = (NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open";
+    return;
+  }
+  if (a === "new-kind") {
+    NEWC.kind = el.getAttribute("data-v");
+    if (NEWC.kind === "direct" && NEWC.picked.length > 1) NEWC.picked = NEWC.picked.slice(0, 1);
+    renderNew(); return;
+  }
+  if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
+  if (a === "new-pick") { newPick(); return; }
+  if (a === "new-go")   { newGo(); return; }
   if (a === "inv-open") {
     if (!P.room) return;
     inviteSheet(bare(P.id), P.room.code || "", roomLabel(bare(P.id), P.room.name));
@@ -2462,28 +2765,33 @@ document.addEventListener("click", function (e) {
     var lid = bare(P.id), wasLive = isLive(lid);
     api("/talk/room/leave", { body: { room_id: lid, uid: myUid() } }).then(function () {
       var sb4 = document.querySelector(".sheet-bg"); if (sb4) sb4.remove();
+      var backTo = backList(lid);
       if (wasLive) liveForget(lid);
       say("방에서 나왔어요");
       refreshRooms();
-      location.hash = wasLive ? "#/talk/trans" : "#/talk/open";
+      location.hash = backTo;
     });
     return;
   }
   if (a === "del-room") {
     if (!confirm("방과 모든 대화가 지워져요. 삭제할까요?")) return;
     var did = bare(P.id), wasLive2 = isLive(did);
+    /* 어디로 돌아갈지는 지우기 전에 정해둔다. 지우고 나면 1:1 이었는지 알 수 없다. */
+    var backTo2 = backList(did);
     api("/talk/room/delete", { body: { room_id: did }, token: tokenOf(did) }).then(function (d) {
       var sb5 = document.querySelector(".sheet-bg"); if (sb5) sb5.remove();
       if (wasLive2) liveForget(did);       /* 서버가 실패해도 내 목록에는 남기지 않는다 */
+      forgetDirect(did);
       if (!d.ok) {
+        /* 예전에는 여기서 늘 통역톡으로 튀었다. 온 곳으로 돌려보낸다. */
         say((d.error || "서버에서 지우지 못했어요") + " · 내 목록에서는 지웠어요");
         refreshRooms();
-        location.hash = "#/talk/trans";
+        location.hash = backTo2;
         return;
-      }       /* 목록에 남지 않도록 이 기기 기록도 지운다 */
+      }
       say("방을 삭제했어요");
       refreshRooms();
-      location.hash = wasLive2 ? "#/talk/trans" : "#/talk/open";
+      location.hash = backTo2;
     });
     return;
   }
@@ -2533,6 +2841,27 @@ document.addEventListener("click", function (e) {
     return;
   }
 });
+
+/* 초대 체크박스. label 안이라 click 으로 잡힌다 */
+document.addEventListener("change", function (e) {
+  var el = e.target;
+  if (!el || el.getAttribute("data-pt2") !== "pick-ck") return;
+  var i = parseInt(el.getAttribute("data-i"), 10);
+  if (NEWC.picked[i]) NEWC.picked[i].on = !!el.checked;
+  if (NEWC.kind === "direct" && el.checked) {
+    NEWC.picked.forEach(function (c, j) { if (j !== i) c.on = false; });
+    renderNew();
+  }
+});
+
+/* '＋ 1:1 채팅 만들기' · '＋ 그룹방 만들기' 를 전체 화면으로 돌린다.
+   index.html 의 작은 시트보다 먼저 잡아야 해서 캡처 단계로 듣는다. */
+document.addEventListener("click", function (e) {
+  var el = e.target && e.target.closest ? e.target.closest('[data-action="talk-new"]') : null;
+  if (!el || !on()) return;
+  e.preventDefault(); e.stopPropagation();
+  newScreen(el.getAttribute("data-mode") === "direct" ? "direct" : "group");
+}, true);
 
 /* 알림을 눌러 들어온 경우: sw.js 가 보내는 room_id 를 서버 방으로 연다 */
 if ("serviceWorker" in navigator) {
