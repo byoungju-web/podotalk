@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "49";
+var PT2_VER = "50";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -178,6 +178,14 @@ function rich(s) {
 (function style() {
   var css = [
     '.pt2-inline-ic{display:inline-block;width:15px;height:15px;vertical-align:-3px;border-radius:4px;overflow:hidden}',
+    '.pt2-lang{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}',
+    '.pt2-lchip{background:var(--tk-soft);border:1.5px solid transparent;border-radius:999px;padding:9px 14px;font-size:13.5px;font-weight:800;color:#3a2a4d}',
+    '.pt2-lchip.on{border-color:var(--tk-grape);color:var(--tk-grape);background:#fff}',
+    '.pt2-keybox{margin-top:10px;background:#fff;border:1px solid var(--tk-line);border-radius:13px;padding:12px}',
+    '.pt2-keyhd{font-weight:900;font-size:14px;color:#241436;margin-bottom:5px}',
+    '.pt2-keyhd span{display:block;font-weight:600;font-size:11.5px;color:var(--tk-sub);margin-top:2px}',
+    '.pt2-keylink{display:block;text-align:center;margin-top:9px;padding:10px;border-radius:10px;background:var(--tk-soft);color:var(--tk-grape);font-weight:800;font-size:13px;text-decoration:none}',
+    '.pt2-keybox input{width:100%;margin-top:9px;padding:11px 12px;border:1.5px solid var(--tk-line);border-radius:10px;font-size:13px;font-family:ui-monospace,monospace;background:#fff;box-sizing:border-box}',
     '.pt2-mem{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:190px;overflow-y:auto}',
     '.pt2-mem-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--tk-line);border-radius:11px;padding:8px 11px}',
     '.pt2-mem-av{width:30px;height:30px;border-radius:10px;overflow:hidden;flex:0 0 auto;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
@@ -336,6 +344,38 @@ function injectSettings() {
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
+    /* ── 화면 언어 ── */
+    '<div class="tk-sec" style="margin-top:14px">🌐 화면 언어</div>' +
+    '<div class="pt2-sub">국가를 고르면 앱 화면이 그 나라 말로 바뀌어요. <b>자동</b>이면 폰 시간대(현재 위치)로 알아서 골라요 — 해외에 가면 그 나라 말로 자동 번역됩니다.</div>' +
+    '<div class="pt2-lang" data-pt2-noui="1">' +
+      UI_LANGS.map(function (x) {
+        return '<button class="pt2-lchip' + (uiPick() === x[0] ? " on" : "") + '" data-pt2="ui-lang" data-v="' + x[0] + '">' +
+          x[1] + " " + x[2] + "</button>";
+      }).join("") +
+    "</div>" +
+    (uiWhere() ? '<div class="pt2-sub" style="margin-top:8px">📍 지금 위치 · <b>' + esc(uiWhere()) + "</b></div>" : "") +
+    '<div class="pt2-sub" style="margin-top:6px">한국어 외 언어는 화면 전체가 자동 번역돼요. <b>API 키 없이도</b> 무료 번역으로 동작합니다. 결과는 이 기기에 저장돼 다음부턴 즉시 표시됩니다.</div>' +
+
+    /* ── AI 키 (선택) ── */
+    '<div class="tk-sec" style="margin-top:14px">🔑 AI 키 (선택)</div>' +
+    '<div class="pt2-sub">넣지 않아도 번역은 무료로 됩니다. 키를 넣으면 번역 품질이 더 좋아져요. 키는 <b>이 기기에만</b> 저장되고 서버로 보내지 않습니다.</div>' +
+
+    '<div class="pt2-keybox">' +
+      '<div class="pt2-keyhd">💎 Gemini <span>무료 · 하루 1,500회 · 카드 불필요</span></div>' +
+      '<div class="pt2-sub">1. aistudio.google.com 접속<br>2. Google 계정으로 로그인<br>3. Get API Key → Create API Key<br>4. 키 복사 후 아래에 붙여넣기</div>' +
+      '<a class="pt2-keylink" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">🔗 aistudio.google.com 열기</a>' +
+      '<input id="pt2KeyG" type="password" placeholder="AIza..." autocomplete="off" value="' + esc(LS("pt2_key_gemini") || "") + '">' +
+      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="key-save" data-k="gemini">Gemini 키 저장</button>' +
+    "</div>" +
+
+    '<div class="pt2-keybox">' +
+      '<div class="pt2-keyhd">✳️ Claude <span>유료 · 최소 $5 충전 필요</span></div>' +
+      '<div class="pt2-sub">1. console.anthropic.com 접속<br>2. Google 계정 또는 이메일로 가입<br>3. Settings → API Keys → Create Key<br>4. $5 충전(결제 등록) 후 키 복사 → 아래 붙여넣기</div>' +
+      '<a class="pt2-keylink" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">🔗 console.anthropic.com 열기</a>' +
+      '<input id="pt2KeyC" type="password" placeholder="sk-ant-api03-..." autocomplete="off" value="' + esc(LS("pt2_key_claude") || "") + '">' +
+      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="key-save" data-k="claude">Claude 키 저장</button>' +
+    "</div>" +
+
     /* 내 번호를 올려두면 남이 연락처에서 나를 찾아 바로 초대할 수 있다.
        번호 자체는 서버에 가지 않는다. 폰에서 해시로 바꿔 보낸다. */
     '<div class="tk-sec" style="margin-top:14px">📇 연락처로 찾기</div>' +
@@ -1638,6 +1678,204 @@ function newGo() {
   });
 }
 
+/* ══════════════ 화면 언어 ══════════════
+   메시지 번역과는 다른 이야기다. 이건 버튼·안내문 같은 화면 글자를
+   통째로 다른 나라 말로 바꾸는 것이다.
+
+   ① 무료 번역기를 쓴다. API 키가 없어도 돌아간다.
+   ② 한 번 번역한 문장은 이 기기에 적어둔다. 다음부터는 곧바로 나온다.
+   ③ 키를 넣어두면 그걸 먼저 쓴다. 번역 품질이 더 낫다.
+   ────────────────────────────────────────────────────────────── */
+var UI_LANGS = [
+  ["auto", "🌐", "자동(위치 따름)"],
+  ["ko", "🇰🇷", "한국어"],
+  ["en", "🇺🇸", "English"],
+  ["zh", "🇨🇳", "中文"],
+  ["hi", "🇮🇳", "हिन्दी"],
+  ["es", "🇪🇸", "Español"],
+  ["fr", "🇫🇷", "Français"],
+  ["de", "🇩🇪", "Deutsch"]
+];
+
+/* 폰 시간대로 지금 어느 나라에 있는지 어림한다.
+   위치 권한을 묻지 않아도 되고, 해외에 나가면 저절로 바뀐다. */
+var TZ_LANG = {
+  Seoul: ["ko", "대한민국"], Pyongyang: ["ko", "조선"],
+  Tokyo: ["ja", "일본"], Shanghai: ["zh", "중국"], Chongqing: ["zh", "중국"],
+  Hong_Kong: ["zh", "홍콩"], Taipei: ["zh", "대만"], Macau: ["zh", "마카오"],
+  Kolkata: ["hi", "인도"], Calcutta: ["hi", "인도"],
+  Madrid: ["es", "스페인"], Mexico_City: ["es", "멕시코"], Bogota: ["es", "콜롬비아"],
+  Buenos_Aires: ["es", "아르헨티나"], Santiago: ["es", "칠레"], Lima: ["es", "페루"],
+  Paris: ["fr", "프랑스"], Brussels: ["fr", "벨기에"],
+  Berlin: ["de", "독일"], Vienna: ["de", "오스트리아"], Zurich: ["de", "스위스"],
+  New_York: ["en", "미국"], Chicago: ["en", "미국"], Denver: ["en", "미국"],
+  Los_Angeles: ["en", "미국"], Phoenix: ["en", "미국"], Anchorage: ["en", "미국"],
+  Honolulu: ["en", "미국"], Toronto: ["en", "캐나다"], Vancouver: ["en", "캐나다"],
+  London: ["en", "영국"], Dublin: ["en", "아일랜드"],
+  Sydney: ["en", "호주"], Melbourne: ["en", "호주"], Auckland: ["en", "뉴질랜드"],
+  Singapore: ["en", "싱가포르"], Manila: ["en", "필리핀"]
+};
+
+function tzGuess() {
+  try {
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    var city = tz.split("/").pop();
+    if (TZ_LANG[city]) return TZ_LANG[city];
+  } catch (e) {}
+  try {
+    var nl = (navigator.language || "").slice(0, 2).toLowerCase();
+    for (var i = 1; i < UI_LANGS.length; i++) if (UI_LANGS[i][0] === nl) return [nl, ""];
+  } catch (e2) {}
+  return ["ko", "대한민국"];
+}
+
+function uiPick() { return LS("pt2_ui") || "auto"; }
+function uiLang() {
+  var p = uiPick();
+  if (p !== "auto") return p;
+  var g = tzGuess()[0];
+  /* 자동인데 우리가 화면을 준비하지 않은 말이면 영어로 간다 */
+  for (var i = 1; i < UI_LANGS.length; i++) if (UI_LANGS[i][0] === g) return g;
+  return "en";
+}
+function uiWhere() {
+  var g = tzGuess();
+  return g[1] ? g[1] : "";
+}
+
+/* 번역해 둔 것 보관 — 언어별로 나눠 담는다 */
+function uiCache(l) { try { return JSON.parse(LS("pt2_uic_" + l) || "{}"); } catch (e) { return {}; } }
+function uiCacheSave(l, o) { try { LSS("pt2_uic_" + l, JSON.stringify(o)); } catch (e) {} }
+
+var uiQ = [], uiBusy = false, uiSeen = {}, uiPaint = null;
+
+/* 키가 있으면 키를 먼저, 없으면 무료 번역기 */
+function uiTranslateOne(text, lang, done) {
+  var gk = LS("pt2_key_gemini") || "";
+  if (gk) { geminiTr(text, lang, gk, done, function () { freeTr(text, lang, done); }); return; }
+  var ck = LS("pt2_key_claude") || "";
+  if (ck) { claudeTr(text, lang, ck, done, function () { freeTr(text, lang, done); }); return; }
+  freeTr(text, lang, done);
+}
+function freeTr(text, lang, done) {
+  trxGoogle(text, "ko", lang, done, function () {
+    trxMyMemory(text, "ko", lang, done, function () { done(""); });
+  });
+}
+function trPrompt(lang) {
+  var nm = { en: "English", zh: "Chinese", hi: "Hindi", es: "Spanish", fr: "French", de: "German", ja: "Japanese" }[lang] || lang;
+  return "Translate the Korean UI text into " + nm +
+    ". Keep emoji and numbers as they are. Reply with the translation only, no quotes, no explanation.";
+}
+function geminiTr(text, lang, key, ok, fail) {
+  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: trPrompt(lang) }] },
+      contents: [{ role: "user", parts: [{ text: text }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 400 }
+    })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    var t = d && d.candidates && d.candidates[0] && d.candidates[0].content &&
+            d.candidates[0].content.parts && d.candidates[0].content.parts[0];
+    ok(String((t && t.text) || "").trim() || "");
+  })["catch"](fail);
+}
+function claudeTr(text, lang, key, ok, fail) {
+  fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json", "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-3-5-haiku-latest", max_tokens: 400,
+      system: trPrompt(lang), messages: [{ role: "user", content: text }]
+    })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    var t = d && d.content && d.content[0] && d.content[0].text;
+    ok(String(t || "").trim() || "");
+  })["catch"](fail);
+}
+
+function uiStep() {
+  var job = uiQ.shift();
+  if (!job) { uiBusy = false; return; }
+  uiBusy = true;
+  uiTranslateOne(job.t, job.l, function (out) {
+    if (out) {
+      var c = uiCache(job.l); c[job.t] = out; uiCacheSave(job.l, c);
+      if (uiPaint) clearTimeout(uiPaint);
+      uiPaint = setTimeout(uiPaintNow, 220);
+    }
+    setTimeout(uiStep, 80);
+  });
+}
+
+var KO_RE = /[가-힣]/;
+var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, INPUT: 1, SELECT: 1, OPTION: 1, CODE: 1 };
+
+/* 화면에 있는 한국어 글자를 모아 바꿔 넣는다 */
+function uiPaintNow() {
+  var lang = uiLang();
+  if (lang === "ko") return;
+  var c = uiCache(lang), miss = [];
+  var walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: function (n) {
+      if (!n.nodeValue || !KO_RE.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+      var pn = n.parentNode;
+      if (!pn || SKIP_TAGS[pn.nodeName]) return NodeFilter.FILTER_REJECT;
+      if (pn.closest && pn.closest("[data-pt2-noui]")) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var n, list = [];
+  while ((n = walk.nextNode())) list.push(n);
+  list.forEach(function (node) {
+    var raw = node.__ko || node.nodeValue;
+    var key = raw.trim();
+    if (!key) return;
+    node.__ko = raw;                       /* 원문을 붙들어 둔다 (언어를 되돌릴 때 쓴다) */
+    if (c[key]) { node.nodeValue = raw.replace(key, c[key]); return; }
+    if (!uiSeen[lang + "|" + key]) { uiSeen[lang + "|" + key] = 1; miss.push(key); }
+  });
+  /* 입력칸 안내문도 같이 */
+  [].forEach.call(document.querySelectorAll("input[placeholder],textarea[placeholder]"), function (el) {
+    var raw = el.__ko || el.getAttribute("placeholder") || "";
+    if (!KO_RE.test(raw)) return;
+    el.__ko = raw;
+    if (c[raw]) { el.setAttribute("placeholder", c[raw]); return; }
+    if (!uiSeen[lang + "|" + raw]) { uiSeen[lang + "|" + raw] = 1; miss.push(raw); }
+  });
+
+  miss.slice(0, 60).forEach(function (t) { uiQ.push({ t: t, l: lang }); });
+  if (miss.length && !uiBusy) uiStep();
+}
+
+/* 화면이 새로 그려질 때마다 다시 훑는다 */
+var uiObs = null, uiTimer = null;
+function uiWatch() {
+  if (uiLang() === "ko") return;
+  if (uiObs) return;
+  try {
+    uiObs = new MutationObserver(function () {
+      if (uiTimer) clearTimeout(uiTimer);
+      uiTimer = setTimeout(uiPaintNow, 160);
+    });
+    uiObs.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  uiPaintNow();
+}
+function uiSetLang(v) {
+  LSS("pt2_ui", v);
+  uiSeen = {};
+  if (uiObs) { try { uiObs.disconnect(); } catch (e) {} uiObs = null; }
+  /* 한국어로 되돌릴 때는 새로 고쳐 원문을 되살린다 */
+  if (uiLang() === "ko") { location.reload(); return; }
+  uiWatch();
+}
+
 /* ══════════════ 전화번호 명부 (카톡식 초대의 뿌리) ══════════════
    카톡은 주소록을 통째로 서버에 올려서 "이 번호는 가입자"를 가려낸다.
    웹은 주소록 전체를 못 읽으므로, 사용자가 고른 번호만 그때그때 확인한다.
@@ -2866,6 +3104,20 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "ui-lang") {
+    uiSetLang(el.getAttribute("data-v"));
+    try { renderTalkSettings(); } catch (e) {}
+    say("화면 언어를 바꿨어요 🌐");
+    return;
+  }
+  if (a === "key-save") {
+    var kk = el.getAttribute("data-k");
+    var box = document.getElementById(kk === "gemini" ? "pt2KeyG" : "pt2KeyC");
+    var val = ((box || {}).value || "").trim();
+    if (val) { LSS("pt2_key_" + kk, val); say((kk === "gemini" ? "Gemini" : "Claude") + " 키를 저장했어요 🔑"); }
+    else { try { localStorage.removeItem("pt2_key_" + kk); } catch (e) {} say("키를 지웠어요"); }
+    return;
+  }
   if (a === "ph-save") {
     var pv = ((document.getElementById("pt2Phone") || {}).value || "").trim();
     registerPhone(pv, function (ok2) { if (ok2) try { renderTalkSettings(); } catch (e) {} });
@@ -3117,6 +3369,9 @@ if ("serviceWorker" in navigator) {
     location.hash = "#/talk/room/" + PFX + e.data.room_id;
   });
 }
+
+/* 화면 언어가 한국어가 아니면 처음부터 번역을 걸어둔다 */
+try { uiWatch(); } catch (e) {}
 
 /* 바로가기·북마크로 #/talk/trans 로 바로 들어온 경우.
    index.html 의 라우터는 pt2.js 보다 먼저 돌기 때문에 'trans' 를 몰라서
