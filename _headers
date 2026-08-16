@@ -1,0 +1,14 @@
+# Cloudflare Pages 응답 헤더
+# manifest 와 서비스워커는 브라우저 캐시에도 굳으면 안 된다.
+
+/manifest.json
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
