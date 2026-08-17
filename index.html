@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-17 v46";</script>
+<script>window.PODOTALK_BUILD = "2026-08-17 v47";</script>
 <!-- 폰트만 CDN. 실패해도 시스템 폰트로 폴백되어 동작에 영향 없음 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- QRCode for JavaScript (davidshimjs/qrcodejs, MIT) — CDN 의존 제거를 위해 인라인 -->
@@ -5844,7 +5844,7 @@ function renderTalkSettings(){
       '<div class="tip" style="margin-top:6px">'+(hasKey?'현재 키가 연결돼 있어요 ✅':'⚠️ 아직 키가 없어요. 없어도 번역은 됩니다.')+'</div>'+
       '<div class="tk-sec">사장님 도우미</div>'+
       '<div class="tk-toggle">🤖 부재중 AI 자동응답<span class="tk-sw'+(ai?" on":"")+'" data-action="talk-toggle-ai"></span></div>'+
-      '<div class="tip" style="margin-top:0">1:1 채팅에서 손님 메시지에 <b>Podoya 키</b>로 사장님 대신 자동 응답해요. '+(hasKey?'현재 키가 연결돼 있어요 ✅':'⚠️ 아직 AI 키가 없어요. Podoya에서 키를 설정하면 동작합니다.')+'</div>'+
+      '<div class="tip" style="margin-top:0">1:1 채팅에서 손님이 보낸 메시지에 사장님 대신 자동으로 답해요. '+(hasKey?'키가 연결돼 있어요 ✅':'⚠️ 위 <b>AI 키</b> 칸에 키를 넣어야 동작합니다.')+'</div>'+
 
 
     '</div>';
@@ -6696,32 +6696,14 @@ function ptInjectSync(){
   var box=document.querySelector(".tk-set");
   if(!box || box.querySelector("[data-pt-sec]")) return;
 
-  var sec=document.createElement("div");
-  sec.className="tk-sec"; sec.setAttribute("data-pt-sec","1");
-  sec.textContent="🍇 포도 서비스 연동";
-  box.appendChild(sec);
-
-  /* '포도다에서 대화 가져오기' 는 이 폰에만 저장되던 옛 방을 옮겨오는
-     기능이었다. 지금은 모든 방이 서버에 있어서 가져올 것이 없으므로 뺐다.
-     백업 코드는 프로필·설정을 다른 폰으로 옮길 때 아직 쓸모가 있어 남긴다. */
-  box.appendChild(ptBtn("📤 백업 코드 만들기(복사)","exp","background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:0"));
-  box.appendChild(ptBtn("📥 백업 코드 붙여넣기","imp"));
-
-  var tip=document.createElement("div");
-  tip.className="tip"; tip.style.marginTop="6px";
-  tip.textContent="폰을 바꿀 때 백업 코드를 복사해 새 폰에 붙여넣으면 프로필과 설정이 그대로 옮겨집니다.";
-  box.appendChild(tip);
-
+  /* 백업 코드는 구글 로그인이 들어오면서 할 일이 없어졌다. 계정에 묶여
+     있으면 새 폰에서 로그인 한 번으로 돌아오므로, 코드를 따로 챙기게 만들면
+     오히려 헷갈린다. 포도다 링크 안내도 포도다 버튼을 뺀 뒤로 맞지 않아 지웠다. */
   var sec2=document.createElement("div");
-  sec2.className="tk-sec"; sec2.textContent="바로가기";
+  sec2.className="tk-sec"; sec2.setAttribute("data-pt-sec","1");
+  sec2.textContent="바로가기";
   box.appendChild(sec2);
-  /* 쇼핑 탭을 뺀 것과 같은 이유로 포도다 열기도 뺐다. */
   box.appendChild(ptBtn("🍇 포도야 (AI 비서) 열기","podoya","background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:0"));
-
-  var tip2=document.createElement("div");
-  tip2.className="tip"; tip2.style.marginTop="6px";
-  tip2.textContent="초대 링크는 서로 통해요. 포도다에서 만든 방 링크를 포도톡의 ‘🔑 링크·코드로 입장’에 붙여넣으면 그대로 들어갑니다.";
-  box.appendChild(tip2);
 }
 
 /* 설정 화면이 그려질 때마다 덧붙이기 (원본 함수는 그대로 두고 감싸기만) */
@@ -6766,14 +6748,14 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=66"></script>
+<script src="/pt2.js?v=67"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고
      캐시를 비운 뒤 한 번만 다시 받아온다. 실패해도 한 번만 하고 멈춘다. -->
 <script>
 (function () {
-  var WANT = "66";                    // pt2.js 의 PT2_VER 과 같게 둔다
+  var WANT = "67";                    // pt2.js 의 PT2_VER 과 같게 둔다
   var MARK = "pt2_fix_" + WANT;
   function fix(why) {
     try { if (sessionStorage.getItem(MARK)) return; sessionStorage.setItem(MARK, "1"); } catch (e) { return; }
