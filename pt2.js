@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "53";
+var PT2_VER = "54";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1504,9 +1504,9 @@ function newScreen(kind) {
   /* direct = 1:1 채팅 · group = 그룹방 · live1 = 1:1 통역방 · livemulti = 다중 통역방
      통역방도 만드는 절차는 같다. 그런데 지금까지 통역방만 브라우저 기본
      입력창(prompt)을 써서, 주소가 그대로 뜨는 낯선 화면이 나왔다. */
-  NEWC.kind = ({ group: 1, live1: 1, livemulti: 1 })[kind] ? kind : "direct";
+  NEWC.kind = ({ group: 1, open: 1, live1: 1, livemulti: 1 })[kind] ? kind : "direct";
   NEWC.picked = [];
-  NEWC.name = ""; NEWC.intro = ""; NEWC.pub = false;
+  NEWC.name = ""; NEWC.intro = ""; NEWC.pub = (NEWC.kind === "open");
   location.hash = "#/talk/new";
 }
 
@@ -1531,6 +1531,7 @@ function renderNew() {
   var lv = newIsLive();
   var TT = { direct: ["새 1:1 채팅", "둘이서 이야기해요"],
              group: ["새 그룹방", "여러 명이 함께 이야기해요"],
+             open: ["새 오픈채팅방", "누구나 찾아 들어올 수 있어요"],
              live1: ["새 1:1 동시통역톡", "서로 다른 말로 둘이 이야기해요"],
              livemulti: ["새 다중동시통역방", "여러 나라 사람이 함께 이야기해요"] }[NEWC.kind];
   var picks = NEWC.picked;
@@ -1554,10 +1555,16 @@ function renderNew() {
         : "") +
       (isD || lv ? "" :
         '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
-        /* 공개 스위치는 아예 두지 않는다. 실수로 한 번 켜면 그 방 대화가
-           통째로 남에게 보이고, 되돌린다고 이미 본 것이 지워지지도 않는다.
-           모든 방은 초대 링크나 코드를 받은 사람만 들어온다. */
-        '<div class="pt2-sub" style="margin-top:2px">🔒 초대 링크나 코드를 받은 사람만 들어와요.</div>') +
+        /* 공개 스위치는 오픈채팅방에서만 보여준다. 일반 그룹방에서는
+           실수로 한 번 켜면 그 방 대화가 통째로 남에게 보이고, 되돌린다고
+           이미 본 것이 지워지지도 않는다. */
+        (NEWC.kind === "open"
+          ? '<div class="tk-toggle">🌏 누구나 들어오게<span class="tk-sw' + (NEWC.pub ? " on" : "") + '" data-pt2="new-pub"></span></div>' +
+            '<div class="pt2-sub" style="margin-top:4px">' +
+              (NEWC.pub
+                ? "켜져 있어요. 포도톡을 여는 <b>누구나</b> 이 방을 찾아 들어오고 대화를 볼 수 있습니다."
+                : "🔒 꺼두면 <b>초대 링크나 코드를 받은 사람만</b> 들어와요.") + "</div>"
+          : '<div class="pt2-sub" style="margin-top:2px">🔒 초대 링크나 코드를 받은 사람만 들어와요.</div>')) +
       (lv ? '<div class="pt2-sub" style="margin-top:2px">각자 자기 말로 쓰면 상대 화면에는 그 사람 언어로 번역돼 보여요. 자동번역이 켜진 채로 시작합니다.</div>'
           : (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "")) +
 
@@ -1637,7 +1644,8 @@ function newGo() {
     type: "general", uid: myUid(), nick: myNick(),
     /* 1:1 과 통역방은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의
        오픈채팅 목록에 뜬다. 코드를 안 받는 것과 목록에 안 뜨는 것은 다른 얘기다. */
-    is_private: 1,          /* 모든 방은 비공개다 */
+    /* 오픈채팅방에서 스위치를 켠 경우에만 공개다. 나머지는 모두 비공개. */
+    is_private: (NEWC.kind === "open" && NEWC.pub) ? 0 : 1,
     emoji: lv ? (multi ? "👪" : "💬") : (isD ? "💬" : "🍇")
   }}).then(function (d) {
     if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
@@ -3038,7 +3046,7 @@ document.addEventListener("click", function (e) {
   if (a === "mic") { pt2MicStart(el.getAttribute("data-id") || P.id); return; }
 
   /* STEP 2 */
-  if (a === "new-sv")   { newScreen("group"); return; }
+  if (a === "new-sv")   { newScreen(seg() === "pub" ? "open" : "group"); return; }
   if (a === "ntype")    {
     window._pt2New = window._pt2New || {};
     var nv = el.getAttribute("data-v");
@@ -3147,6 +3155,7 @@ document.addEventListener("click", function (e) {
       : ((NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open");
     return;
   }
+  if (a === "new-pub")  { newKeep(); NEWC.pub = !NEWC.pub; renderNew(); return; }
   if (a === "new-pick") { newPick(); return; }
   if (a === "new-link") {
     newKeep();
