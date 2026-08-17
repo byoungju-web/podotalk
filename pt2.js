@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "51";
+var PT2_VER = "53";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1104,7 +1104,7 @@ function fixTabbar() {
     '<button data-action="nav" data-to="#/" id="tk-tab-home"><span class="ti">🏠</span>쇼핑</button>' +
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
-    '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">🗨️</span>오픈채팅</button>' +
+    '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">💬</span>일반채팅</button>' +
     '<button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>';
 }
 function markTab(id) {
@@ -1554,13 +1554,10 @@ function renderNew() {
         : "") +
       (isD || lv ? "" :
         '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
-        /* 기본은 비공개다. 예전에는 만들면 곧바로 공개 목록에 올라가
-           모르는 사람이 대화를 다 볼 수 있었다. 공개는 일부러 켜야 한다. */
-        '<div class="tk-toggle">🌏 누구나 들어오게<span class="tk-sw' + (NEWC.pub ? " on" : "") + '" data-pt2="new-priv"></span></div>' +
-        '<div class="pt2-sub" style="margin-top:4px">' +
-          (NEWC.pub
-            ? "⚠️ 켜져 있어요. 포도톡을 여는 <b>누구나</b> 이 방과 대화 내용을 볼 수 있습니다."
-            : "꺼두면 <b>초대 링크나 코드를 받은 사람만</b> 들어옵니다.") + "</div>") +
+        /* 공개 스위치는 아예 두지 않는다. 실수로 한 번 켜면 그 방 대화가
+           통째로 남에게 보이고, 되돌린다고 이미 본 것이 지워지지도 않는다.
+           모든 방은 초대 링크나 코드를 받은 사람만 들어온다. */
+        '<div class="pt2-sub" style="margin-top:2px">🔒 초대 링크나 코드를 받은 사람만 들어와요.</div>') +
       (lv ? '<div class="pt2-sub" style="margin-top:2px">각자 자기 말로 쓰면 상대 화면에는 그 사람 언어로 번역돼 보여요. 자동번역이 켜진 채로 시작합니다.</div>'
           : (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "")) +
 
@@ -1640,7 +1637,7 @@ function newGo() {
     type: "general", uid: myUid(), nick: myNick(),
     /* 1:1 과 통역방은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의
        오픈채팅 목록에 뜬다. 코드를 안 받는 것과 목록에 안 뜨는 것은 다른 얘기다. */
-    is_private: ((isD || lv) ? 1 : (NEWC.pub ? 0 : 1)),
+    is_private: 1,          /* 모든 방은 비공개다 */
     emoji: lv ? (multi ? "👪" : "💬") : (isD ? "💬" : "🍇")
   }}).then(function (d) {
     if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
@@ -2020,14 +2017,14 @@ function roomSetSheet() {
     "<h3>" + esc(roomLabel(bare(id), r.name)) + "</h3>" +
     '<div class="sd">초대 코드 <b>' + esc(r.code || "-") + "</b> · " + (r.members || 1) + "명 참여 중" +
       (r.owner_nick ? "<br>만든 사람 · <b>" + esc(r.owner_nick) + "</b>" + (owner ? " (나)" : "") : "") + "</div>" +
-    '<div class="tk-sec" style="margin-top:12px">참여자 <span id="pt2MemN">(' + (r.members || 1) + ')</span></div>' +
-    '<div class="pt2-mem" id="pt2Mem">' + memRow({ nick: r.owner_nick || myNick(), owner: 1, uid: r.owner_uid || (owner ? myUid() : "") }) + "</div>" +
-    '<button class="cta grape" style="margin-top:12px" data-pt2="inv-open">👥 친구 초대</button>' +
+    '<button class="cta grape" data-pt2="inv-open">👥 친구 초대</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="rename" data-id="' + esc(id) + '">✏️ 방 이름 바꾸기</button>' +
     '<div class="tk-toggle" style="margin-top:10px">🔔 이 방 알림<span class="tk-sw' + (muted(bare(id)) ? "" : " on") + '" data-pt2="noti-toggle" data-id="' + esc(id) + '"></span></div>' +
     /* 자동번역은 통역방·여러 나라 사람이 섞인 그룹방에서 쓰는 기능이다.
        1:1 설정에까지 얹으면 화면만 길어지고 무슨 방인지 헷갈린다. */
-    (isDirectRoom(bare(id)) ? "" :
+    /* 자동번역과 내 언어는 통역방에서 쓰는 것이다. 일반 채팅방·오픈채팅
+       설정에까지 얹으면 화면만 길어지고 무슨 방인지 헷갈린다. */
+    (!isLive(bare(id)) ? "" :
       '<div class="tk-toggle" style="margin-top:10px">🌐 자동번역<span class="tk-sw' + (trOn(id) ? " on" : "") + '" data-pt2="tr-toggle" data-id="' + esc(id) + '"></span></div>' +
       '<div class="pt2-sub" style="margin-top:6px">켜면 <b>남이 쓴 글</b>이 내 언어로 번역돼 보여요. 원문은 아래에 작게 남습니다. 상대도 각자 자기 언어를 고르면 서로 그냥 자기 말로 쓰면 됩니다.</div>' +
       '<div class="tk-field" style="margin-top:8px"><label>내 언어</label>' +
@@ -2042,7 +2039,11 @@ function roomSetSheet() {
         '<div class="pt2-sub" style="margin-top:6px">내가 만든 방이라, 지우면 참여한 모든 사람에게서 사라져요.</div>'
       : '<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="leave">🚪 방 나가기</button>' +
         '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요. 남은 사람들은 그대로 대화합니다.</div>') +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
+    /* 참여자 목록은 맨 아래에 둔다. 위에 있으면 사람이 늘어날수록
+       정작 자주 쓰는 버튼들이 아래로 밀려 내려간다. */
+    '<div class="tk-sec" style="margin-top:16px">참여자 <span id="pt2MemN">(' + (r.members || 1) + ')</span></div>' +
+    '<div class="pt2-mem" id="pt2Mem">' + memRow({ nick: r.owner_nick || myNick(), owner: 1, uid: r.owner_uid || (owner ? myUid() : "") }) + "</div>" +
+    '<button class="cta" style="margin-top:14px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
   bg.setAttribute("data-room", id);
@@ -3146,7 +3147,6 @@ document.addEventListener("click", function (e) {
       : ((NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open");
     return;
   }
-  if (a === "new-priv") { newKeep(); NEWC.pub = !NEWC.pub; renderNew(); return; }
   if (a === "new-pick") { newPick(); return; }
   if (a === "new-link") {
     newKeep();
