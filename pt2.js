@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "56";
+var PT2_VER = "57";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1423,20 +1423,9 @@ function smsTo(nums, body) {
   catch (e) { say("문자 앱을 열지 못했어요"); }
 }
 
-/* 내 번호를 안 올려두면 상대도 나를 연락처에서 찾지 못한다.
-   초대하려는 순간이 그 사실을 알려주기 가장 좋은 때다. */
-function phoneNudge() {
-  if (myPhoneHash()) return;
-  if (LS("pt2_ph_skip") === "1") return;
-  LSS("pt2_ph_skip", "1");
-  setTimeout(function () {
-    if (!confirm("내 전화번호를 등록해 두면, 내 번호를 저장한 사람이 나를 연락처에서 찾아 바로 초대할 수 있어요.\n\n번호는 알아볼 수 없는 값으로 바뀌어 저장됩니다.\n\n지금 등록하러 갈까요?")) return;
-    location.hash = "#/talk/settings";
-  }, 700);
-}
-
+/* 번호 등록을 권하는 안내창은 없앴다. 초대 링크를 한 번 누르면 서버가
+   등록까지 알아서 끝내므로, 사용자가 알아야 할 일이 아니다. */
 function pickContacts(sid, code, name) {
-  phoneNudge();
   if (!hasPicker()) {
     say("이 기기에서는 연락처를 직접 열 수 없어요. 공유하기로 보내주세요");
     shareInvite(sid, code, name);
@@ -1666,7 +1655,6 @@ function newKeep() {
 function newPick() {
   if (!hasPicker()) { say("이 기기에서는 연락처를 열 수 없어요"); return; }
   newKeep();
-  phoneNudge();
   navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (out) {
     if (!out || !out.length) return;
     var add = [];
