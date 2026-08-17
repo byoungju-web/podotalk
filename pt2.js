@@ -27,12 +27,16 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "57";
+var PT2_VER = "58";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
 var PFX = "sv_";                                          /* 서버 방 id 접두어 */
 var POLL_MS = 3000;
+/* index.html 의 감시 장치가 "제대로 된 pt2 가 왔는지" 확인할 표식.
+   숫자가 안 맞으면 index.html 이 캐시를 비우고 스스로 다시 받아온다. */
+try { window.PT2_LOADED = PT2_VER; } catch (e) {}
+
 var LOCAL_ROOMS = false;   /* 이 기기에만 저장되는 방을 쓸지. false = 모든 방이 서버 방 */
 
 /* ── 원본 보관 (PT 레이어가 이미 감싼 것도 그대로 이어받는다) ── */
@@ -943,8 +947,10 @@ function renderRoom(id) {
   P.waiting = false; P.waitSince = 0; P.waitNames = "";
   var head = "";
   try { head = ""; } catch (e) {}
+  /* 다중 통역방에서 나왔는데 1:1 칸이 열리면 방금 쓰던 방이 안 보인다.
+     그 방이 어느 칸에 속하는지 실어 보낸다. */
   var backTo = isLive(bare(id))
-    ? '<span class="tk-back" data-pt2="lang">‹</span>'
+    ? '<span class="tk-back" data-pt2="lang" data-k="' + esc(((liveMeta()[bare(id)] || {}).kind === "multi") ? "multi" : "one") + '">‹</span>'
     : (isDirectRoom(bare(id))
       ? '<span class="tk-back" data-action="talk-tab" data-v="direct">‹</span>'
       : '<span class="tk-back" data-action="talk-tab" data-v="open">‹</span>');
@@ -3021,9 +3027,10 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "lang") {
-    /* 하단 통역톡을 누르면 마지막에 보던 칸이 아니라 1:1 부터 보여준다.
-       어디였는지 기억하게 두면 눌러도 딴 화면이 나와 헷갈린다. */
-    LSS("pt2_lseg", "one");
+    /* 하단 통역톡을 누르면 1:1 칸부터 보여준다.
+       단, 통역방에서 나오는 길이면 그 방이 있던 칸으로 돌려보낸다. */
+    var lk = el.getAttribute("data-k");
+    LSS("pt2_lseg", lk === "multi" ? "multi" : "one");
     if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
     else location.hash = "#/talk/trans";
     return;
