@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "64";
+var PT2_VER = "65";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -188,6 +188,9 @@ function rich(s) {
     '.pt2-lang{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}',
     '.pt2-lchip{background:var(--tk-soft);border:1.5px solid transparent;border-radius:999px;padding:9px 14px;font-size:13.5px;font-weight:800;color:#3a2a4d}',
     '.pt2-lchip.on{border-color:var(--tk-grape);color:var(--tk-grape);background:#fff}',
+    '.pt2-acct{background:#fff;border:1.5px solid var(--tk-grape);border-radius:13px;padding:13px}',
+    '.pt2-acct-t{font-weight:900;font-size:14.5px;color:var(--tk-grape)}',
+    '.pt2-acct-s{font-size:13px;font-weight:700;color:#5B4A72;margin-top:4px;word-break:break-all}',
     '.pt2-keynote{margin-top:8px;background:var(--tk-soft);border-radius:11px;padding:12px 13px;font-size:13.5px;font-weight:700;color:#3a2a4d;line-height:1.7}',
     '.pt2-keynote b{color:var(--tk-grape);font-weight:900}',
     '.pt2-keybox{margin-top:10px;background:#fff;border:1px solid var(--tk-line);border-radius:13px;padding:12px}',
@@ -356,6 +359,19 @@ function injectSettings() {
     '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
     '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
+    /* ── 내 계정 ── */
+    '<div class="tk-sec" style="margin-top:14px">🔐 내 계정</div>' +
+    (acct()
+      ? '<div class="pt2-acct"><div class="pt2-acct-t">✅ 구글 계정에 연결됨</div>' +
+          '<div class="pt2-acct-s">' + esc(acct().email || acct().name || "") + '</div></div>' +
+        '<div class="pt2-sub" style="margin-top:8px">폰을 바꿔도 같은 구글 계정으로 로그인하면 방과 대화가 그대로 돌아옵니다.</div>' +
+        '<button class="cta" style="margin-top:10px;background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="g-out">로그아웃</button>'
+      : '<div class="pt2-keynote">지금은 <b>이 폰에만</b> 저장돼 있어요.<br>' +
+          '폰을 바꾸거나 브라우저 자료를 지우면 <b>방 목록이 사라집니다.</b><br>' +
+          '구글 계정으로 한 번 연결해 두면 새 폰에서도 그대로 돌아옵니다.</div>' +
+        '<button class="cta grape" style="margin-top:10px" data-pt2="g-in">🔐 구글로 로그인</button>' +
+        '<div class="pt2-sub" style="margin-top:8px">비밀번호도 인증번호도 없어요. 크롬에 로그인된 구글 계정을 한 번 고르면 끝입니다.</div>') +
+
     /* ── 화면 언어 ── */
     '<div class="tk-sec" style="margin-top:14px">🌐 화면 언어</div>' +
     '<div class="pt2-sub">국가를 고르면 앱 화면이 그 나라 말로 바뀌어요. <b>자동</b>이면 폰 시간대(현재 위치)로 알아서 골라요 — 해외에 가면 그 나라 말로 자동 번역됩니다.</div>' +
@@ -1738,6 +1754,79 @@ function newGo() {
         finish();
       });
   });
+}
+
+/* ══════════════ 구글 로그인 ══════════════
+   포도톡은 폰 안의 무작위 uid 로 사람을 구분한다. 그래서 폰을 바꾸면
+   서버가 그 사람을 몰라 방 목록이 텅 빈다. 구글 계정을 그 uid 에 묶어두면
+   새 폰에서 버튼 한 번으로 방이 전부 돌아온다.
+
+   ★ 아래 CLIENT_ID 를 본인 것으로 바꿔야 동작한다. 받는 방법은
+     설정 화면 안내에 적어뒀다. 워커에도 같은 값을 넣어야 한다.
+   ────────────────────────────────────────────────────────────── */
+var G_CLIENT_ID = "";   /* 예: "1234567890-abcdef.apps.googleusercontent.com" */
+
+function gReady() { return !!(G_CLIENT_ID && window.google && google.accounts && google.accounts.id); }
+function acct() { return LSJ("pt2_acct", null); }
+
+/* 구글 스크립트를 한 번만 불러온다 */
+var gLoading = false;
+function gLoad(cb) {
+  if (!G_CLIENT_ID) { cb(false); return; }
+  if (gReady()) { cb(true); return; }
+  if (gLoading) { setTimeout(function () { gLoad(cb); }, 300); return; }
+  gLoading = true;
+  var sc = document.createElement("script");
+  sc.src = "https://accounts.google.com/gsi/client";
+  sc.async = true; sc.defer = true;
+  sc.onload = function () { cb(gReady()); };
+  sc.onerror = function () { cb(false); };
+  document.head.appendChild(sc);
+}
+
+/* 로그인 결과를 서버에 보내 계정과 uid 를 묶는다 */
+function gSend(idToken) {
+  say("로그인 확인 중…");
+  api("/talk/auth/google", { body: { id_token: idToken, uid: myUid() } }).then(function (d) {
+    if (!d || !d.ok) { say((d && d.error) || "로그인하지 못했어요"); return; }
+    /* 서버가 정해준 계정 uid 로 이 폰을 맞춘다. 이게 곧 계정 이어받기다. */
+    try { window.DB.set("pododa_uid", d.uid); } catch (e) {}
+    LSS("pt2_acct", JSON.stringify({ email: d.email || "", name: d.name || "" }));
+    say(d.moved ? d.moved + "개 방을 계정으로 옮겼어요 🍇" : "로그인했어요 🍇");
+    refreshRooms(function () { try { renderTalkSettings(); } catch (e2) {} });
+  });
+}
+
+function gLogin() {
+  if (!G_CLIENT_ID) {
+    alert("아직 구글 로그인 준비가 안 됐어요.\n\npt2.js 맨 위의 G_CLIENT_ID 에 구글 클라이언트 ID 를 넣고, 워커에도 GOOGLE_CLIENT_ID 를 넣어야 동작합니다.");
+    return;
+  }
+  gLoad(function (ok2) {
+    if (!ok2) { say("구글 로그인을 불러오지 못했어요"); return; }
+    try {
+      google.accounts.id.initialize({
+        client_id: G_CLIENT_ID,
+        callback: function (res) { if (res && res.credential) gSend(res.credential); },
+        auto_select: false
+      });
+      /* 안드로이드 크롬은 이미 구글에 로그인돼 있어 보통 한 번 누르면 끝난다 */
+      google.accounts.id.prompt(function (n) {
+        if (n && n.isNotDisplayed && n.isNotDisplayed()) {
+          say("구글 계정 선택 창이 막혔어요. 크롬에서 구글에 로그인돼 있는지 확인해 주세요");
+        }
+      });
+    } catch (e) { say("구글 로그인을 열지 못했어요"); }
+  });
+}
+
+function gLogout() {
+  if (!confirm("로그아웃하면 이 폰에서 방 목록이 비워집니다.\n다시 로그인하면 그대로 돌아옵니다.\n\n로그아웃할까요?")) return;
+  try { localStorage.removeItem("pt2_acct"); } catch (e) {}
+  /* uid 를 새로 만들어 이 폰을 빈 상태로 되돌린다. 서버 자료는 지우지 않는다. */
+  try { window.DB.set("pododa_uid", "u_" + Math.random().toString(36).slice(2, 10)); } catch (e2) {}
+  say("로그아웃했어요");
+  refreshRooms(function () { try { renderTalkSettings(); } catch (e3) {} });
 }
 
 /* ══════════════ 화면 언어 ══════════════
@@ -3234,6 +3323,8 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "g-in")  { gLogin(); return; }
+  if (a === "g-out") { gLogout(); return; }
   if (a === "ui-lang") {
     uiSetLang(el.getAttribute("data-v"));
     try { renderTalkSettings(); } catch (e) {}
