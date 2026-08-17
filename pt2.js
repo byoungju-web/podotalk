@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "54";
+var PT2_VER = "56";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -195,6 +195,8 @@ function rich(s) {
     '.pt2-mem-row:active{background:var(--tk-soft)}',
     '.pt2-mem-go{color:#c9bfd8;font-size:18px;font-weight:700;flex:0 0 auto;margin-left:2px}',
     '.pt2-prof-av{width:82px;height:82px;border-radius:26px;overflow:hidden;margin:2px auto 0;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
+    '.pt2-sms-btn{flex:0 0 auto;background:var(--tk-grape);color:#fff;border:0;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:800}',
+    '.pt2-sms-btn.done{background:var(--tk-soft);color:var(--tk-sub)}',
     '.pt2-mem-tag{font-size:10.5px;font-weight:800;color:var(--tk-grape);background:var(--tk-soft);border-radius:6px;padding:2px 6px;flex:0 0 auto}',
     '.pt2-av-img{display:block;width:100%;height:100%;background-size:cover;background-position:center;border-radius:inherit}',
     '.pt2-picklist{display:flex;flex-direction:column;gap:7px;margin-top:10px}',
@@ -1301,6 +1303,26 @@ function renderAlarm() {
 window.renderTalk = function (sub, arg) {
   /* 초대 링크로 들어온 경우. 코드를 물어보지 않고 그 방으로 바로 넣는다.
      받은 사람 입장에서 링크를 누른 것 자체가 이미 초대의 증거다. */
+  /* #/talk/i/열쇠 — 초대받은 사람이 링크를 누른 경우.
+     서버가 방에 넣고 번호 등록까지 대신 끝낸다. 상대는 아무것도 안 한다. */
+  if (sub === "i" && arg && on()) {
+    try { document.querySelector("#view").innerHTML = '<div class="tk-empty"><div class="ee">🍇</div>초대를 확인하는 중…</div>'; } catch (e) {}
+    api("/talk/invite/claim", { body: { token: String(arg).trim(), uid: myUid(), nick: myNick() } })
+      .then(function (d) {
+        if (d && d.ok && d.room_id) {
+          say("『" + (d.name || "대화방") + "』에 들어왔어요 🍇");
+          refreshRooms();
+          location.replace("#/talk/room/" + PFX + d.room_id);
+          return;
+        }
+        try {
+          document.querySelector("#view").innerHTML =
+            '<div class="tk-empty"><div class="ee">⚠️</div>' + esc((d && d.error) || "초대 링크를 쓸 수 없어요") +
+            '<br><span style="font-size:12px">보낸 분에게 새 링크를 받아주세요</span></div>';
+        } catch (e2) {}
+      });
+    return;
+  }
   if (sub === "join" && arg && on()) {
     var key = String(arg).trim();
     try { document.querySelector("#view").innerHTML = '<div class="tk-empty"><div class="ee">🍇</div>방을 여는 중…</div>'; } catch (e) {}
@@ -1401,7 +1423,20 @@ function smsTo(nums, body) {
   catch (e) { say("문자 앱을 열지 못했어요"); }
 }
 
+/* 내 번호를 안 올려두면 상대도 나를 연락처에서 찾지 못한다.
+   초대하려는 순간이 그 사실을 알려주기 가장 좋은 때다. */
+function phoneNudge() {
+  if (myPhoneHash()) return;
+  if (LS("pt2_ph_skip") === "1") return;
+  LSS("pt2_ph_skip", "1");
+  setTimeout(function () {
+    if (!confirm("내 전화번호를 등록해 두면, 내 번호를 저장한 사람이 나를 연락처에서 찾아 바로 초대할 수 있어요.\n\n번호는 알아볼 수 없는 값으로 바뀌어 저장됩니다.\n\n지금 등록하러 갈까요?")) return;
+    location.hash = "#/talk/settings";
+  }, 700);
+}
+
 function pickContacts(sid, code, name) {
+  phoneNudge();
   if (!hasPicker()) {
     say("이 기기에서는 연락처를 직접 열 수 없어요. 공유하기로 보내주세요");
     shareInvite(sid, code, name);
@@ -1454,19 +1489,51 @@ function shareInvite(sid, code, name) {
    문자 앱을 저절로 여는 것은 브라우저가 막기 때문에 버튼이 반드시 필요하다. */
 function smsSheet(list, name, sid, code) {
   var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
-  var nums = list.map(function (c) { return normPhone(c.tel); });
-  var who = list.map(function (c) { return esc(c.name || c.tel); }).join(", ");
   var bg = document.createElement("div");
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>문자로 초대하기</h3>" +
-    '<div class="sd">' + who + " · 아직 포도톡을 안 쓰는 분이에요.<br>아래를 누르면 문자 앱이 초대 링크까지 채워진 채로 열립니다.</div>" +
-    '<button class="cta grape" data-pt2="sms-go" data-nums="' + esc(nums.join(",")) + '" data-name="' + esc(name || "") + '" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '">📩 문자 앱 열기</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="inv-copy" data-id="' + esc(sid) + '" data-code="' + esc(code || "") + '">🔗 초대 링크만 복사</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">나중에</button>' +
+    "<h3>처음 초대하는 분</h3>" +
+    '<div class="sd">아직 포도톡을 안 쓰는 분이에요. 링크를 한 번만 누르면 <b>가입도 코드도 없이</b> 바로 들어와지고, 다음부터는 연락처에서 고르는 것만으로 초대됩니다.</div>' +
+    '<div class="pt2-mem" id="pt2Sms" style="max-height:250px">' +
+      '<div class="pt2-sub">초대 링크를 만드는 중…</div>' +
+    "</div>" +
+    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
+
+  /* 사람마다 전용 링크를 받아 각자 보내기 버튼을 만든다.
+     한 통에 여러 명을 묶으면 누가 눌렀는지 알 수 없어 등록을 대신해줄 수 없다. */
+  makeInvites(sid, list, function (tokens) {
+    var box = document.getElementById("pt2Sms");
+    if (!box) return;
+    box.innerHTML = list.map(function (c) {
+      var tk = c.hash && tokens[c.hash];
+      var body = tk ? keyText(name, tk) : inviteText(name, sid, code);
+      return '<div class="pt2-mem-row">' +
+        '<span class="pt2-mem-av"><span class="pt2-mem-ini">' + esc((c.name || "?").slice(0, 1)) + "</span></span>" +
+        '<span class="pt2-mem-nm">' + esc(c.name || c.tel) + "</span>" +
+        '<button class="pt2-sms-btn" data-pt2="sms-one" data-num="' + esc(normPhone(c.tel)) + '" data-body="' + esc(body) + '">📩 보내기</button>' +
+        "</div>";
+    }).join("");
+  });
+}
+
+/* 사람마다 다른 초대 링크를 만든다.
+   이 링크를 누르면 방 입장과 번호 등록이 한꺼번에 끝난다.
+   서버에 이 기능이 없으면(404) 예전처럼 공용 코드 링크로 돌아간다. */
+function makeInvites(sid, list, cb) {
+  var hs = list.map(function (c) { return c.hash; }).filter(Boolean);
+  if (!hs.length) { cb({}); return; }
+  api("/talk/invite/create", { body: { room_id: sid, uid: myUid(), hashes: hs } })
+    .then(function (d) { cb((d && d.ok && d.tokens) || {}); });
+}
+function keyLink(tk) {
+  return (location.origin || "https://podotalk.kr") + "/#/talk/i/" + encodeURIComponent(tk);
+}
+function keyText(name, tk) {
+  return "🍇 포도톡 『" + (name || "대화방") + "』에 초대합니다.\n" +
+         "아래를 한 번만 누르면 바로 들어와져요. 가입도 코드도 없어요.\n" + keyLink(tk);
 }
 
 function inviteSheet(sid, code, name) {
@@ -1599,6 +1666,7 @@ function newKeep() {
 function newPick() {
   if (!hasPicker()) { say("이 기기에서는 연락처를 열 수 없어요"); return; }
   newKeep();
+  phoneNudge();
   navigator.contacts.select(["name", "tel"], { multiple: true }).then(function (out) {
     if (!out || !out.length) return;
     var add = [];
@@ -2964,7 +3032,14 @@ document.addEventListener("click", function (e) {
     });
     return;
   }
-  if (a === "lang") { location.hash = "#/talk/trans"; return; }
+  if (a === "lang") {
+    /* 하단 통역톡을 누르면 마지막에 보던 칸이 아니라 1:1 부터 보여준다.
+       어디였는지 기억하게 두면 눌러도 딴 화면이 나와 헷갈린다. */
+    LSS("pt2_lseg", "one");
+    if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
+    else location.hash = "#/talk/trans";
+    return;
+  }
   if (a === "lseg") {
     LSS("pt2_lseg", el.getAttribute("data-v"));
     if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
@@ -3171,6 +3246,12 @@ document.addEventListener("click", function (e) {
     newGo();
     return;
   }
+  if (a === "sms-one") {
+    smsTo([el.getAttribute("data-num")], el.getAttribute("data-body") || "");
+    el.textContent = "보냈어요";
+    el.className = "pt2-sms-btn done";
+    return;
+  }
   if (a === "sms-go") {
     var ns = (el.getAttribute("data-nums") || "").split(",").filter(Boolean);
     smsTo(ns, inviteText(el.getAttribute("data-name"), el.getAttribute("data-id"), el.getAttribute("data-code")));
@@ -3367,6 +3448,13 @@ document.addEventListener("change", function (e) {
     newKeep(); renderNew();
   }
 });
+
+/* 하단 '일반채팅' 을 누르면 오픈채팅 칸이 아니라 일반채팅 칸부터 보여준다 */
+document.addEventListener("click", function (e) {
+  var el = e.target && e.target.closest ? e.target.closest('[data-action="talk-tab"][data-v="open"]') : null;
+  if (!el) return;
+  LSS("pt2_seg", "gen");
+}, true);
 
 /* '＋ 1:1 채팅 만들기' · '＋ 그룹방 만들기' 를 전체 화면으로 돌린다.
    index.html 의 작은 시트보다 먼저 잡아야 해서 캡처 단계로 듣는다. */
