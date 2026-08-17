@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-17 v45";</script>
+<script>window.PODOTALK_BUILD = "2026-08-17 v46";</script>
 <!-- 폰트만 CDN. 실패해도 시스템 폰트로 폴백되어 동작에 영향 없음 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- QRCode for JavaScript (davidshimjs/qrcodejs, MIT) — CDN 의존 제거를 위해 인라인 -->
@@ -6766,14 +6766,14 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=65"></script>
+<script src="/pt2.js?v=66"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고
      캐시를 비운 뒤 한 번만 다시 받아온다. 실패해도 한 번만 하고 멈춘다. -->
 <script>
 (function () {
-  var WANT = "65";                    // pt2.js 의 PT2_VER 과 같게 둔다
+  var WANT = "66";                    // pt2.js 의 PT2_VER 과 같게 둔다
   var MARK = "pt2_fix_" + WANT;
   function fix(why) {
     try { if (sessionStorage.getItem(MARK)) return; sessionStorage.setItem(MARK, "1"); } catch (e) { return; }

@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "65";
+var PT2_VER = "66";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1764,7 +1764,7 @@ function newGo() {
    ★ 아래 CLIENT_ID 를 본인 것으로 바꿔야 동작한다. 받는 방법은
      설정 화면 안내에 적어뒀다. 워커에도 같은 값을 넣어야 한다.
    ────────────────────────────────────────────────────────────── */
-var G_CLIENT_ID = "";   /* 예: "1234567890-abcdef.apps.googleusercontent.com" */
+var G_CLIENT_ID = "1007117932498-2cea0161fftm4ed4ndp5tbkv3899kgpm.apps.googleusercontent.com";
 
 function gReady() { return !!(G_CLIENT_ID && window.google && google.accounts && google.accounts.id); }
 function acct() { return LSJ("pt2_acct", null); }
