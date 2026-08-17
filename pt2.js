@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "58";
+var PT2_VER = "59";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1109,7 +1109,8 @@ function fixTabbar() {
   if (!bar || bar.getAttribute("data-pt2") === "1") return;
   bar.setAttribute("data-pt2", "1");
   bar.innerHTML =
-    '<button data-action="nav" data-to="#/" id="tk-tab-home"><span class="ti">🏠</span>쇼핑</button>' +
+    /* 쇼핑은 포도다(pododa.kr)로 넘기는 문이었다. 포도톡에서 쇼핑까지
+       하려면 아직 갈 길이 멀어서 탭에서 뺐다. 필요해지면 되살리면 된다. */
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
     '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">💬</span>일반채팅</button>' +
@@ -1117,7 +1118,7 @@ function fixTabbar() {
 }
 function markTab(id) {
   fixTabbar();
-  ["home", "direct", "lang", "open", "settings"].forEach(function (t) {
+  ["direct", "lang", "open", "settings"].forEach(function (t) {
     var b = document.getElementById("tk-tab-" + t);
     if (b) b.classList.toggle("on", t === id);
   });
@@ -3468,6 +3469,22 @@ if ("serviceWorker" in navigator) {
     location.hash = "#/talk/room/" + PFX + e.data.room_id;
   });
 }
+
+/* 탭을 열어둔 채 몇 시간 지나면, 그 사이 새 판이 올라와도 이 탭은
+   어제 화면 그대로 남는다. 다시 켜질 때 30분이 넘었으면 새로 받아온다.
+   대화 중이거나 글을 쓰는 중이면 건드리지 않는다. */
+(function staleGuard() {
+  var born = Date.now();
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    if (Date.now() - born < 30 * 60 * 1000) return;
+    var box = document.getElementById("tkInput");
+    if (box && (box.value || "").trim()) return;      /* 쓰던 글이 있으면 그냥 둔다 */
+    if (document.querySelector(".sheet-bg")) return;  /* 설정 창이 열려 있으면 그냥 둔다 */
+    born = Date.now();
+    location.reload();
+  });
+})();
 
 /* 화면 언어가 한국어가 아니면 처음부터 번역을 걸어둔다 */
 try { uiWatch(); } catch (e) {}
