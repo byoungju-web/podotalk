@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "60";
+var PT2_VER = "61";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -3496,8 +3496,20 @@ try { uiWatch(); } catch (e) {}
    index.html 의 라우터는 pt2.js 보다 먼저 돌기 때문에 'trans' 를 몰라서
    기본값인 일반채팅 목록을 그려 놓는다. 여기서 한 번 다시 그려 맞춘다. */
 (function bootRoute() {
-  if ((location.hash || "").indexOf("#/talk/trans") !== 0) return;
-  try { window.renderTalk("trans", null); } catch (e) {}
+  /* pt2.js 는 index.html 맨 아래에서 실린다. 그래서 주소를 직접 열거나
+     새로고침해서 들어오면, index.html 이 자기 옛 화면을 이미 그려놓은 뒤에
+     이 파일이 도착한다. 탭을 눌러 들어올 때만 새 화면이 나오고, 주소로
+     바로 들어오면 옛 화면이 남던 이유가 이것이다.
+     여기서 현재 주소를 한 번 다시 그려 어느 길로 들어와도 같게 맞춘다. */
+  var h = location.hash || "";
+  if (h.indexOf("#/talk") !== 0) return;
+  var seg2 = h.slice(2).split("/");        /* "#/talk/room/sv_x" → talk, room, sv_x */
+  var sub = seg2[1] || "";
+  var arg = seg2[2] ? decodeURIComponent(seg2[2]) : null;
+  try {
+    if (sub) window.renderTalk(sub, arg);
+    else window.renderTalkList("direct");
+  } catch (e) {}
 })();
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
