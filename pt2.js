@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "59";
+var PT2_VER = "60";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -87,13 +87,16 @@ function LSJ(k, d)  { try { var v = JSON.parse(LS(k) || "null"); return v == nul
     var ap = LS("pt_api");
     if (ap && !LS("pt2_api")) LSS("pt2_api", ap);
 
-    /* index4 를 쓰던 기기는 이미 서버 방을 쓰고 있었으므로 서버 모드를 켠 채로 시작한다 */
-    if (uid && LS("pt2_on") === null) LSS("pt2_on", "1");
+    /* 서버 모드는 기본이 켜짐이다 (on() 참고). 여기서 따로 적어둘 필요가 없다. */
   } catch (e) {}
   LSS("pt2_migrated", "1");
 })();
 
-function on()      { return STEP >= 1 && LS("pt2_on") === "1"; }
+/* 서버 방 쓰기. 예전에는 "1" 이 적혀 있어야 켜졌고, 그 값은 옛 pt_uid
+   기록이 있는 기기에서만 자동으로 들어갔다. 그래서 새 브라우저에서는
+   꺼진 채로 시작해 index.html 의 옛 화면이 그대로 보였다.
+   이제 로컬 방을 안 쓰므로 꺼진 상태는 쓸 데가 없다. 기본을 켜짐으로 둔다. */
+function on()      { return STEP >= 1 && LS("pt2_on") !== "0"; }
 /* ── 빌드 도장 ──────────────────────────────────────────────────
    index.html 과 pt2.js 는 따로 캐시된다. 하나만 새로 받아지는 일이
    잦아서, 화면만 보고는 어느 쪽이 옛 것인지 알 수가 없었다.
