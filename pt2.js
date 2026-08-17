@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "50";
+var PT2_VER = "51";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -494,7 +494,7 @@ function localOpenItems() {
 
 /* 오픈채팅 탭 = [ 오픈채팅 | 상점톡 ] 두 칸.
    상점톡은 예전 '일반채팅'(가게·판매자와의 1:1)을 그대로 옮긴 것이다. */
-function seg() { return LS("pt2_seg") === "shop" ? "shop" : "open"; }
+function seg() { return LS("pt2_seg") === "pub" ? "pub" : "gen"; }
 
 function shopItems() {
   var out = [];
@@ -557,26 +557,27 @@ function renderDirect() {
 }
 
 function renderOpen() {
-  var cur = seg();
-  var items = (cur === "shop") ? shopItems() : (LOCAL_ROOMS ? localOpenItems() : []);
-  if (cur === "open") {
-    svRooms().forEach(function (r) {
-      if (isLive(r.id)) return;          /* 동시통역방은 통역톡 탭에서만 보인다 */
-      if (isDirectRoom(r.id)) return;    /* 1:1 은 💬 채팅 탭에서만 보인다 */
-      items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
-    });
-  }
+  var cur = seg() === "pub" ? "pub" : "gen";
+  var items = (cur === "gen" && LOCAL_ROOMS) ? localOpenItems() : [];
+  svRooms().forEach(function (r) {
+    if (isLive(r.id)) return;          /* 동시통역방은 통역톡 탭에서만 보인다 */
+    if (isDirectRoom(r.id)) return;    /* 1:1 은 💬 채팅 탭에서만 보인다 */
+    /* 일반채팅 = 코드로만 들어오는 내 방 · 오픈채팅 = 누구나 보는 공개방 */
+    var pub = !r.is_private;
+    if (cur === "pub" ? !pub : pub) return;
+    items.push({ pin: false, ts: r.last_ts || r.ts || 0, html: svRoomItem(r) });
+  });
   items.sort(function (a, b) {
     if (a.pin !== b.pin) return a.pin ? -1 : 1;
     return (b.ts || 0) - (a.ts || 0);
   });
 
   var head = "";
-  try { head = tkHeader(cur === "shop" ? "상점톡" : "오픈채팅", cur === "shop" ? "가게" : "공개방"); } catch (e) {}
+  try { head = tkHeader(cur === "pub" ? "오픈채팅" : "일반채팅", cur === "pub" ? "공개방" : "초대·코드"); } catch (e) {}
   var segBar =
     '<div class="pt2-seg">' +
-      '<button class="' + (cur === "open" ? "on" : "") + '" data-pt2="seg" data-v="open">🗨️ 오픈채팅</button>' +
-      '<button class="' + (cur === "shop" ? "on" : "") + '" data-pt2="seg" data-v="shop">🏪 상점톡</button>' +
+      '<button class="' + (cur === "gen" ? "on" : "") + '" data-pt2="seg" data-v="gen">💬 일반채팅</button>' +
+      '<button class="' + (cur === "pub" ? "on" : "") + '" data-pt2="seg" data-v="pub">🌏 오픈채팅</button>' +
     "</div>";
   var say_ =
     '<div class="tk-say">' +
@@ -584,7 +585,7 @@ function renderOpen() {
       '<button class="tk-say-mic" data-action="talk-say-mic" id="tkSayMic">🎙️</button>' +
       '<button class="tk-say-go" data-action="talk-say-go">이동</button>' +
     "</div>";
-  var tools = (cur === "shop") ? "" :
+  var tools =
     '<div class="tk-tools">' +
       '<button class="tk-tool primary" data-pt2="new-sv">＋ 방 만들기</button>' +
       '<button class="tk-tool" data-pt2="join-code"># 코드로 입장</button>' +
@@ -595,8 +596,8 @@ function renderOpen() {
           '<button class="tk-tool" data-action="talk-join-code">🔑 초대 링크로 입장</button>' +
         "</div>"
       : "");
-  var empty = (cur === "shop")
-    ? '<div class="tk-empty"><div class="ee">🏪</div>가게와 나눈 대화가 없어요.<br>상점에서 문의하기를 누르면 여기에 생겨요.</div>'
+  var empty = (cur === "pub")
+    ? '<div class="tk-empty"><div class="ee">🌏</div>공개방이 없어요.<br>방을 만들 때 <b>누구나 들어오게</b>를 켜면 여기에 보여요.</div>'
     : '<div class="tk-empty"><div class="ee">💬</div>방이 없어요. 새로 만들어보세요!</div>';
   var body = items.length
     ? '<div class="tk-list" id="tkList">' + items.map(function (x) { return x.html; }).join("") + "</div>"
@@ -638,7 +639,7 @@ window.renderTalkList = function (kind) {
     return;
   }
   if (STEP >= 2 && (kind === "open" || kind === "general")) {
-    if (kind === "general") LSS("pt2_seg", "shop");   /* 옛 '일반채팅' 진입 → 상점톡 칸 */
+    if (kind === "general") LSS("pt2_seg", "gen");
     renderOpen();                                    /* 캐시로 즉시 그리고 */
     if (on()) refreshRooms(function () {              /* 서버 응답 오면 다시 */
       if (location.hash.indexOf("#/talk/open") === 0 || location.hash === "#/talk") renderOpen();
@@ -1429,7 +1430,7 @@ function pickContacts(sid, code, name) {
       };
       if (!uids.length) { after(); return; }
 
-      api("/talk/room/invite", { token: tokenOf(sid), body: { room_id: sid, uids: uids } })
+      api("/talk/room/invite", { token: tokenOf(sid), body: { room_id: sid, uids: uids, uid: myUid() } })
         .then(function (r) {
           if (r && r.ok) { say(uids.length + "분을 방에 초대했어요 🍇"); refreshRooms(); }
           else { rest = rest.concat(arr.filter(function (c) { return c.uid; })); }
@@ -1505,7 +1506,7 @@ function newScreen(kind) {
      입력창(prompt)을 써서, 주소가 그대로 뜨는 낯선 화면이 나왔다. */
   NEWC.kind = ({ group: 1, live1: 1, livemulti: 1 })[kind] ? kind : "direct";
   NEWC.picked = [];
-  NEWC.name = ""; NEWC.intro = ""; NEWC.priv = false;
+  NEWC.name = ""; NEWC.intro = ""; NEWC.pub = false;
   location.hash = "#/talk/new";
 }
 
@@ -1553,7 +1554,13 @@ function renderNew() {
         : "") +
       (isD || lv ? "" :
         '<div class="tk-field"><label>한 줄 소개 (선택)</label><input id="pt2CIntro" maxlength="120" value="' + esc(NEWC.intro || "") + '" placeholder="무슨 얘기를 하는 방인가요" autocomplete="off"></div>' +
-        '<div class="tk-toggle">코드로만 입장<span class="tk-sw' + (NEWC.priv ? " on" : "") + '" data-pt2="new-priv"></span></div>') +
+        /* 기본은 비공개다. 예전에는 만들면 곧바로 공개 목록에 올라가
+           모르는 사람이 대화를 다 볼 수 있었다. 공개는 일부러 켜야 한다. */
+        '<div class="tk-toggle">🌏 누구나 들어오게<span class="tk-sw' + (NEWC.pub ? " on" : "") + '" data-pt2="new-priv"></span></div>' +
+        '<div class="pt2-sub" style="margin-top:4px">' +
+          (NEWC.pub
+            ? "⚠️ 켜져 있어요. 포도톡을 여는 <b>누구나</b> 이 방과 대화 내용을 볼 수 있습니다."
+            : "꺼두면 <b>초대 링크나 코드를 받은 사람만</b> 들어옵니다.") + "</div>") +
       (lv ? '<div class="pt2-sub" style="margin-top:2px">각자 자기 말로 쓰면 상대 화면에는 그 사람 언어로 번역돼 보여요. 자동번역이 켜진 채로 시작합니다.</div>'
           : (isD ? '<div class="pt2-sub" style="margin-top:2px">입장 코드는 없어요. 초대받은 사람이 바로 들어옵니다.</div>' : "")) +
 
@@ -1633,7 +1640,7 @@ function newGo() {
     type: "general", uid: myUid(), nick: myNick(),
     /* 1:1 과 통역방은 반드시 비공개다. 공개로 두면 둘만의 방이 모두의
        오픈채팅 목록에 뜬다. 코드를 안 받는 것과 목록에 안 뜨는 것은 다른 얘기다. */
-    is_private: ((isD || lv) ? 1 : (NEWC.priv ? 1 : 0)),
+    is_private: ((isD || lv) ? 1 : (NEWC.pub ? 0 : 1)),
     emoji: lv ? (multi ? "👪" : "💬") : (isD ? "💬" : "🍇")
   }}).then(function (d) {
     if (!d || !d.ok) { say((d && d.error) || "방을 만들지 못했어요"); return; }
@@ -1665,7 +1672,7 @@ function newGo() {
     };
 
     if (!uids.length) { say("방을 만들었어요 🍇"); finish(); return; }
-    api("/talk/room/invite", { token: d.token, body: { room_id: d.id, uids: uids } })
+    api("/talk/room/invite", { token: d.token, body: { room_id: d.id, uids: uids, uid: myUid() } })
       .then(function (r) {
         if (r && r.ok) say(uids.length + "분을 방에 초대했어요 🍇");
         else {
@@ -2941,7 +2948,7 @@ document.addEventListener("click", function (e) {
 
   /* 탭 · 칸 나누기 */
   if (a === "seg") {
-    LSS("pt2_seg", el.getAttribute("data-v") === "shop" ? "shop" : "open");
+    LSS("pt2_seg", el.getAttribute("data-v") === "pub" ? "pub" : "gen");
     renderOpen();
     if (on()) refreshRooms(function () {
       if (location.hash.indexOf("#/talk/open") === 0 || location.hash === "#/talk") renderOpen();
@@ -3139,7 +3146,7 @@ document.addEventListener("click", function (e) {
       : ((NEWC.kind === "direct") ? "#/talk/direct" : "#/talk/open");
     return;
   }
-  if (a === "new-priv") { NEWC.priv = !NEWC.priv; el.className = "tk-sw" + (NEWC.priv ? " on" : ""); return; }
+  if (a === "new-priv") { newKeep(); NEWC.pub = !NEWC.pub; renderNew(); return; }
   if (a === "new-pick") { newPick(); return; }
   if (a === "new-link") {
     newKeep();
