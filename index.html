@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-17 v41";</script>
+<script>window.PODOTALK_BUILD = "2026-08-17 v43";</script>
 <!-- 폰트만 CDN. 실패해도 시스템 폰트로 폴백되어 동작에 영향 없음 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- QRCode for JavaScript (davidshimjs/qrcodejs, MIT) — CDN 의존 제거를 위해 인라인 -->
@@ -639,6 +639,13 @@ var QRCode;
 
 </script>
 <style>
+.tk-keynote{margin-top:8px;background:#F3ECFF;border-radius:11px;padding:12px 13px;font-size:13.5px;font-weight:700;color:#3a2a4d;line-height:1.7}
+.tk-keynote b{color:#7A3EE8;font-weight:900}
+.tk-keybox{margin-top:10px;background:#fff;border:1px solid #EBE3F5;border-radius:13px;padding:13px}
+.tk-keyhd{font-weight:900;font-size:16px;color:#241436}
+.tk-keyhd span{display:block;font-weight:800;font-size:13.5px;color:#5B4A72;margin-top:4px}
+.tk-keystep{margin-top:7px;font-size:13.5px;font-weight:600;color:#5B4A72;line-height:1.85}
+.tk-keylink{display:block;text-align:center;margin-top:10px;padding:12px;border-radius:10px;background:#F3ECFF;color:#7A3EE8;font-weight:900;font-size:14px;text-decoration:none}
 :root{
   --paper:#FBF8FF; --ink:#1B1024; --sub:#7A6B8C;
   --grape:#6D28D9; --grape-d:#4C1D95; --grape-soft:#EFE8FB;
@@ -5792,7 +5799,7 @@ function renderTalkAlarm(){
   setTalkTab("alarm");
 }
 
-var TK_EMOJIS=["🍇","😀","😎","🧑","👩","👨","🐱","🐶","🌸","⭐","🍑","🦄","🧑‍🍳","🌷"];
+var TK_EMOJIS=["😀","😎","🧑","👩","👨","🌸","⭐","🍑","🧑‍🍳","🌷"];
 function renderTalkSettings(){
   var noti = DB.get("pododa_talk_noti")!=="0";
   var ai = talkAIOn();
@@ -5812,18 +5819,34 @@ function renderTalkSettings(){
       '<button class="cta grape" data-action="talk-save-nick">닉네임 저장</button>'+
       '<div class="tk-toggle">알림 받기<span class="tk-sw'+(noti?" on":"")+'" data-action="talk-toggle-noti"></span></div>'+
       '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-action="nav" data-to="#/talk/alarm">🔔 알림 보기</button>'+
-      '<div class="tk-sec">🔑 AI 키 (자동응답·브리핑)</div>'+
-      '<div class="tk-field"><label>🟣 Claude (Anthropic) 키</label><input id="tkKeyC" value="'+escapeHtml(keyFor("claude"))+'" placeholder="sk-ant-..." autocomplete="off" autocapitalize="none"></div>'+
-      '<div class="tk-field"><label>🔵 Gemini (Google) 키</label><input id="tkKeyG" value="'+escapeHtml(keyFor("gemini"))+'" placeholder="AIza..." autocomplete="off" autocapitalize="none"></div>'+
-      '<button class="cta grape" data-action="talk-save-key">키 저장하고 연결</button>'+
-      '<div class="tip" style="margin-top:6px">🔒 키는 이 기기(localStorage)에만 저장돼요(Podoya와 공유). 부재중 AI 자동응답·예약 브리핑 등에 사용됩니다. '+(hasKey?'현재 키 연결됨 ✅':'⚠️ 아직 키가 없어요.')+'</div>'+
+      /* AI 키는 이 한 곳에서만 받는다. 발급 방법과 바로 가는 링크를
+         같이 붙여, 여기서 시작해서 여기서 끝나게 했다. */
+      '<div class="tk-sec">🔑 AI 키 (선택)</div>'+
+      '<div class="tk-keynote">넣지 않아도 <b>번역은 무료로 됩니다.</b><br>'+
+        '키를 넣으면 번역 품질이 좋아지고, 부재중 자동응답·브리핑에도 쓰입니다.<br>'+
+        '🔒 키는 <b>이 기기에만</b> 저장돼요(Podoya와 공유). 서버로 보내지 않습니다.</div>'+
+
+      '<div class="tk-keybox">'+
+        '<div class="tk-keyhd">💎 Gemini <span>무료 · 하루 1,500회 · 카드 불필요</span></div>'+
+        '<div class="tk-keystep">1. aistudio.google.com 접속<br>2. Google 계정으로 로그인<br>3. Get API Key → Create API Key<br>4. 키 복사 후 아래에 붙여넣기</div>'+
+        '<a class="tk-keylink" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">🔗 aistudio.google.com 열기</a>'+
+        '<div class="tk-field" style="margin-top:9px"><label>🔵 Gemini (Google) 키</label><input id="tkKeyG" value="'+escapeHtml(keyFor("gemini"))+'" placeholder="AIza..." autocomplete="off" autocapitalize="none"></div>'+
+      '</div>'+
+
+      '<div class="tk-keybox">'+
+        '<div class="tk-keyhd">✳️ Claude <span>유료 · 최소 $5 충전 필요</span></div>'+
+        '<div class="tk-keystep">1. console.anthropic.com 접속<br>2. Google 계정 또는 이메일로 가입<br>3. Settings → API Keys → Create Key<br>4. $5 충전(결제 등록) 후 키 복사 → 아래 붙여넣기</div>'+
+        '<a class="tk-keylink" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">🔗 console.anthropic.com 열기</a>'+
+        '<div class="tk-field" style="margin-top:9px"><label>🟣 Claude (Anthropic) 키</label><input id="tkKeyC" value="'+escapeHtml(keyFor("claude"))+'" placeholder="sk-ant-..." autocomplete="off" autocapitalize="none"></div>'+
+      '</div>'+
+
+      '<button class="cta grape" style="margin-top:10px" data-action="talk-save-key">키 저장하고 연결</button>'+
+      '<div class="tip" style="margin-top:6px">'+(hasKey?'현재 키가 연결돼 있어요 ✅':'⚠️ 아직 키가 없어요. 없어도 번역은 됩니다.')+'</div>'+
       '<div class="tk-sec">사장님 도우미</div>'+
       '<div class="tk-toggle">🤖 부재중 AI 자동응답<span class="tk-sw'+(ai?" on":"")+'" data-action="talk-toggle-ai"></span></div>'+
       '<div class="tip" style="margin-top:0">1:1 채팅에서 손님 메시지에 <b>Podoya 키</b>로 사장님 대신 자동 응답해요. '+(hasKey?'현재 키가 연결돼 있어요 ✅':'⚠️ 아직 AI 키가 없어요. Podoya에서 키를 설정하면 동작합니다.')+'</div>'+
-      '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-grape);box-shadow:none" data-action="talk-tpl-manage">⚡ 빠른 답장 문구 관리</button>'+
-      '<div class="tk-sec">데이터</div>'+
-      '<button class="cta" style="background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none" data-action="talk-clear">모든 대화 내용 삭제</button>'+
-      '<div class="tip" style="margin-top:6px">🍇 포도톡 대화·프로필은 이 기기(localStorage)에만 저장돼요. 서버로 전송되지 않습니다.</div>'+
+
+
     '</div>';
   setTalkTab("settings");
   var fi=$("#tkAvatarFile");
@@ -6741,14 +6764,14 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=61"></script>
+<script src="/pt2.js?v=63"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고
      캐시를 비운 뒤 한 번만 다시 받아온다. 실패해도 한 번만 하고 멈춘다. -->
 <script>
 (function () {
-  var WANT = "61";                    // pt2.js 의 PT2_VER 과 같게 둔다
+  var WANT = "63";                    // pt2.js 의 PT2_VER 과 같게 둔다
   var MARK = "pt2_fix_" + WANT;
   function fix(why) {
     try { if (sessionStorage.getItem(MARK)) return; sessionStorage.setItem(MARK, "1"); } catch (e) { return; }

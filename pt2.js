@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "61";
+var PT2_VER = "63";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -188,6 +188,8 @@ function rich(s) {
     '.pt2-lang{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}',
     '.pt2-lchip{background:var(--tk-soft);border:1.5px solid transparent;border-radius:999px;padding:9px 14px;font-size:13.5px;font-weight:800;color:#3a2a4d}',
     '.pt2-lchip.on{border-color:var(--tk-grape);color:var(--tk-grape);background:#fff}',
+    '.pt2-keynote{margin-top:8px;background:var(--tk-soft);border-radius:11px;padding:12px 13px;font-size:13.5px;font-weight:700;color:#3a2a4d;line-height:1.7}',
+    '.pt2-keynote b{color:var(--tk-grape);font-weight:900}',
     '.pt2-keybox{margin-top:10px;background:#fff;border:1px solid var(--tk-line);border-radius:13px;padding:12px}',
     '.pt2-keyhd{font-weight:900;font-size:14px;color:#241436;margin-bottom:5px}',
     '.pt2-keyhd span{display:block;font-weight:600;font-size:11.5px;color:var(--tk-sub);margin-top:2px}',
@@ -202,6 +204,7 @@ function rich(s) {
     '.pt2-mem-row:active{background:var(--tk-soft)}',
     '.pt2-mem-go{color:#c9bfd8;font-size:18px;font-weight:700;flex:0 0 auto;margin-left:2px}',
     '.pt2-prof-av{width:82px;height:82px;border-radius:26px;overflow:hidden;margin:2px auto 0;background:var(--tk-soft);display:flex;align-items:center;justify-content:center}',
+    '.pt2-prof-edit{background:var(--tk-soft);color:var(--tk-grape);border:0;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800}',
     '.pt2-sms-btn{flex:0 0 auto;background:var(--tk-grape);color:#fff;border:0;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:800}',
     '.pt2-sms-btn.done{background:var(--tk-soft);color:var(--tk-sub)}',
     '.pt2-mem-tag{font-size:10.5px;font-weight:800;color:var(--tk-grape);background:var(--tk-soft);border-radius:6px;padding:2px 6px;flex:0 0 auto}',
@@ -364,26 +367,6 @@ function injectSettings() {
     "</div>" +
     (uiWhere() ? '<div class="pt2-sub" style="margin-top:8px">📍 지금 위치 · <b>' + esc(uiWhere()) + "</b></div>" : "") +
     '<div class="pt2-sub" style="margin-top:6px">한국어 외 언어는 화면 전체가 자동 번역돼요. <b>API 키 없이도</b> 무료 번역으로 동작합니다. 결과는 이 기기에 저장돼 다음부턴 즉시 표시됩니다.</div>' +
-
-    /* ── AI 키 (선택) ── */
-    '<div class="tk-sec" style="margin-top:14px">🔑 AI 키 (선택)</div>' +
-    '<div class="pt2-sub">넣지 않아도 번역은 무료로 됩니다. 키를 넣으면 번역 품질이 더 좋아져요. 키는 <b>이 기기에만</b> 저장되고 서버로 보내지 않습니다.</div>' +
-
-    '<div class="pt2-keybox">' +
-      '<div class="pt2-keyhd">💎 Gemini <span>무료 · 하루 1,500회 · 카드 불필요</span></div>' +
-      '<div class="pt2-sub">1. aistudio.google.com 접속<br>2. Google 계정으로 로그인<br>3. Get API Key → Create API Key<br>4. 키 복사 후 아래에 붙여넣기</div>' +
-      '<a class="pt2-keylink" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">🔗 aistudio.google.com 열기</a>' +
-      '<input id="pt2KeyG" type="password" placeholder="AIza..." autocomplete="off" value="' + esc(LS("pt2_key_gemini") || "") + '">' +
-      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="key-save" data-k="gemini">Gemini 키 저장</button>' +
-    "</div>" +
-
-    '<div class="pt2-keybox">' +
-      '<div class="pt2-keyhd">✳️ Claude <span>유료 · 최소 $5 충전 필요</span></div>' +
-      '<div class="pt2-sub">1. console.anthropic.com 접속<br>2. Google 계정 또는 이메일로 가입<br>3. Settings → API Keys → Create Key<br>4. $5 충전(결제 등록) 후 키 복사 → 아래 붙여넣기</div>' +
-      '<a class="pt2-keylink" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">🔗 console.anthropic.com 열기</a>' +
-      '<input id="pt2KeyC" type="password" placeholder="sk-ant-api03-..." autocomplete="off" value="' + esc(LS("pt2_key_claude") || "") + '">' +
-      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="key-save" data-k="claude">Claude 키 저장</button>' +
-    "</div>" +
 
     /* 내 번호를 올려두면 남이 연락처에서 나를 찾아 바로 초대할 수 있다.
        번호 자체는 서버에 가지 않는다. 폰에서 해시로 바꿔 보낸다. */
@@ -1351,6 +1334,7 @@ window.renderTalk = function (sub, arg) {
     return;
   }
   if (sub === "new") { renderNew(); return; }
+  if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
     if (arg) return trxRoom(arg);
     var k = lseg();
@@ -1828,10 +1812,16 @@ function uiCacheSave(l, o) { try { LSS("pt2_uic_" + l, JSON.stringify(o)); } cat
 var uiQ = [], uiBusy = false, uiSeen = {}, uiPaint = null;
 
 /* 키가 있으면 키를 먼저, 없으면 무료 번역기 */
+/* 키는 설정 위쪽 한 곳에서만 받는다. 그 값은 index.html 의 keyFor 가
+   갖고 있으므로(포도야와 공유) 여기서 따로 저장하지 않고 그것을 읽는다. */
+function aiKey(which) {
+  try { if (window.keyFor) return window.keyFor(which) || ""; } catch (e) {}
+  try { return (window.DB && window.DB.get("fl_key_" + which)) || ""; } catch (e2) { return ""; }
+}
 function uiTranslateOne(text, lang, done) {
-  var gk = LS("pt2_key_gemini") || "";
+  var gk = aiKey("gemini");
   if (gk) { geminiTr(text, lang, gk, done, function () { freeTr(text, lang, done); }); return; }
-  var ck = LS("pt2_key_claude") || "";
+  var ck = aiKey("claude");
   if (ck) { claudeTr(text, lang, ck, done, function () { freeTr(text, lang, done); }); return; }
   freeTr(text, lang, done);
 }
@@ -2018,6 +2008,53 @@ function matchContacts(list, cb) {
 
 /* 참여자 한 줄. 프로필 사진은 각자 자기 폰에만 있고 서버로 오지 않는다.
    그래서 나는 내 사진, 남은 이름 첫 글자를 딴 동그라미로 보여준다. */
+/* 프로필 편집 — 설정 전체가 아니라 사진·이모지·닉네임까지만.
+   설정 화면 전부를 열면 알림이며 키며 다 딸려 나와서 정작 고칠 것을 찾기 힘들다. */
+var PROF_EMOJI = ["😀", "😎", "🧑", "👩", "👨", "🌸", "⭐", "🍑", "🧑‍🍳", "🌷"];
+
+function renderProfile() {
+  var av = "";
+  try { av = window.talkAvatar ? window.talkAvatar() : ""; } catch (e) {}
+  var isPh = false;
+  try { isPh = !!(window.isPhoto && window.isPhoto(av)); } catch (e) {}
+  var face = isPh ? imgAv(av) : '<span style="font-size:34px">' + esc(av || "😀") + "</span>";
+  var row = PROF_EMOJI.map(function (x) {
+    return '<button class="tk-emo' + (x === av ? " on" : "") + '" data-action="talk-set-emoji" data-e="' + x + '">' + x + "</button>";
+  }).join("");
+
+  document.querySelector("#view").innerHTML =
+    '<div class="tk-rhead"><span class="tk-back" data-pt2="prof-back">‹</span>' +
+      '<div class="tk-rh-mid"><div class="tk-hi">프로필 편집</div>' +
+      '<div class="tk-hs">사진 · 이모지 · 대화명</div></div></div>' +
+    '<div class="tk-set">' +
+      '<div class="tk-prof">' +
+        '<div class="tk-prof-av">' + face + "</div>" +
+        '<div class="tk-prof-mid"><div class="tk-prof-nm">' + esc(myNick()) + '</div>' +
+          '<div class="tk-prof-sub">내 프로필</div></div>' +
+        '<button class="tk-prof-btn" data-action="talk-pick-photo">사진 변경</button>' +
+      "</div>" +
+      '<input id="tkAvatarFile" type="file" accept="image/*" style="display:none">' +
+      '<div class="tk-field"><label>프로필 이모지</label><div class="tk-emos">' + row + "</div></div>" +
+      '<div class="tk-field"><label>내 대화명(닉네임)</label>' +
+        '<input id="tkNick" value="' + esc(myNick()) + '" placeholder="포도" autocomplete="off"></div>' +
+      '<button class="cta grape" data-action="talk-save-nick">닉네임 저장</button>' +
+      '<div class="pt2-sub" style="margin-top:10px">사진과 대화명은 이 기기에 저장돼요. 대화방에서는 대화명이 상대에게 보입니다.</div>' +
+    "</div>";
+  markTab("settings");
+
+  /* 사진 고르기는 index.html 의 처리를 그대로 쓴다 */
+  var fi = document.getElementById("tkAvatarFile");
+  if (fi) fi.addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f || !window.tkResizeImg) return;
+    window.tkResizeImg(f, 180, function (durl) {
+      try { window.DB.set("pododa_talk_avatar", durl); } catch (e2) {}
+      say("프로필 사진을 바꿨어요 📷");
+      renderProfile();
+    });
+  });
+}
+
 function memRow(m) {
   var me = m.uid && m.uid === myUid();
   var nm = m.nick || "익명";
@@ -2070,7 +2107,7 @@ function memSheet(m) {
       (m.owner === "1" || m.owner === 1 ? "이 방을 만든 사람" : "참여자") +
       (when ? "<br>" + when : "") + "</div>" +
     (me
-      ? '<button class="cta grape" data-action="talk-tab" data-v="settings">내 프로필 바꾸기</button>'
+      ? '<button class="cta grape" data-pt2="prof-open">내 프로필 바꾸기</button>'
       : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요. 사진은 각자 폰에만 저장돼서 여기서는 보이지 않습니다.</div>') +
     '<button class="cta" style="margin-top:10px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
@@ -2115,7 +2152,10 @@ function roomSetSheet() {
         '<div class="pt2-sub" style="margin-top:6px">내 목록에서만 사라져요. 남은 사람들은 그대로 대화합니다.</div>') +
     /* 참여자 목록은 맨 아래에 둔다. 위에 있으면 사람이 늘어날수록
        정작 자주 쓰는 버튼들이 아래로 밀려 내려간다. */
-    '<div class="tk-sec" style="margin-top:16px">참여자 <span id="pt2MemN">(' + (r.members || 1) + ')</span></div>' +
+    '<div class="tk-sec" style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">' +
+      '<span>참여자 <span id="pt2MemN">(' + (r.members || 1) + ')</span></span>' +
+      '<button class="pt2-prof-edit" data-pt2="prof-open">✏️ 프로필 편집</button>' +
+    "</div>" +
     '<div class="pt2-mem" id="pt2Mem">' + memRow({ nick: r.owner_nick || myNick(), owner: 1, uid: r.owner_uid || (owner ? myUid() : "") }) + "</div>" +
     '<button class="cta" style="margin-top:14px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
@@ -3200,14 +3240,6 @@ document.addEventListener("click", function (e) {
     say("화면 언어를 바꿨어요 🌐");
     return;
   }
-  if (a === "key-save") {
-    var kk = el.getAttribute("data-k");
-    var box = document.getElementById(kk === "gemini" ? "pt2KeyG" : "pt2KeyC");
-    var val = ((box || {}).value || "").trim();
-    if (val) { LSS("pt2_key_" + kk, val); say((kk === "gemini" ? "Gemini" : "Claude") + " 키를 저장했어요 🔑"); }
-    else { try { localStorage.removeItem("pt2_key_" + kk); } catch (e) {} say("키를 지웠어요"); }
-    return;
-  }
   if (a === "ph-save") {
     var pv = ((document.getElementById("pt2Phone") || {}).value || "").trim();
     registerPhone(pv, function (ok2) { if (ok2) try { renderTalkSettings(); } catch (e) {} });
@@ -3257,6 +3289,12 @@ document.addEventListener("click", function (e) {
     return;
   }
   if (a === "new-go")   { newGo(); return; }
+  if (a === "prof-open") {
+    var sb0 = document.querySelector(".sheet-bg"); if (sb0) sb0.remove();
+    location.hash = "#/talk/profile";
+    return;
+  }
+  if (a === "prof-back") { history.back(); return; }
   if (a === "mem-open") {
     memSheet({
       nick: el.getAttribute("data-nick"), uid: el.getAttribute("data-uid"),
