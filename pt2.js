@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "68";
+var PT2_VER = "69";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -384,7 +384,7 @@ function injectSettings() {
     /* 내 번호를 올려두면 남이 연락처에서 나를 찾아 바로 초대할 수 있다.
        번호 자체는 서버에 가지 않는다. 폰에서 해시로 바꿔 보낸다. */
     '<div class="tk-sec" style="margin-top:14px">📇 연락처로 찾기</div>' +
-    '<div class="pt2-sub">내 번호를 올려두면, 내 번호를 저장한 사람이 연락처에서 나를 골라 바로 방에 초대할 수 있어요. 번호는 서버에 그대로 저장되지 않고 알아볼 수 없는 값으로 바뀌어 저장됩니다.</div>' +
+    '<div class="pt2-sub">내 번호를 등록해 두면, <b>내 번호를 폰에 저장해 둔 사람</b>이 연락처에서 나를 골라 바로 대화방에 부를 수 있어요.<br>번호는 알아볼 수 없는 글자로 바꿔서 보관하고, <b>다른 사람에게 내 번호가 보이지 않습니다.</b></div>' +
     '<div class="tk-field" style="margin-top:8px"><label>내 전화번호</label>' +
       '<input id="pt2Phone" type="tel" inputmode="tel" placeholder="010-0000-0000" value="' + esc(LS("pt2_ph_show") || "") + '"></div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="ph-save">' +
@@ -394,8 +394,7 @@ function injectSettings() {
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
-        '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
-        '<div class="pt2-sub" style="margin-top:6px">이 기기의 알림은 포도톡 서버 하나만 씁니다. 포도다 주문 알림은 pododa.kr 에서 받으세요.</div>'
+        '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>'
       : "") +
     /* '예전 대화 옮기기' 는 뺐다. 이 폰에만 있던 옛 방은 이제 목록에도
        안 나오고, 모든 방이 처음부터 서버에 만들어진다. */
@@ -3633,6 +3632,11 @@ try { uiWatch(); } catch (e) {}
     else window.renderTalkList("direct");
   } catch (e) {}
 })();
+
+/* index.html 이 먼저 그려놓은 옛 화면이 0.2~0.5초 스쳐 보이던 것을 막는다.
+   index.html 이 <html> 에 pt2-boot 을 붙여 화면을 감춰두고, 여기서 다 그린
+   뒤에 떼어낸다. 이 파일이 안 실려도 index.html 쪽 시간제한이 대신 떼어낸다. */
+try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
 try { fixTabbar(); } catch (e) {}
