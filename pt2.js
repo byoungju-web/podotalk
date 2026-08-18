@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "67";
+var PT2_VER = "68";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -353,12 +353,9 @@ function injectSettings() {
   var wrap = document.createElement("div");
   wrap.setAttribute("data-pt2-sec", "1");
   wrap.innerHTML =
-    '<div class="tk-sec">🌐 서버 연결 (포도톡 방·봇)</div>' +
-    '<div class="tk-toggle">서버 방 사용<span class="tk-sw' + (on() ? " on" : "") + '" data-pt2="toggle"></span></div>' +
-    '<div class="pt2-sub" style="margin-top:6px">포도톡의 모든 방은 서버에 저장돼요. 폰을 바꿔도 대화가 그대로 있고, 다른 사람과 실제로 같은 방에서 이야기할 수 있어요.</div>' +
-    '<div class="tk-field" style="margin-top:10px"><label>API 주소</label><input id="pt2Api" value="' + esc(apiBase()) + '" autocomplete="off" autocapitalize="none"></div>' +
-    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="save-api">주소 저장하고 상태 확인</button>' +
-    '<div id="pt2Health" class="pt2-sub" style="margin-top:8px"></div>' +
+    /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
+       스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
+       주소는 사용자가 고칠 일이 없는데 화면에 서버 주소만 드러냈다. */
     /* ── 내 계정 ── */
     '<div class="tk-sec" style="margin-top:14px">🔐 내 계정</div>' +
     (acct()
@@ -400,13 +397,9 @@ function injectSettings() {
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>' +
         '<div class="pt2-sub" style="margin-top:6px">이 기기의 알림은 포도톡 서버 하나만 씁니다. 포도다 주문 알림은 pododa.kr 에서 받으세요.</div>'
       : "") +
-    /* 옮길 방이 하나도 없으면 이 칸 자체를 안 보여준다.
-       할 일이 없는데 버튼만 있으면 그게 더 헷갈린다. */
-    ((STEP >= 7 && hasLocalRooms())
-      ? '<div class="tk-sec" style="margin-top:14px">📤 예전 대화 옮기기</div>' +
-        '<div class="pt2-sub">이 폰에만 남아 있는 옛날 방이 있어요. 서버로 옮기면 폰을 바꿔도 그대로 있습니다. 사진은 옮겨지지 않아요.</div>' +
-        '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="up-open">옮길 방 고르기</button>'
-      : "");
+    /* '예전 대화 옮기기' 는 뺐다. 이 폰에만 있던 옛 방은 이제 목록에도
+       안 나오고, 모든 방이 처음부터 서버에 만들어진다. */
+    "";
   box.appendChild(wrap);
 
   if (STEP >= 6) paintPushSwitch();
