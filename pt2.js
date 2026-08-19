@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "70";
+var PT2_VER = "71";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1917,12 +1917,12 @@ function trPrompt(lang) {
     ". Keep emoji and numbers as they are. Reply with the translation only, no quotes, no explanation.";
 }
 function geminiTr(text, lang, key, ok, fail) {
-  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
+  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + encodeURIComponent(key), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: trPrompt(lang) }] },
       contents: [{ role: "user", parts: [{ text: text }] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 400 }
+      generationConfig: { maxOutputTokens: 400 }
     })
   }).then(function (r) { return r.json(); }).then(function (d) {
     var t = d && d.candidates && d.candidates[0] && d.candidates[0].content &&
