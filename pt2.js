@@ -1917,12 +1917,12 @@ function trPrompt(lang) {
     ". Keep emoji and numbers as they are. Reply with the translation only, no quotes, no explanation.";
 }
 function geminiTr(text, lang, key, ok, fail) {
-  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + encodeURIComponent(key), {
+  fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: trPrompt(lang) }] },
       contents: [{ role: "user", parts: [{ text: text }] }],
-      generationConfig: { maxOutputTokens: 400 }
+      generationConfig: { temperature: 0, maxOutputTokens: 400 }
     })
   }).then(function (r) { return r.json(); }).then(function (d) {
     var t = d && d.candidates && d.candidates[0] && d.candidates[0].content &&
@@ -2131,16 +2131,80 @@ function renderProfile() {
     window.tkResizeImg(f, 180, function (durl) {
       try { window.DB.set("pododa_talk_avatar", durl); } catch (e2) {}
       say("프로필 사진을 바꿨어요 📷");
+      avPush();
       renderProfile();
     });
   });
 }
 
+/* ══════════════ 프로필 사진 나눠 갖기 ══════════════
+   내 사진은 서버에 한 번 올려두고, 남의 사진은 받아서 잠깐 들고 있는다.
+   올릴 때는 112px 로 한 번 더 줄인다. 목록에 30px 로 보일 그림에 큰 파일을
+   주고받을 이유가 없다. ────────────────────────────────────────── */
+var avCache = {};          /* uid → 사진. 이 화면에서만 쓰고 새로고침하면 비워진다 */
+var avAsked = {};
+
+/* 내 사진을 작게 줄여 올린다. 바뀌었을 때만 한 번 */
+function avShrink(durl, cb) {
+  try {
+    var im = new Image();
+    im.onload = function () {
+      try {
+        var n = 112, c = document.createElement("canvas");
+        c.width = n; c.height = n;
+        var g = c.getContext("2d");
+        var side = Math.min(im.width, im.height);
+        g.drawImage(im, (im.width - side) / 2, (im.height - side) / 2, side, side, 0, 0, n, n);
+        cb(c.toDataURL("image/jpeg", 0.72));
+      } catch (e) { cb(durl); }
+    };
+    im.onerror = function () { cb(""); };
+    im.src = durl;
+  } catch (e) { cb(""); }
+}
+
+function avPush() {
+  if (!on()) return;
+  var mine = myPhoto();
+  var mark = mine ? hash36(mine) : "none";
+  if (LS("pt2_av_sent") === mark) return;      /* 안 바뀌었으면 그냥 둔다 */
+  if (!mine) {
+    api("/talk/avatar", { body: { uid: myUid(), data: "" } })
+      .then(function () { LSS("pt2_av_sent", mark); });
+    return;
+  }
+  avShrink(mine, function (small) {
+    if (!small) return;
+    api("/talk/avatar", { body: { uid: myUid(), data: small } }).then(function (d) {
+      if (d && d.ok) { LSS("pt2_av_sent", mark); avCache[myUid()] = small; }
+    });
+  });
+}
+
+/* 남의 사진을 받아온다. 한 번 받은 사람은 다시 묻지 않는다. */
+function avFetch(uids, cb) {
+  var need = uids.filter(function (u) { return u && !avCache[u] && !avAsked[u]; });
+  if (!need.length) { cb && cb(); return; }
+  need.forEach(function (u) { avAsked[u] = 1; });
+  api("/talk/avatars?uids=" + encodeURIComponent(need.join(","))).then(function (d) {
+    if (d && d.ok && d.avatars) {
+      Object.keys(d.avatars).forEach(function (u) { avCache[u] = d.avatars[u]; });
+    }
+    cb && cb();
+  });
+}
+
+/* 이 사람 얼굴 — 내 것은 내 폰 사진, 남은 받아둔 사진, 없으면 이름 첫 글자 */
+function faceOf(uid, nick) {
+  if (uid && uid === myUid() && myPhoto()) return imgAv(myPhoto());
+  if (uid && avCache[uid]) return imgAv(avCache[uid]);
+  return '<span class="pt2-mem-ini">' + esc(String(nick || "?").slice(0, 1)) + "</span>";
+}
+
 function memRow(m) {
   var me = m.uid && m.uid === myUid();
   var nm = m.nick || "익명";
-  var face = (me && myPhoto()) ? imgAv(myPhoto())
-    : '<span class="pt2-mem-ini">' + esc(nm.slice(0, 1)) + "</span>";
+  var face = faceOf(m.uid, nm);
   return '<div class="pt2-mem-row" data-pt2="mem-open"' +
       ' data-nick="' + esc(nm) + '" data-uid="' + esc(m.uid || "") + '"' +
       ' data-owner="' + (m.owner ? 1 : 0) + '" data-joined="' + (m.joined || "") + '">' +
@@ -2159,6 +2223,11 @@ function loadMembers(sid) {
     var cnt = document.getElementById("pt2MemN");
     if (box) box.innerHTML = d.members.map(memRow).join("");
     if (cnt) cnt.textContent = "(" + d.members.length + ")";
+    /* 얼굴이 도착하면 그 줄만 다시 그린다 */
+    avFetch(d.members.map(function (m) { return m.uid; }), function () {
+      var b2 = document.getElementById("pt2Mem");
+      if (b2) b2.innerHTML = d.members.map(memRow).join("");
+    });
   });
 }
 
@@ -2169,7 +2238,8 @@ function memSheet(m) {
   var me = m.uid && m.uid === myUid();
   var nm = m.nick || "익명";
   var face = (me && myPhoto()) ? imgAv(myPhoto())
-    : '<span class="pt2-mem-ini" style="font-size:30px">' + esc(nm.slice(0, 1)) + "</span>";
+    : (m.uid && avCache[m.uid] ? imgAv(avCache[m.uid])
+      : '<span class="pt2-mem-ini" style="font-size:30px">' + esc(nm.slice(0, 1)) + "</span>");
   var when = "";
   if (m.joined) {
     var t = new Date(parseInt(m.joined, 10));
@@ -2189,7 +2259,7 @@ function memSheet(m) {
       (when ? "<br>" + when : "") + "</div>" +
     (me
       ? '<button class="cta grape" data-pt2="prof-open">내 프로필 바꾸기</button>'
-      : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요. 사진은 각자 폰에만 저장돼서 여기서는 보이지 않습니다.</div>') +
+      : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요.</div>') +
     '<button class="cta" style="margin-top:10px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
@@ -3609,6 +3679,9 @@ if ("serviceWorker" in navigator) {
     location.reload();
   });
 })();
+
+/* 내 사진이 바뀌었으면 조용히 올려둔다 */
+setTimeout(function () { try { avPush(); } catch (e) {} }, 1500);
 
 /* 화면 언어가 한국어가 아니면 처음부터 번역을 걸어둔다 */
 try { uiWatch(); } catch (e) {}
