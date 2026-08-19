@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "71";
+var PT2_VER = "72";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -138,7 +138,15 @@ function hasLocalRooms() {
   } catch (e) { return false; }
 }
 
-function apiBase() { return (LS("pt2_api") || DEF_API).replace(/\/+$/, ""); }
+/* 폰에 저장된 API 주소를 쓰되, 성한 주소일 때만 쓴다.
+   설정에서 주소 칸을 없앤 뒤로 잘못된 값이 저장돼 있으면 고칠 길이 없어
+   앱이 통째로 먹통이 된다. 이상하면 기본 주소로 돌아온다. */
+function apiBase() {
+  var v = (LS("pt2_api") || "").trim().replace(/\/+$/, "");
+  if (/^https:\/\/[a-z0-9.-]+(\.[a-z]{2,}|\.workers\.dev)(\/[^\s]*)?$/i.test(v)) return v;
+  if (v) { try { localStorage.removeItem("pt2_api"); } catch (e) {} }   /* 못 쓸 값은 치운다 */
+  return DEF_API.replace(/\/+$/, "");
+}
 function myUid()   { try { return mMe(); } catch (e) { return "u_anon"; } }
 function myNick()  { try { return talkNick() || "포도"; } catch (e) { return "포도"; } }
 function isSv(id)  { return typeof id === "string" && id.indexOf(PFX) === 0; }
@@ -169,7 +177,13 @@ function api(path, opt) {
       if (r.status === 401 || r.status === 403) return { ok: false, error: "권한이 없어요 (" + r.status + ")" };
       return { ok: false, error: "서버 응답을 읽지 못했어요 (" + r.status + ")" };
     });
-  }).catch(function () { return { ok: false, error: "서버에 연결하지 못했어요" }; });
+  }).catch(function () {
+    /* 폰이 끊긴 것과 서버가 멈춘 것은 다른 일이다. 같은 말로 뭉뚱그리면
+       어디를 봐야 할지 알 수가 없다. */
+    var off = false;
+    try { off = (navigator.onLine === false); } catch (e) {}
+    return { ok: false, error: off ? "인터넷이 끊겼어요. 연결을 확인해 주세요" : "서버에 연결하지 못했어요" };
+  });
 }
 
 /* 링크와 @이름, **굵게**만 살리고 나머지는 전부 이스케이프한다.
