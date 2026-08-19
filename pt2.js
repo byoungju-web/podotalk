@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "73";
+var PT2_VER = "74";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -202,6 +202,10 @@ function rich(s) {
     '.pt2-lang{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}',
     '.pt2-lchip{background:var(--tk-soft);border:1.5px solid transparent;border-radius:999px;padding:9px 14px;font-size:13.5px;font-weight:800;color:#3a2a4d}',
     '.pt2-lchip.on{border-color:var(--tk-grape);color:var(--tk-grape);background:#fff}',
+    '.pt2-legal{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--tk-line);border-radius:13px;padding:14px 15px;margin-top:8px;text-decoration:none;color:#241436}',
+    '.pt2-legal-ic{font-size:17px;flex:0 0 auto}',
+    '.pt2-legal-t{flex:1;font-size:14.5px;font-weight:800}',
+    '.pt2-legal-go{color:#c9bfd8;font-size:19px;font-weight:700}',
     '.pt2-acct{background:#fff;border:1.5px solid var(--tk-grape);border-radius:13px;padding:13px}',
     '.pt2-acct-t{font-weight:900;font-size:14.5px;color:var(--tk-grape)}',
     '.pt2-acct-s{font-size:13px;font-weight:700;color:#5B4A72;margin-top:4px;word-break:break-all}',
@@ -412,6 +416,16 @@ function injectSettings() {
       (myPhoneHash() ? "번호 다시 등록" : "번호 등록하기") + "</button>" +
     (myPhoneHash() ? '<div class="pt2-sub" style="margin-top:6px">✅ 등록돼 있어요. 지우려면 아래를 누르세요.</div>' +
         '<button class="cta" style="margin-top:6px;background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="ph-del">번호 등록 지우기</button>' : "") +
+    /* ── 약관 및 정책 ──
+       포도랑과 같은 자리에 두되, 문구는 포도톡에 맞춰 다시 썼다.
+       포도랑은 기록이 기기에만 남지만 포도톡은 서버에 남기 때문이다. */
+    '<div class="tk-sec" style="margin-top:16px">📄 약관 및 정책</div>' +
+    '<a class="pt2-legal" href="/terms.html" target="_blank" rel="noopener">' +
+      '<span class="pt2-legal-ic">📜</span><span class="pt2-legal-t">이용약관</span><span class="pt2-legal-go">›</span></a>' +
+    '<a class="pt2-legal" href="/privacy.html" target="_blank" rel="noopener">' +
+      '<span class="pt2-legal-ic">🔒</span><span class="pt2-legal-t">개인정보처리방침</span><span class="pt2-legal-go">›</span></a>' +
+    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 자세한 내용은 개인정보처리방침을 봐주세요.</div>' +
+
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
