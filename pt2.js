@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "72";
+var PT2_VER = "73";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -370,6 +370,13 @@ function injectSettings() {
     /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
        스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
        주소는 사용자가 고칠 일이 없는데 화면에 서버 주소만 드러냈다. */
+    /* ── 서버 연결 확인 ──
+       '연결하지 못했어요' 만으로는 폰 문제인지 서버 문제인지 알 수가 없다.
+       실제 이유를 폰 화면에서 바로 보여준다. */
+    '<div class="tk-sec" style="margin-top:14px">🩺 서버 연결 확인</div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="diag">지금 확인해 보기</button>' +
+    '<div id="pt2Diag" class="pt2-sub" style="margin-top:8px;white-space:pre-wrap"></div>' +
+
     /* ── 내 계정 ── */
     '<div class="tk-sec" style="margin-top:14px">🔐 내 계정</div>' +
     (acct()
@@ -3399,6 +3406,34 @@ document.addEventListener("click", function (e) {
 
   /* STEP 5 */
   if (a === "roomset")  { roomSetSheet(); return; }
+  if (a === "diag") {
+    var out = document.getElementById("pt2Diag");
+    var w = function (t) { if (out) out.textContent = t; };
+    var base = apiBase();
+    var lines = ["주소 · " + base,
+                 "인터넷 · " + ((navigator.onLine === false) ? "끊김 ❌" : "연결됨 ✅"),
+                 "확인하는 중…"];
+    w(lines.join("\n"));
+
+    /* ① 그냥 열어보기 (CORS 검사 없음) */
+    fetch(base + "/health", { mode: "no-cors" }).then(function () {
+      lines[2] = "서버까지 닿음 ✅";
+    })["catch"](function (e) {
+      lines[2] = "서버까지 못 닿음 ❌ (" + (e && e.message ? e.message : "원인 불명") + ")";
+    }).then(function () {
+      /* ② 앱이 쓰는 방식 그대로 (CORS 검사 포함) */
+      w(lines.join("\n") + "\n앱 방식으로 확인 중…");
+      return fetch(base + "/health", { headers: { "Content-Type": "application/json" } })
+        .then(function (r) { return r.text().then(function (t) {
+          lines[3] = "앱 방식 · " + r.status + " " + (t.indexOf('"ok":true') >= 0 ? "정상 ✅" : "응답 이상 ⚠️");
+        }); })
+        ["catch"](function (e2) {
+          lines[3] = "앱 방식 · 막힘 ❌\n같은 주소를 브라우저로 열면 되는데 앱에서만 막히면 CORS 설정(ALLOW_ORIGIN)이 지금 주소와 다른 경우입니다.\n지금 주소 · " + location.origin +
+            "\n(" + (e2 && e2.message ? e2.message : "원인 불명") + ")";
+        });
+    }).then(function () { w(lines.join("\n")); });
+    return;
+  }
   if (a === "g-in")  { gLogin(); return; }
   if (a === "g-out") { gLogout(); return; }
   if (a === "ui-lang") {
