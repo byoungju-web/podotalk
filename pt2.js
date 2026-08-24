@@ -1131,8 +1131,8 @@ function chaseBot() {
 
 /* ══════════════ 하단 탭 재구성 ══════════════
    채팅 · 일반채팅 · 통역톡 · 포도AI · 설정 (5칸)
-   포도AI 는 podoya.ai.kr 로 넘어간다 (index.html 의 data-pt="podoya" 처리기 사용)
-   기존 '일반채팅'은 오픈채팅 안의 '상점톡' 칸으로 옮긴다.
+   포도AI 는 podoya.ai.kr 로 넘어간다. 아이콘은 앱 아이콘(podotalk-192.png)을
+   그대로 쓴다 — 🍇 는 채팅 목록의 포도야 비서와 겹쳐서 헷갈렸다.
    index.html 은 건드리지 않고 여기서 버튼만 다시 그린다. */
 function fixTabbar() {
   var bar = document.getElementById("talkbar");
