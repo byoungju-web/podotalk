@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "74";
+var PT2_VER = "75";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1130,7 +1130,8 @@ function chaseBot() {
 }
 
 /* ══════════════ 하단 탭 재구성 ══════════════
-   쇼핑 · 채팅 · 통역톡 · 오픈채팅 · 설정 (5칸 유지)
+   채팅 · 일반채팅 · 통역톡 · 포도AI · 설정 (5칸)
+   포도AI 는 podoya.ai.kr 로 넘어간다 (index.html 의 data-pt="podoya" 처리기 사용)
    기존 '일반채팅'은 오픈채팅 안의 '상점톡' 칸으로 옮긴다.
    index.html 은 건드리지 않고 여기서 버튼만 다시 그린다. */
 function fixTabbar() {
@@ -1141,8 +1142,9 @@ function fixTabbar() {
     /* 쇼핑은 포도다(pododa.kr)로 넘기는 문이었다. 포도톡에서 쇼핑까지
        하려면 아직 갈 길이 멀어서 탭에서 뺐다. 필요해지면 되살리면 된다. */
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
+    '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">👥</span>일반채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
-    '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">💬</span>일반채팅</button>' +
+    '<button data-pt="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
     '<button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>';
 }
 function markTab(id) {
