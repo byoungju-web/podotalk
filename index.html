@@ -1376,8 +1376,9 @@ body.talk-mode .cta.grape:active{ background:var(--tk-grape-d); }
   </div>
   <div class="talkbar" id="talkbar">
     <button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>
-    <button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">🌐</span>오픈채팅</button>
-    <button data-action="talk-tab" data-v="general" id="tk-tab-general"><span class="ti">🗨️</span>일반채팅</button>
+    <button data-action="talk-tab" data-v="general" id="tk-tab-general"><span class="ti">👥</span>일반채팅</button>
+    <button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">🌐</span>통역톡</button>
+    <button data-pt="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>
     <button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>
   </div>
 </div>
@@ -6713,11 +6714,7 @@ function ptInjectSync(){
   /* 백업 코드는 구글 로그인이 들어오면서 할 일이 없어졌다. 계정에 묶여
      있으면 새 폰에서 로그인 한 번으로 돌아오므로, 코드를 따로 챙기게 만들면
      오히려 헷갈린다. 포도다 링크 안내도 포도다 버튼을 뺀 뒤로 맞지 않아 지웠다. */
-  var sec2=document.createElement("div");
-  sec2.className="tk-sec"; sec2.setAttribute("data-pt-sec","1");
-  sec2.textContent="바로가기";
-  box.appendChild(sec2);
-  box.appendChild(ptBtn("🍇 포도야 (AI 비서) 열기","podoya","background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:0"));
+  /* '포도야 (AI 비서) 열기' 는 하단 탭바의 🍇 포도AI 탭으로 옮겼다. 설정에서는 삭제. */
 }
 
 /* 설정 화면이 그려질 때마다 덧붙이기 (원본 함수는 그대로 두고 감싸기만) */
