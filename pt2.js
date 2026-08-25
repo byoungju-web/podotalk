@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "79";
+var PT2_VER = "81";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -437,6 +437,8 @@ function injectSettings() {
     '<a class="pt2-legal" href="/privacy.html" target="_blank" rel="noopener">' +
       '<span class="pt2-legal-ic">🔒</span><span class="pt2-legal-t">개인정보처리방침</span><span class="pt2-legal-go">›</span></a>' +
     '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다. 자세한 내용은 위 두 문서에 있습니다.</div>' +
+    '<a class="pt2-legal" href="#/talk/quit" data-pt2="quit">' +
+      '<span class="pt2-legal-ic">🗑</span><span class="pt2-legal-t">계정 탈퇴 · 내 자료 모두 지우기</span><span class="pt2-legal-go">›</span></a>' +
 
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
@@ -1251,6 +1253,90 @@ function renderCall(){
   markTab("lang");
 }
 
+/* ══════════════ 계정 탈퇴 ══════════════
+   쓰시는 분이 직접 지울 수 있어야 한다. 운영자에게 메일을 보내 기다리게 하지 않는다. */
+function renderQuit(){
+  var head = ""; try { head = tkHeader("계정 탈퇴", "⚠️ 되돌릴 수 없음"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head +
+    '<div class="trx-lead">아래 버튼을 누르면 <b>바로 지워집니다.</b> 신청하고 기다리실 필요가 없습니다.</div>' +
+    '<div class="tk-card" style="padding:14px 15px">' +
+      '<div class="pt2-sub" style="font-weight:900;color:#B91C1C;margin-bottom:8px">지워지는 것</div>' +
+      '<div class="pt2-sub" style="line-height:1.8">' +
+        '· 내가 만든 방과 그 안의 대화 (서버에서 삭제)<br>' +
+        '· 내가 들어가 있던 방에서 나가기<br>' +
+        '· 이 폰에 저장된 모든 것 — 방 목록, 대화명, 프로필 사진, 알림 설정, AI 키, 번호 등록<br>' +
+        '· 전화통역의 통화기록 · 저장된 번호 · 용어집 · 이용권 코드<br>' +
+        '· 구글 계정 연결 (식별번호 · 이메일 · 이름)<br>· 번호 등록, 알림 주소, 프로필 사진' +
+      "</div>" +
+    "</div>" +
+    '<div class="pt2-sub" style="margin:10px 0 4px">남는 것이 하나 있습니다. <b>다른 사람이 만든 방에 내가 남긴 말</b>은 그 방의 기록이라 지워지지 않습니다. 그 부분은 방을 만든 분에게 삭제를 요청해 주세요.</div>' +
+    '<button class="cta" style="margin-top:12px;background:#DC2626;box-shadow:none" data-pt2="quit-go">계정과 모든 자료 지우기</button>' +
+    '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">두 번 확인한 뒤 지웁니다</div>';
+  markTab("settings");
+}
+function quitWipeLocal(){
+  try { localStorage.clear(); } catch (e) {}
+  try { sessionStorage.clear(); } catch (e) {}
+  try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
+    }
+  } catch (e) {}
+  setTimeout(function () { try { location.replace("/"); } catch (e) { location.href = "/"; } }, 900);
+}
+function quitAll(){
+  say("지우는 중… 잠시만 기다려 주세요");
+  var uid = myUid();
+
+  /* 서버의 계정까지 지운다. 구글 로그인을 해 두신 분은 그 자리에서
+     구글 확인을 한 번 더 받는다. uid 만으로 지우게 두면 남의 계정을
+     지울 수 있게 되기 때문이다. */
+  var eraseAccount = function (next) {
+    api("/talk/auth/me?uid=" + encodeURIComponent(uid)).then(function (me) {
+      if (!me || !me.linked) {
+        api("/talk/account/delete", { body: { uid: uid } }).then(next, next);
+        return;
+      }
+      say("탈퇴 확인을 위해 구글 로그인을 한 번 더 확인합니다");
+      var done = false;
+      var fire = function (cred) {
+        if (done) return; done = true;
+        api("/talk/account/delete", { body: { uid: uid, id_token: cred } }).then(next, next);
+      };
+      try {
+        gLoad(function (ok2) {
+          if (!ok2 || !G_CLIENT_ID) { if (!done) { done = true; next(); } return; }
+          google.accounts.id.initialize({
+            client_id: G_CLIENT_ID,
+            callback: function (res) { fire(res && res.credential); },
+            auto_select: true
+          });
+          google.accounts.id.prompt(function () {});
+        });
+      } catch (e) { if (!done) { done = true; next(); } }
+      /* 구글 창이 안 뜨거나 취소해도 폰 자료는 지운다 */
+      setTimeout(function () { if (!done) { done = true; next(); } }, 20000);
+    }, function () { next(); });
+  };
+
+  api("/talk/rooms?type=mine&uid=" + encodeURIComponent(uid)).then(function (m) {
+    var rooms = (m && m.rooms) || [];
+    var after = function () { eraseAccount(quitWipeLocal); };
+    if (!rooms.length) return after();
+    var n = 0;
+    var fin = function () { n++; if (n >= rooms.length) after(); };
+    rooms.forEach(function (r) {
+      var id = r && r.id; if (!id) return fin();
+      var tk = tokenOf(id);
+      if (tk) api("/talk/room/delete", { body: { room_id: id }, token: tk }).then(fin, fin);
+      else api("/talk/room/leave", { body: { room_id: id, uid: uid } }).then(fin, fin);
+    });
+    /* 서버가 답을 안 줘도 폰 자료는 반드시 지운다 */
+    setTimeout(quitWipeLocal, 40000);
+  }, function () { eraseAccount(quitWipeLocal); });
+}
+
 /* 설정에서 여는 포도랑 화면들 — 통화기록 · 전화통역 설정 · 이용권 */
 function renderPodo(kind){
   var M = {
@@ -1262,10 +1348,7 @@ function renderPodo(kind){
   var head = ""; try { head = tkHeader(m[0], "📞 전화통역"); } catch (e) {}
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-sub" style="margin:-4px 0 10px">' + m[2] + "</div>" +
-    podoFrame(m[1]) +
-    '<div class="tk-tools" style="margin-top:10px">' +
-      '<button class="tk-tool" data-pt2="callout">↗ 포도랑에서 바로 열기</button>' +
-    "</div>";
+    podoFrame(m[1]);
   markTab("settings");
 }
 
@@ -1445,6 +1528,7 @@ window.renderTalk = function (sub, arg) {
     return;
   }
   if (sub === "calllog") { renderPodo(arg || "log"); return; }
+  if (sub === "quit") { renderQuit(); return; }
   if (sub === "new") { renderNew(); return; }
   if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
@@ -3340,6 +3424,12 @@ document.addEventListener("click", function (e) {
     if (location.hash === "#/talk/trans") { try { renderTalk("trans", null); } catch (_e) {} }
     else location.hash = "#/talk/trans";
     return;
+  }
+  if (a === "quit") { location.hash = "#/talk/quit"; return; }
+  if (a === "quit-go") {
+    if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
+    if (!confirm("한 번 더 확인합니다.\n\n지금 지우면 되돌릴 수 없습니다. 계속할까요?")) return;
+    quitAll(); return;
   }
   if (a === "calllog") { location.hash = "#/talk/calllog/" + (el.getAttribute("data-k") || "log"); return; }
   if (a === "callout") { try { window.open(PODOLANG, "_blank"); } catch (e) { location.href = PODOLANG; } return; }
