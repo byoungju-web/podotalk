@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "77";
+var PT2_VER = "79";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -342,8 +342,8 @@ function rich(s) {
     '.pt2-x:active{background:#EFE6FA}',
     '.pt2-seg3 button{font-size:11.5px;padding:8px 2px;line-height:1.35;white-space:normal}',
     '.pt2-seg4 button{font-size:10.5px;padding:8px 1px;line-height:1.3;white-space:normal}',
-    '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff;height:calc(100dvh - 340px);min-height:460px}',
-    '.pt2-callframe{width:100%;height:100%;border:0;display:block}',
+    '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
+    '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
@@ -374,12 +374,14 @@ function injectSettings() {
   var wrap = document.createElement("div");
   wrap.setAttribute("data-pt2-sec", "1");
   wrap.innerHTML =
-    /* ── 전화통역 통화기록 ──
-       포도랑 아래쪽에 있던 '통화기록' 을 이리로 옮겼다.
-       포도톡 안에서는 포도랑의 아래 차림표를 감춰 두기 때문이다. */
+    /* ── 전화통역 ──
+       포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
+       전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
     '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
-    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog">🗂 통화기록 보기</button>' +
-    '<div class="pt2-sub" style="margin-top:8px">통역톡 → 전화통역으로 건 통화의 번호와 주고받은 말이 남습니다.</div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="set">⚙️ 전화통역 설정 · 말투 · 용어집</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="my">🎟 이용권 · 저장현황 · 기록 지우기</button>' +
+    '<div class="pt2-sub" style="margin-top:8px">전화 통역은 포도랑이 맡습니다. 위 세 가지가 전화 통역에 관한 전부입니다.</div>' +
 
     /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
        스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
@@ -434,7 +436,7 @@ function injectSettings() {
       '<span class="pt2-legal-ic">📜</span><span class="pt2-legal-t">이용약관</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="/privacy.html" target="_blank" rel="noopener">' +
       '<span class="pt2-legal-ic">🔒</span><span class="pt2-legal-t">개인정보처리방침</span><span class="pt2-legal-go">›</span></a>' +
-    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 자세한 내용은 개인정보처리방침을 봐주세요.</div>' +
+    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다. 자세한 내용은 위 두 문서에 있습니다.</div>' +
 
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
@@ -1218,15 +1220,30 @@ function segBarHtml(cur){
    포도랑(podolang.kr)의 전화 통역 화면을 그대로 불러온다.
    포도랑 쪽은 주소에 ?call 이 붙으면 전화 통역 칸부터 열게 해 뒀다.
    여기서는 화면을 띄우기만 한다. 통역·통화는 전부 포도랑이 맡는다. */
+var PODOLANG      = "https://podolang.kr/";
 var PODOLANG_CALL = "https://podolang.kr/?call";
-var PODOLANG_LOG  = "https://podolang.kr/?log";
+
+/* 포도랑 화면을 창 하나에 담아 보여준다. 안쪽 스크롤은 없다.
+   포도랑이 '내 키가 이만큼' 이라고 알려주면 그만큼 창을 늘린다. */
+function podoFrame(q){
+  return '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="https://podolang.kr/?' + q + '" ' +
+    'allow="microphone; autoplay; clipboard-write" scrolling="no"></iframe></div>';
+}
+window.addEventListener("message", function (ev) {
+  try {
+    if (!ev.data || ev.data.podolang !== "h") return;
+    if (String(ev.origin || "").indexOf("podolang.kr") < 0) return;
+    var f = document.querySelector(".pt2-callframe");
+    if (f) f.style.height = Math.max(320, ev.data.h | 0) + "px";
+  } catch (e) {}
+});
+
 function renderCall(){
   var head = ""; try { head = tkHeader("통역톡", "📞 전화통역"); } catch (e) {}
   document.querySelector("#view").innerHTML = head + segBarHtml("call") +
     '<div class="trx-lead">상대는 <b>그냥 전화를 받아</b> 평소처럼 말하면 됩니다. 앱을 깔 필요도, 버튼을 누를 필요도 없어요.<br>' +
     '<b>이어폰을 쓰세요.</b> 스피커로 들으면 통역 음성을 마이크가 다시 주워서 말이 꼬입니다.</div>' +
-    '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="' + PODOLANG_CALL + '" ' +
-      'allow="microphone; autoplay; clipboard-write" allowfullscreen></iframe></div>' +
+    podoFrame("call") +
     '<div class="tk-tools" style="margin-top:10px">' +
       '<button class="tk-tool" data-pt2="callout">↗ 포도랑에서 바로 열기</button>' +
     "</div>" +
@@ -1234,13 +1251,21 @@ function renderCall(){
   markTab("lang");
 }
 
-/* 설정 → 통화기록. 포도랑의 통화기록 화면만 불러온다. */
-function renderCallLog(){
-  var head = ""; try { head = tkHeader("통화기록", "📞 전화통역"); } catch (e) {}
+/* 설정에서 여는 포도랑 화면들 — 통화기록 · 전화통역 설정 · 이용권 */
+function renderPodo(kind){
+  var M = {
+    log: ["통화기록", "log",  "건 번호와 주고받은 말이 남습니다. 이 폰 안에만 저장됩니다."],
+    set: ["전화통역 설정", "set", "말투와 용어집을 정합니다. 전화 통역에만 쓰입니다."],
+    my:  ["이용권 · 저장현황", "my", "이용권 코드, 남은 시간, 통화기록 지우기가 여기 있습니다."]
+  };
+  var m = M[kind] || M.log;
+  var head = ""; try { head = tkHeader(m[0], "📞 전화통역"); } catch (e) {}
   document.querySelector("#view").innerHTML = head +
-    '<div class="pt2-callwrap" style="height:calc(100dvh - 210px);min-height:520px">' +
-      '<iframe class="pt2-callframe" src="' + PODOLANG_LOG + '"></iframe></div>' +
-    '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">기록은 이 폰 안에만 저장됩니다</div>';
+    '<div class="pt2-sub" style="margin:-4px 0 10px">' + m[2] + "</div>" +
+    podoFrame(m[1]) +
+    '<div class="tk-tools" style="margin-top:10px">' +
+      '<button class="tk-tool" data-pt2="callout">↗ 포도랑에서 바로 열기</button>' +
+    "</div>";
   markTab("settings");
 }
 
@@ -1419,7 +1444,7 @@ window.renderTalk = function (sub, arg) {
     });
     return;
   }
-  if (sub === "calllog") { renderCallLog(); return; }
+  if (sub === "calllog") { renderPodo(arg || "log"); return; }
   if (sub === "new") { renderNew(); return; }
   if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
@@ -3316,8 +3341,8 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
-  if (a === "calllog") { location.hash = "#/talk/calllog"; return; }
-  if (a === "callout") { try { window.open(PODOLANG_CALL, "_blank"); } catch (e) { location.href = PODOLANG_CALL; } return; }
+  if (a === "calllog") { location.hash = "#/talk/calllog/" + (el.getAttribute("data-k") || "log"); return; }
+  if (a === "callout") { try { window.open(PODOLANG, "_blank"); } catch (e) { location.href = PODOLANG; } return; }
   if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
   if (a === "row-noti") {
