@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "76";
+var PT2_VER = "77";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -374,6 +374,13 @@ function injectSettings() {
   var wrap = document.createElement("div");
   wrap.setAttribute("data-pt2-sec", "1");
   wrap.innerHTML =
+    /* ── 전화통역 통화기록 ──
+       포도랑 아래쪽에 있던 '통화기록' 을 이리로 옮겼다.
+       포도톡 안에서는 포도랑의 아래 차림표를 감춰 두기 때문이다. */
+    '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog">🗂 통화기록 보기</button>' +
+    '<div class="pt2-sub" style="margin-top:8px">통역톡 → 전화통역으로 건 통화의 번호와 주고받은 말이 남습니다.</div>' +
+
     /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
        스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
        주소는 사용자가 고칠 일이 없는데 화면에 서버 주소만 드러냈다. */
@@ -1212,6 +1219,7 @@ function segBarHtml(cur){
    포도랑 쪽은 주소에 ?call 이 붙으면 전화 통역 칸부터 열게 해 뒀다.
    여기서는 화면을 띄우기만 한다. 통역·통화는 전부 포도랑이 맡는다. */
 var PODOLANG_CALL = "https://podolang.kr/?call";
+var PODOLANG_LOG  = "https://podolang.kr/?log";
 function renderCall(){
   var head = ""; try { head = tkHeader("통역톡", "📞 전화통역"); } catch (e) {}
   document.querySelector("#view").innerHTML = head + segBarHtml("call") +
@@ -1224,6 +1232,16 @@ function renderCall(){
     "</div>" +
     '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">전화 통역은 포도랑 이용권이 필요합니다 · PT2 v' + PT2_VER + "</div>";
   markTab("lang");
+}
+
+/* 설정 → 통화기록. 포도랑의 통화기록 화면만 불러온다. */
+function renderCallLog(){
+  var head = ""; try { head = tkHeader("통화기록", "📞 전화통역"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head +
+    '<div class="pt2-callwrap" style="height:calc(100dvh - 210px);min-height:520px">' +
+      '<iframe class="pt2-callframe" src="' + PODOLANG_LOG + '"></iframe></div>' +
+    '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">기록은 이 폰 안에만 저장됩니다</div>';
+  markTab("settings");
 }
 
 /* 서버에서 받은 목록과 이 기기 기록을 합친다 */
@@ -1401,6 +1419,7 @@ window.renderTalk = function (sub, arg) {
     });
     return;
   }
+  if (sub === "calllog") { renderCallLog(); return; }
   if (sub === "new") { renderNew(); return; }
   if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
@@ -3297,6 +3316,7 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
+  if (a === "calllog") { location.hash = "#/talk/calllog"; return; }
   if (a === "callout") { try { window.open(PODOLANG_CALL, "_blank"); } catch (e) { location.href = PODOLANG_CALL; } return; }
   if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
