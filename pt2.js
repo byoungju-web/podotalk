@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "75";
+var PT2_VER = "76";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -341,6 +341,9 @@ function rich(s) {
     '.pt2-x{flex:0 0 auto;width:34px;height:34px;margin-right:8px;border-radius:11px;background:#F6F1FD;color:#9B8BBE;font-size:14px;font-weight:800}',
     '.pt2-x:active{background:#EFE6FA}',
     '.pt2-seg3 button{font-size:11.5px;padding:8px 2px;line-height:1.35;white-space:normal}',
+    '.pt2-seg4 button{font-size:10.5px;padding:8px 1px;line-height:1.3;white-space:normal}',
+    '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff;height:calc(100dvh - 340px);min-height:460px}',
+    '.pt2-callframe{width:100%;height:100%;border:0;display:block}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
@@ -1161,7 +1164,7 @@ function markTab(id) {
    각자 자기 폰에서 자기 언어만 고르면 서로 자기 말로 쓰면 된다. */
 function lseg(){
   var v = LS("pt2_lseg");
-  return (v === "multi" || v === "trx") ? v : "one";
+  return (v === "multi" || v === "trx" || v === "call") ? v : "one";
 }
 function liveRooms(){ return LSJ("pt2_live_rooms", []); }
 function liveAdd(sid){
@@ -1196,11 +1199,31 @@ function aliasSet(sid, v){
 function roomLabel(sid, fallback){ return aliasGet(sid) || fallback || "통역방"; }
 
 function segBarHtml(cur){
-  return '<div class="pt2-seg pt2-seg3">' +
+  return '<div class="pt2-seg pt2-seg4">' +
     '<button class="' + (cur === "one" ? "on" : "") + '" data-pt2="lseg" data-v="one">💬 1:1<br>동시통역</button>' +
     '<button class="' + (cur === "multi" ? "on" : "") + '" data-pt2="lseg" data-v="multi">👪 다중<br>동시통역</button>' +
     '<button class="' + (cur === "trx" ? "on" : "") + '" data-pt2="lseg" data-v="trx">🔄 마주보기<br>통역</button>' +
+    '<button class="' + (cur === "call" ? "on" : "") + '" data-pt2="lseg" data-v="call">📞 전화<br>통역</button>' +
   "</div>";
+}
+
+/* ══════════════ 전화통역 (통역톡 안의 네 번째 칸) ══════════════
+   포도랑(podolang.kr)의 전화 통역 화면을 그대로 불러온다.
+   포도랑 쪽은 주소에 ?call 이 붙으면 전화 통역 칸부터 열게 해 뒀다.
+   여기서는 화면을 띄우기만 한다. 통역·통화는 전부 포도랑이 맡는다. */
+var PODOLANG_CALL = "https://podolang.kr/?call";
+function renderCall(){
+  var head = ""; try { head = tkHeader("통역톡", "📞 전화통역"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head + segBarHtml("call") +
+    '<div class="trx-lead">상대는 <b>그냥 전화를 받아</b> 평소처럼 말하면 됩니다. 앱을 깔 필요도, 버튼을 누를 필요도 없어요.<br>' +
+    '<b>이어폰을 쓰세요.</b> 스피커로 들으면 통역 음성을 마이크가 다시 주워서 말이 꼬입니다.</div>' +
+    '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="' + PODOLANG_CALL + '" ' +
+      'allow="microphone; autoplay; clipboard-write" allowfullscreen></iframe></div>' +
+    '<div class="tk-tools" style="margin-top:10px">' +
+      '<button class="tk-tool" data-pt2="callout">↗ 포도랑에서 바로 열기</button>' +
+    "</div>" +
+    '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">전화 통역은 포도랑 이용권이 필요합니다 · PT2 v' + PT2_VER + "</div>";
+  markTab("lang");
 }
 
 /* 서버에서 받은 목록과 이 기기 기록을 합친다 */
@@ -1383,6 +1406,7 @@ window.renderTalk = function (sub, arg) {
   if (sub === "trans") {
     if (arg) return trxRoom(arg);
     var k = lseg();
+    if (k === "call") return renderCall();
     if (k !== "trx") {
       renderLive(k);
       if (on()) refreshRooms(function () {
@@ -3158,7 +3182,7 @@ function svRoomOf(sid){
 }
 function repaintList(){
   var h = location.hash || "";
-  if (h.indexOf("#/talk/trans") === 0) { return lseg() === "trx" ? trxList() : renderLive(lseg()); }
+  if (h.indexOf("#/talk/trans") === 0) { return lseg() === "call" ? renderCall() : lseg() === "trx" ? trxList() : renderLive(lseg()); }
   if (h.indexOf("#/talk/direct") === 0) { if (on()) renderDirect(); else window.renderTalkList("direct"); return; }
   if (h.indexOf("#/talk/open") === 0 || h === "#/talk") { renderOpen(); return; }
 }
@@ -3273,6 +3297,7 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
+  if (a === "callout") { try { window.open(PODOLANG_CALL, "_blank"); } catch (e) { location.href = PODOLANG_CALL; } return; }
   if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
   if (a === "row-noti") {
