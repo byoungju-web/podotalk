@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "81";
+var PT2_VER = "82";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -344,6 +344,7 @@ function rich(s) {
     '.pt2-seg4 button{font-size:10.5px;padding:8px 1px;line-height:1.3;white-space:normal}',
     '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
     '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
+    '.pt2-aiframe{width:100%;height:calc(100dvh - 190px);min-height:460px;border:0;display:block}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
@@ -1158,12 +1159,12 @@ function fixTabbar() {
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
     '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">👥</span>일반채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
-    '<button data-pt="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
+    '<button data-pt2="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
     '<button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>';
 }
 function markTab(id) {
   fixTabbar();
-  ["direct", "lang", "open", "settings"].forEach(function (t) {
+  ["direct", "lang", "open", "settings", "podoya"].forEach(function (t) {
     var b = document.getElementById("tk-tab-" + t);
     if (b) b.classList.toggle("on", t === id);
   });
@@ -1251,6 +1252,21 @@ function renderCall(){
     "</div>" +
     '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">전화 통역은 포도랑 이용권이 필요합니다 · PT2 v' + PT2_VER + "</div>";
   markTab("lang");
+}
+
+/* ══════════════ 포도AI ══════════════
+   포도야(podoya.ai.kr)를 포도톡 안에서 연다. 밖으로 나가버리면 아래 탭 다섯 개가
+   사라져서 돌아올 길이 없었다. 여기서 열면 탭이 그대로 남는다. */
+var PODOYA = "https://podoya.ai.kr/";
+function renderPodoya(){
+  var head = ""; try { head = tkHeader("포도AI", "🍇 포도야"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head +
+    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + '" ' +
+      'allow="microphone; clipboard-write"></iframe></div>' +
+    '<div class="tk-tools" style="margin-top:10px">' +
+      '<button class="tk-tool" data-pt2="podoyaout">↗ 포도야에서 바로 열기</button>' +
+    "</div>";
+  markTab("podoya");
 }
 
 /* ══════════════ 계정 탈퇴 ══════════════
@@ -1529,6 +1545,7 @@ window.renderTalk = function (sub, arg) {
   }
   if (sub === "calllog") { renderPodo(arg || "log"); return; }
   if (sub === "quit") { renderQuit(); return; }
+  if (sub === "podoya") { renderPodoya(); return; }
   if (sub === "new") { renderNew(); return; }
   if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
@@ -3425,6 +3442,8 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
+  if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
+  if (a === "podoyaout") { try { window.open(PODOYA, "_blank"); } catch (e) { location.href = PODOYA; } return; }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
   if (a === "quit-go") {
     if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
