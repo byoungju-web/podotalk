@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "82";
+var PT2_VER = "83";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -345,6 +345,17 @@ function rich(s) {
     '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
     '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
     '.pt2-aiframe{width:100%;height:calc(100dvh - 190px);min-height:460px;border:0;display:block}',
+    '.pt2-rep{margin-left:6px;border:none;background:none;color:#b9b2c9;font-size:15px;font-weight:900;line-height:1;padding:0 4px;cursor:pointer;font-family:inherit}',
+    '.pt2-whys{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}',
+    '.pt2-why{flex:1 1 44%;padding:11px 8px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}',
+    '.pt2-why:active{background:var(--tk-soft)}',
+    '.pt2-repq{margin-top:10px;padding:10px 12px;border-radius:11px;background:var(--tk-soft);color:var(--tk-sub);font-size:12.5px;line-height:1.6;word-break:break-word}',
+    '.pt2-blkrow{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--tk-line)}',
+    '.pt2-blkrow:last-child{border-bottom:0}',
+    '.pt2-blkrow span b{display:block;font-size:14px;font-weight:800}',
+    '.pt2-blkrow span small{display:block;font-size:11.5px;color:var(--tk-sub);font-weight:700}',
+    '.pt2-blkx{margin-left:auto;padding:8px 12px;border-radius:10px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-grape);font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}',
+    '.pt2-ban{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(58px + env(safe-area-inset-bottom));width:100%;max-width:430px;z-index:40;background:#FEE2E2;border-top:1.5px solid #FCA5A5;color:#991B1B;font-size:12.5px;font-weight:800;line-height:1.6;padding:10px 14px;text-align:center}',
     '.pt2-seg button{flex:1;padding:10px 6px;border-radius:10px;font-weight:800;font-size:13.5px;color:var(--tk-grape);background:transparent}',
     '.pt2-seg button.on{background:#fff;color:var(--tk-grape-d);box-shadow:0 2px 8px rgba(76,29,149,.10)}',
     '.pt2-mic{background:var(--tk-soft) !important;color:var(--tk-grape-d) !important}',
@@ -378,6 +389,13 @@ function injectSettings() {
     /* ── 전화통역 ──
        포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
+    /* ── 안전 ──
+       사람이 글을 올리는 앱이라 신고·차단이 반드시 있어야 한다. */
+    '<div class="tk-sec" style="margin-top:14px">🛡 안전</div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="safety">🚨 신고와 안전 · 금지된 것</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">🚫 차단한 사람</button>' +
+    '<div class="pt2-sub" style="margin-top:8px">신고는 <b>hasin5jk@gmail.com</b> 으로도 받습니다.</div>' +
+
     '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="set">⚙️ 전화통역 설정 · 말투 · 용어집</button>' +
@@ -789,7 +807,10 @@ function msgHtml(m) {
       '<span class="tk-time">' + esc(t) + "</span></div>";
   }
   return '<div class="tk-row them"><div class="tk-savatar">🙂</div>' +
-    '<div class="tk-bcol"><div class="tk-who">' + esc(m.nick || "익명") + "</div>" +
+    '<div class="tk-bcol"><div class="tk-who">' + esc(m.nick || "익명") +
+      '<button class="pt2-rep" data-pt2="rep-open" data-u="' + esc(m.uid || "") +
+      '" data-n="' + esc(m.nick || "") + '" data-m="' + esc(m.id || "") +
+      '" data-b="' + esc(String(m.body || "").slice(0, 300)) + '" title="신고">⋯</button></div>' +
     '<div class="tk-bub">' + rich(main) + sub + "</div></div>" +
     '<span class="tk-time">' + esc(t) + "</span></div>";
 }
@@ -921,7 +942,8 @@ function renderMsgs(list, force) {
 
 function poll(first) {
   if (!P.id) return Promise.resolve();
-  return api("/talk/messages?room_id=" + encodeURIComponent(bare(P.id))).then(function (d) {
+  return api("/talk/messages?room_id=" + encodeURIComponent(bare(P.id)) +
+    "&uid=" + encodeURIComponent(myUid())).then(function (d) {
     if (!P.id || !d || !d.messages) return;
     var list = d.messages || [];
     var last = list.length ? list[list.length - 1] : null;
@@ -1254,6 +1276,138 @@ function renderCall(){
   markTab("lang");
 }
 
+/* ══════════════ 안전 · 신고 · 차단 ══════════════
+   앱스토어(지침 1.2)가 사람이 글을 올리는 앱에 요구하는 것들이다.
+   막는 일은 서버가 한다. 여기서는 누르는 자리와 보여주는 것만 맡는다. */
+var BLK = { list: [], loaded: false };
+function blkLoad(cb){
+  api("/talk/blocks?uid=" + encodeURIComponent(myUid())).then(function (d) {
+    BLK.list = (d && d.blocks) || []; BLK.loaded = true; if (cb) cb();
+  }, function () { if (cb) cb(); });
+}
+function blkHas(uid){
+  for (var i = 0; i < BLK.list.length; i++) if (BLK.list[i].uid === uid) return true;
+  return false;
+}
+
+/* 신고 이유 고르기 */
+var REP_WHY = ["욕설·괴롭힘", "음란물", "도박 권유", "마약 거래", "총기·무기", "사기·스팸", "기타"];
+function repSheet(uid, nick, mid, text, roomId){
+  if (!uid || uid === myUid()) { say("자기 자신은 신고할 수 없어요"); return; }
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>🚨 신고하기</h3>" +
+    '<div class="sd"><b>' + esc(nick || "이 사람") + "</b> 님을 신고합니다.<br>" +
+    "신고하면 이 사람의 글은 <b>바로 안 보이게</b> 됩니다. 서로 다른 사람 3명이 신고하면 " +
+    "사람 손을 거치지 않고 <b>즉시 글쓰기가 제한</b>됩니다.</div>" +
+    (text ? '<div class="pt2-repq">' + esc(String(text).slice(0, 160)) + "</div>" : "") +
+    '<div class="pt2-whys">' + REP_WHY.map(function (w) {
+      return '<button class="pt2-why" data-pt2="rep-go" data-u="' + esc(uid) + '" data-n="' + esc(nick || "") +
+        '" data-m="' + esc(mid || "") + '" data-r="' + esc(w) + '" data-rid="' + esc(roomId || "") +
+        '" data-b="' + esc(String(text || "").slice(0, 300)) + '">' + esc(w) + "</button>";
+    }).join("") + "</div>" +
+    '<button class="cta" style="margin-top:10px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">취소</button>' +
+    "</div>";
+  document.body.appendChild(bg);
+}
+function repSend(el){
+  var uid = el.getAttribute("data-u");
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  say("신고를 접수했어요");
+  api("/talk/report", { body: {
+    uid: myUid(), target_uid: uid, reason: el.getAttribute("data-r"),
+    msg_id: el.getAttribute("data-m"), room_id: el.getAttribute("data-rid"),
+    body: el.getAttribute("data-b")
+  }}).then(function (d) {
+    blkLoad();
+    if (d && d.banned) say("신고 " + (d.reports || "") + "건이 쌓여 이 사람의 글쓰기가 제한되었어요");
+    else say("접수했어요. 이 사람의 글은 이제 안 보입니다");
+    P.sig = ""; poll(true);
+  }, function () { say("신고를 보내지 못했어요"); });
+}
+function blkAdd(uid, nick){
+  if (!uid || uid === myUid()) return;
+  api("/talk/block", { body: { uid: myUid(), target_uid: uid } }).then(function () {
+    say((nick ? nick + " 님을" : "이 사람을") + " 차단했어요");
+    blkLoad(function () { P.sig = ""; poll(true); });
+  }, function () { say("차단하지 못했어요"); });
+}
+function blkDel(uid){
+  api("/talk/block", { body: { uid: myUid(), target_uid: uid, remove: 1 } }).then(function () {
+    say("차단을 풀었어요");
+    blkLoad(function () { renderBlocked(); });
+  });
+}
+
+/* 설정 → 차단한 사람 */
+function renderBlocked(){
+  var head = ""; try { head = tkHeader("차단한 사람", "🛡 안전"); } catch (e) {}
+  var rows = BLK.list.length
+    ? BLK.list.map(function (b) {
+        return '<div class="pt2-blkrow"><span class="pt2-mem-ini">' + esc((b.nick || "?").slice(0, 1)) + "</span>" +
+          "<span><b>" + esc(b.nick || "이름 없음") + "</b><small>차단함</small></span>" +
+          '<button class="pt2-blkx" data-pt2="blk-del" data-u="' + esc(b.uid) + '">차단 풀기</button></div>';
+      }).join("")
+    : '<div class="pt2-sub" style="text-align:center;padding:26px 0">차단한 사람이 없습니다.</div>';
+  document.querySelector("#view").innerHTML = head +
+    '<div class="pt2-sub" style="margin:-4px 0 10px">차단한 사람의 글은 보이지 않습니다. 상대는 차단된 사실을 알 수 없습니다.</div>' +
+    '<div class="tk-card" style="padding:6px 10px">' + rows + "</div>";
+  markTab("settings");
+  blkLoad(function () {
+    if ((location.hash || "").indexOf("#/talk/blocked") === 0) renderBlocked();
+  });
+}
+
+/* 설정 → 신고 안내 */
+function renderSafety(){
+  var head = ""; try { head = tkHeader("신고와 안전", "🛡 안전"); } catch (e) {}
+  document.querySelector("#view").innerHTML = head +
+    '<div class="tk-card" style="padding:14px 15px">' +
+      '<div class="pt2-sub" style="line-height:1.9">' +
+        "<b>금지된 것</b><br>" +
+        "· 욕설 · 괴롭힘 · 협박<br>" +
+        "· 음란물, 성매매 알선<br>" +
+        "· 도박 권유 · 사설 도박 광고<br>" +
+        "· 마약 거래<br>· 총기 · 무기 거래<br>· 사기 · 스팸 · 사칭" +
+      "</div>" +
+    "</div>" +
+    '<div class="tk-card" style="padding:14px 15px;margin-top:10px">' +
+      '<div class="pt2-sub" style="line-height:1.9">' +
+        "<b>어떻게 처리되나요</b><br>" +
+        "① 마약 · 도박 · 총기 · 성매매 <b>거래 글은 아예 보내지지 않습니다.</b> 보내려 한 사람은 그 자리에서 30일 제한됩니다.<br>" +
+        "② 욕설은 ●● 로 가려집니다.<br>" +
+        "③ 신고하면 그 사람 글이 <b>나에게는 바로</b> 안 보입니다.<br>" +
+        "④ 서로 다른 사람 <b>3명이 신고하면 7일</b>, <b>10명이면 1년</b> 글쓰기가 제한됩니다. " +
+        "사람이 확인할 때까지 기다리지 않고 <b>즉시</b> 적용됩니다." +
+      "</div>" +
+    "</div>" +
+    '<div class="pt2-sub" style="margin-top:12px;line-height:1.9">' +
+      "잘못 걸렸거나 급한 일은 <b>hasin5jk@gmail.com</b> 으로 알려주세요. 확인해서 풀어드립니다." +
+    "</div>" +
+    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">🚫 차단한 사람 보기</button>';
+  markTab("settings");
+}
+
+/* 내가 제한을 받고 있으면 위에 알려준다 */
+function banCheck(){
+  api("/talk/mystate?uid=" + encodeURIComponent(myUid())).then(function (d) {
+    var b = d && d.ban; if (!b) return;
+    var t = new Date(b.until || Date.now());
+    var el = document.getElementById("pt2Ban");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "pt2Ban"; el.className = "pt2-ban";
+      document.body.appendChild(el);
+    }
+    el.innerHTML = "🚫 신고가 쌓여 글쓰기가 제한되었습니다 · " +
+      (t.getMonth() + 1) + "월 " + t.getDate() + "일까지<br>" +
+      '<span style="font-weight:700">' + esc(b.reason || "") + " · 문의 hasin5jk@gmail.com</span>";
+  }, function () {});
+}
+
 /* ══════════════ 포도AI ══════════════
    포도야(podoya.ai.kr)를 포도톡 안에서 연다. 밖으로 나가버리면 아래 탭 다섯 개가
    사라져서 돌아올 길이 없었다. 여기서 열면 탭이 그대로 남는다. */
@@ -1546,6 +1700,8 @@ window.renderTalk = function (sub, arg) {
   if (sub === "calllog") { renderPodo(arg || "log"); return; }
   if (sub === "quit") { renderQuit(); return; }
   if (sub === "podoya") { renderPodoya(); return; }
+  if (sub === "safety")  { renderSafety(); return; }
+  if (sub === "blocked") { renderBlocked(); return; }
   if (sub === "new") { renderNew(); return; }
   if (sub === "profile") { renderProfile(); return; }
   if (sub === "trans") {
@@ -2465,7 +2621,11 @@ function memSheet(m) {
       (when ? "<br>" + when : "") + "</div>" +
     (me
       ? '<button class="cta grape" data-pt2="prof-open">내 프로필 바꾸기</button>'
-      : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요.</div>') +
+      : '<div class="pt2-sub">사진과 이름은 본인만 바꿀 수 있어요.</div>' +
+        '<div class="tk-tools" style="margin-top:12px">' +
+          '<button class="tk-tool" data-pt2="blk-add" data-u="' + esc(m.uid || "") + '" data-n="' + esc(nm) + '">🚫 차단</button>' +
+          '<button class="tk-tool" data-pt2="rep-open" data-u="' + esc(m.uid || "") + '" data-n="' + esc(nm) + '">🚨 신고</button>' +
+        "</div>") +
     '<button class="cta" style="margin-top:10px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
@@ -3442,6 +3602,19 @@ document.addEventListener("click", function (e) {
     else location.hash = "#/talk/trans";
     return;
   }
+  if (a === "safety")  { location.hash = "#/talk/safety";  return; }
+  if (a === "blocked") { location.hash = "#/talk/blocked"; return; }
+  if (a === "rep-open") {
+    repSheet(el.getAttribute("data-u"), el.getAttribute("data-n"),
+             el.getAttribute("data-m"), el.getAttribute("data-b"), bare(P.id || ""));
+    return;
+  }
+  if (a === "rep-go")  { repSend(el); return; }
+  if (a === "blk-add") {
+    var sbx = document.querySelector(".sheet-bg"); if (sbx) sbx.remove();
+    blkAdd(el.getAttribute("data-u"), el.getAttribute("data-n")); return;
+  }
+  if (a === "blk-del") { blkDel(el.getAttribute("data-u")); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
   if (a === "podoyaout") { try { window.open(PODOYA, "_blank"); } catch (e) { location.href = PODOYA; } return; }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
@@ -3960,5 +4133,9 @@ try { fixTabbar(); } catch (e) {}
 window.addEventListener("hashchange", function () { try { fixTabbar(); } catch (e) {} });
 
 if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
+
+/* 차단 목록과 내 제한 상태를 미리 받아둔다 */
+try { blkLoad(); } catch (e) {}
+try { setTimeout(banCheck, 1200); } catch (e) {}
 
 })();
