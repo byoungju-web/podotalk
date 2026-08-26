@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "83";
+var PT2_VER = "84";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -389,13 +389,6 @@ function injectSettings() {
     /* ── 전화통역 ──
        포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
-    /* ── 안전 ──
-       사람이 글을 올리는 앱이라 신고·차단이 반드시 있어야 한다. */
-    '<div class="tk-sec" style="margin-top:14px">🛡 안전</div>' +
-    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="safety">🚨 신고와 안전 · 금지된 것</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">🚫 차단한 사람</button>' +
-    '<div class="pt2-sub" style="margin-top:8px">신고는 <b>hasin5jk@gmail.com</b> 으로도 받습니다.</div>' +
-
     '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="set">⚙️ 전화통역 설정 · 말투 · 용어집</button>' +
@@ -452,12 +445,17 @@ function injectSettings() {
        포도랑은 기록이 기기에만 남지만 포도톡은 서버에 남기 때문이다. */
     '<div class="tk-sec" style="margin-top:16px">📄 약관 및 정책</div>' +
     '<a class="pt2-legal" href="/terms.html" target="_blank" rel="noopener">' +
-      '<span class="pt2-legal-ic">📜</span><span class="pt2-legal-t">이용약관</span><span class="pt2-legal-go">›</span></a>' +
+      '<span class="pt2-legal-t">이용약관</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="/privacy.html" target="_blank" rel="noopener">' +
-      '<span class="pt2-legal-ic">🔒</span><span class="pt2-legal-t">개인정보처리방침</span><span class="pt2-legal-go">›</span></a>' +
-    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다. 자세한 내용은 위 두 문서에 있습니다.</div>' +
+      '<span class="pt2-legal-t">개인정보처리방침</span><span class="pt2-legal-go">›</span></a>' +
+    /* 신고·차단도 정책에 해당하므로 개인정보처리방침 바로 아래에 둔다 */
+    '<a class="pt2-legal" href="#/talk/safety" data-pt2="safety">' +
+      '<span class="pt2-legal-t">신고와 안전 · 금지된 것</span><span class="pt2-legal-go">›</span></a>' +
+    '<a class="pt2-legal" href="#/talk/blocked" data-pt2="blocked">' +
+      '<span class="pt2-legal-t">차단한 사람</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="#/talk/quit" data-pt2="quit">' +
-      '<span class="pt2-legal-ic">🗑</span><span class="pt2-legal-t">계정 탈퇴 · 내 자료 모두 지우기</span><span class="pt2-legal-go">›</span></a>' +
+      '<span class="pt2-legal-t">계정 탈퇴 · 내 자료 모두 지우기</span><span class="pt2-legal-go">›</span></a>' +
+    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다.</div>' +
 
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
@@ -1387,7 +1385,7 @@ function renderSafety(){
     '<div class="pt2-sub" style="margin-top:12px;line-height:1.9">' +
       "잘못 걸렸거나 급한 일은 <b>hasin5jk@gmail.com</b> 으로 알려주세요. 확인해서 풀어드립니다." +
     "</div>" +
-    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">🚫 차단한 사람 보기</button>';
+    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">차단한 사람 보기</button>';
   markTab("settings");
 }
 
