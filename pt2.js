@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "84";
+var PT2_VER = "85";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -766,20 +766,27 @@ try {
 function stopPoll() { if (P.timer) { clearInterval(P.timer); P.timer = null; } }
 function startPoll() {
   stopPoll();
+  if (document.hidden) return;          /* 화면을 안 보고 있으면 아예 걸지 않는다 */
   P.timer = setInterval(function () {
     if (!document.hidden && P.id) poll(false);
   }, POLL_MS);
 }
+/* 화면을 덮거나 다른 앱으로 넘어가면 타이머를 끊는다. 예전에는 타이머가 계속
+   돌면서 매번 '숨김이니 건너뛴다' 만 했다. 요청은 안 나갔지만 타이머는 살아
+   있었고, 돌아올 때까지 아무것도 못 받았다. 이제는 끊고, 돌아오면 한 번 받아
+   따라잡은 뒤 다시 건다. 사람이 늘수록 이 한 가지가 서버 요청을 크게 줄인다. */
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) { stopPoll(); return; }
+  if (P.id) { poll(false); startPoll(); }
+});
 
 /* 방을 떠나면 타이머를 끈다. router 는 등록 시점의 참조로 묶여 있어 감싸도 안 먹으므로
    hashchange 를 따로 듣는다. 새 해시가 서버 방이면 건드리지 않는다. */
 window.addEventListener("hashchange", function () {
   var m = (location.hash || "").match(/#\/talk\/room\/([\w-]+)/);
-  if (!m || !isSv(m[1])) { stopPoll(); pt2MicStop(); P.id = null; P.room = null; }
+  if (!m || !isSv(m[1])) { stopPoll(); pt2MicStop(); P.id = null; P.room = null; P.after = 0; P.list = []; }
 });
-document.addEventListener("visibilitychange", function () {
-  if (!document.hidden && P.id) poll(false);
-});
+
 
 function msgHtml(m) {
   var mine = m.uid === myUid();
@@ -878,10 +885,21 @@ function trStep(){
     }
     setTimeout(trStep, 60);
   };
-  /* 보낸 사람 언어를 모르므로 자동 감지가 되는 무료 번역을 먼저 쓴다 */
-  trxGoogle(job.text, "auto", trxG(job.tgt), done, function () {
-    trxAI(job.text, "EN", job.tgt, function (o) { done(o); });
-  });
+  /* 우리 서버(Workers AI)로 번역한다. 예전에는 구글 무료 주소를 직접 불렀는데
+     공식 API 가 아니라 사람이 늘면 막힌다. 서버가 같은 문장을 캐시로 들고
+     있어서 두 번째부터는 모델을 아예 부르지 않는다.
+     서버가 답을 못 주면 옛 길(구글 → 내 AI 키)로 한 번 더 시도한다. */
+  api("/talk/translate", { body: { text: job.text, to: trxG(job.tgt).toLowerCase() } })
+    .then(function (r) {
+      if (r && r.ok && r.text) { done(r.text); return; }
+      trxGoogle(job.text, "auto", trxG(job.tgt), done, function () {
+        trxAI(job.text, "EN", job.tgt, function (o) { done(o); });
+      });
+    }, function () {
+      trxGoogle(job.text, "auto", trxG(job.tgt), done, function () {
+        trxAI(job.text, "EN", job.tgt, function (o) { done(o); });
+      });
+    });
 }
 
 /* 이 메시지를 내 언어로 바꾼 결과. 아직 없으면 줄 세우고 '번역 중'을 돌려준다 */
@@ -938,13 +956,42 @@ function renderMsgs(list, force) {
   if (force || near) doScroll();
 }
 
+/* ══ 폴링 — 바뀐 것만 받아온다 ══
+   예전에는 3초마다 최근 60개를 통째로 다시 받았다. 새 글이 없어도 60개였다.
+   서버는 처음부터 after 커서를 받을 수 있었는데 앱이 안 보내고 있었다.
+   이제 마지막으로 받은 시각을 함께 보낸다. 새 글이 없으면 0개가 온다.
+   사람이 늘수록 이 한 줄이 데이터베이스 읽기를 통째로 없앤다. */
 function poll(first) {
   if (!P.id) return Promise.resolve();
-  return api("/talk/messages?room_id=" + encodeURIComponent(bare(P.id)) +
-    "&uid=" + encodeURIComponent(myUid())).then(function (d) {
+  var url = "/talk/messages?room_id=" + encodeURIComponent(bare(P.id)) +
+            "&uid=" + encodeURIComponent(myUid());
+  /* 방에 처음 들어올 때만 통째로 받고, 그 뒤로는 새 것만 받는다 */
+  var inc = !first && P.after && (P.list || []).length;
+  if (inc) url += "&after=" + encodeURIComponent(P.after);
+
+  return api(url).then(function (d) {
     if (!P.id || !d || !d.messages) return;
-    var list = d.messages || [];
+
+    var list;
+    if (inc) {
+      if (!d.messages.length) {
+        /* 새 글이 없다. 봇 기다림만 확인하고 그림은 그대로 둔다 */
+        if (P.waiting && Date.now() - (P.waitSince || 0) > 90000) {
+          P.waiting = false; renderMsgs(P.list || [], false);
+        }
+        return;
+      }
+      /* 이어 붙인다. 같은 글이 두 번 들어오지 않게 id 로 거른다 */
+      var seen = {};
+      (P.list || []).forEach(function (x) { if (x && x.id) seen[x.id] = 1; });
+      list = (P.list || []).concat(d.messages.filter(function (x) { return !(x && x.id && seen[x.id]); }));
+      if (list.length > 300) list = list.slice(-300);      /* 너무 길어지면 앞을 버린다 */
+    } else {
+      list = d.messages || [];
+    }
+
     var last = list.length ? list[list.length - 1] : null;
+    if (last && last.created) P.after = last.created;
 
     /* 봇 답이 들어왔으면 '답하는 중' 카드를 내린다 */
     if (P.waiting) {
@@ -1007,7 +1054,7 @@ function pt2MicStart(id){
 
 function renderRoom(id) {
   stopPoll();
-  P.id = id; P.sig = ""; P.room = null; P.bots = [];
+  P.id = id; P.sig = ""; P.room = null; P.bots = []; P.after = 0; P.list = [];
   P.waiting = false; P.waitSince = 0; P.waitNames = "";
   var head = "";
   try { head = ""; } catch (e) {}
@@ -1080,7 +1127,7 @@ window.renderTalkRoom = function (id) {
     var mv = upMap()[id];
     if (mv && mv.sid) { location.replace("#/talk/room/" + PFX + mv.sid); return; }
   }
-  stopPoll(); P.id = null;
+  stopPoll(); P.id = null; P.after = 0; P.list = [];
   return O.renderTalkRoom.apply(this, arguments);
 };
 
@@ -1104,7 +1151,17 @@ function svSend(id) {
     '</div></div><span class="tk-time">전송중</span></div>');
   doScroll();
 
-  api("/talk/message", { body: { room_id: bare(id), uid: myUid(), nick: myNick(), body: text } })
+  /* @봇을 부를 때는 내 AI 키를 함께 보낸다. 키가 있으면 그 키로 돌아가서
+     한도가 없다. 키는 서버에 저장되지 않고 그 요청에서만 쓰인다. */
+  var mine = { room_id: bare(id), uid: myUid(), nick: myNick(), body: text };
+  try {
+    if (mentions.length && typeof getKey === "function" && getKey()) {
+      mine.ai_key = getKey();
+      mine.ai_provider = (typeof getProvider === "function" ? getProvider() : "claude");
+    }
+  } catch (e) {}
+
+  api("/talk/message", { body: mine })
     .then(function (d) {
       if (!d || !d.ok) { say((d && d.error) || "전송하지 못했어요"); poll(true); return; }
       var names = (d.bots && d.bots.length) ? d.bots : mentions;
@@ -1115,7 +1172,7 @@ function svSend(id) {
         chaseBot();
       }
       P.sig = "";                    /* 강제로 다시 그리게 */
-      poll(true);
+      poll(false);                   /* after 커서로 새 것만 받아 이어 붙인다 */
     });
 }
 
