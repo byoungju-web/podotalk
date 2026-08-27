@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "85";
+var PT2_VER = "91";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -345,6 +345,8 @@ function rich(s) {
     '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
     '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
     '.pt2-aiframe{width:100%;height:calc(100dvh - 190px);min-height:460px;border:0;display:block}',
+    '.tk-in{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:15px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box}',
+    '.tk-in:focus{border-color:var(--tk-grape)}',
     '.pt2-rep{margin-left:6px;border:none;background:none;color:#b9b2c9;font-size:15px;font-weight:900;line-height:1;padding:0 4px;cursor:pointer;font-family:inherit}',
     '.pt2-whys{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}',
     '.pt2-why{flex:1 1 44%;padding:11px 8px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}',
@@ -389,6 +391,10 @@ function injectSettings() {
     /* ── 전화통역 ──
        포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
+    '<div class="tk-sec" style="margin-top:14px">🍇 크레딧</div>' +
+    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="credits">잔액 보기 · 코드 넣기</button>' +
+    '<div class="pt2-sub" style="margin-top:8px">채팅과 통역톡은 크레딧 없이 씁니다. AI와 통역 통화에만 쓰입니다.</div>' +
+
     '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="set">⚙️ 전화통역 설정 · 말투 · 용어집</button>' +
@@ -763,6 +769,10 @@ try {
   }
 } catch (e) {}
 
+/* 간격을 늘렸다가 되돌렸다. 조용할 때 30초까지 느려지게 해봤는데,
+   상대가 말을 걸어도 한참 뒤에야 뜨는 게 채팅 앱으로는 답답했다.
+   서버 값은 줄지만 쓰는 맛을 버리면 안 된다. 3초 고정으로 되돌린다.
+   요청 수를 줄이는 일은 나중에 WebSocket 으로 제대로 하는 게 맞다. */
 function stopPoll() { if (P.timer) { clearInterval(P.timer); P.timer = null; } }
 function startPoll() {
   stopPoll();
@@ -794,7 +804,11 @@ function msgHtml(m) {
   try { t = tkClock(m.created); } catch (e) {}
 
   /* 남이 쓴 글은 자동번역을 시도한다. 원문은 아래에 작게 남긴다 */
-  var tr = mine ? null : trFor(m.body);
+  /* 서버가 방 안의 언어들로 미리 번역해 보내준 것(m.tr)이 있으면 그걸 쓴다.
+     100명 방이어도 서버는 언어 수만큼만 번역하므로, 받는 폰은 아무것도
+     요청하지 않는다. 아직 안 왔으면 예전처럼 폰이 스스로 번역한다. */
+  var tr = mine ? null
+    : (m.tr && trOn(P.id) ? { text: m.tr } : trFor(m.body));
   var main = (tr && tr.text) ? tr.text : m.body;
   var sub = "";
   if (tr && tr.text) sub = '<div class="pt2-orig">' + esc(m.body) + "</div>";
@@ -835,7 +849,16 @@ function trSetOn(id, v){ LSS("pt2_tr_" + bare(id), v ? "1" : "0"); }
 function myLang(){ return LS("pt2_tr_lang") || "KO"; }
 /* 처음 한 번은 한국어로 맞춰둔다. 이후 직접 고른 값은 그대로 지킨다 */
 (function(){ if (LS("pt2_lang_init") !== "1") { LSS("pt2_tr_lang", "KO"); LSS("pt2_lang_init", "1"); } })();
-function setMyLang(v){ LSS("pt2_tr_lang", v); }
+function setMyLang(v){
+  LSS("pt2_tr_lang", v);
+  /* 서버가 방 안의 언어 목록을 알아야 미리 번역할 수 있다. 조용히 알려둔다. */
+  try {
+    if (P.id) api("/talk/room/join", { body: {
+      room_id: bare(P.id), uid: myUid(), nick: myNick(),
+      lang: trxG(v).toLowerCase()
+    }});
+  } catch (e) {}
+}
 
 function trCache(){ return LSJ("pt2_tr_cache", {}); }
 function trCacheSave(o){
@@ -964,7 +987,8 @@ function renderMsgs(list, force) {
 function poll(first) {
   if (!P.id) return Promise.resolve();
   var url = "/talk/messages?room_id=" + encodeURIComponent(bare(P.id)) +
-            "&uid=" + encodeURIComponent(myUid());
+            "&uid=" + encodeURIComponent(myUid()) +
+            "&lang=" + encodeURIComponent(trxG(myLang()).toLowerCase());
   /* 방에 처음 들어올 때만 통째로 받고, 그 뒤로는 새 것만 받는다 */
   var inc = !first && P.after && (P.list || []).length;
   if (inc) url += "&after=" + encodeURIComponent(P.after);
@@ -1114,7 +1138,7 @@ function renderRoom(id) {
       (trOn(id) ? " · 🌐 " + trxName(myLang()) : "");
     var tb = document.getElementById("pt2TaskBtn");
     if (tb && P.room.type === "study") tb.style.display = "";
-    api("/talk/room/join", { body: { room_id: bare(id), uid: myUid(), nick: myNick() } });
+    api("/talk/room/join", { body: { room_id: bare(id), uid: myUid(), nick: myNick(), lang: trxG(myLang()).toLowerCase() } });
     if (STEP >= 4) loadBots(id);
     poll(true).then(function () { startPoll(); });
   });
@@ -1153,7 +1177,8 @@ function svSend(id) {
 
   /* @봇을 부를 때는 내 AI 키를 함께 보낸다. 키가 있으면 그 키로 돌아가서
      한도가 없다. 키는 서버에 저장되지 않고 그 요청에서만 쓰인다. */
-  var mine = { room_id: bare(id), uid: myUid(), nick: myNick(), body: text };
+  var mine = { room_id: bare(id), uid: myUid(), nick: myNick(), body: text,
+               lang: trxG(myLang()).toLowerCase() };
   try {
     if (mentions.length && typeof getKey === "function" && getKey()) {
       mine.ai_key = getKey();
@@ -1171,6 +1196,16 @@ function svSend(id) {
         P.waitNames = names.join(", @");
         chaseBot();
       }
+      /* 크레딧이 바닥나면 한 번만 알려준다. 말은 막히지 않는다.
+         번역만 안 될 뿐이고, 받는 쪽은 원문을 그대로 본다. */
+      if (d.low && !window.__lowSaid) {
+        window.__lowSaid = 1;
+        setTimeout(function () {
+          say("크레딧이 없어 번역이 안 돼요. 설정 → 크레딧에서 채워주세요");
+        }, 600);
+      }
+      if (!d.low) window.__lowSaid = 0;
+
       P.sig = "";                    /* 강제로 다시 그리게 */
       poll(false);                   /* after 커서로 새 것만 받아 이어 붙인다 */
     });
@@ -1461,6 +1496,140 @@ function banCheck(){
       (t.getMonth() + 1) + "월 " + t.getDate() + "일까지<br>" +
       '<span style="font-weight:700">' + esc(b.reason || "") + " · 문의 hasin5jk@gmail.com</span>";
   }, function () {});
+}
+
+/* ══════════════ 크레딧 ══════════════
+   AI 는 우리 키로 돌아간다. 그래서 쓰는 만큼 크레딧이 깎인다.
+   깎는 일은 전부 서버가 한다. 여기서는 보여주고 채우기만 한다. */
+var CDS = { balance: null, cost: null };
+function cdLoad(cb){
+  api("/talk/credits?uid=" + encodeURIComponent(myUid())).then(function (d) {
+    if (d) { CDS.balance = d.balance; CDS.cost = d.cost || null; }
+    if (cb) cb();
+  }, function () { if (cb) cb(); });
+}
+function renderCredits(){
+  var head = ""; try { head = tkHeader("크레딧", "🍇 포도"); } catch (e) {}
+  var b = CDS.balance;
+  document.querySelector("#view").innerHTML = head +
+    '<div class="tk-card" style="padding:18px 16px;text-align:center">' +
+      '<div class="pt2-sub" style="margin-bottom:6px">남은 크레딧</div>' +
+      '<div style="font-size:34px;font-weight:900;color:var(--tk-grape);line-height:1.2">' +
+        (b === null ? "…" : Number(b).toLocaleString()) + "</div>" +
+    "</div>" +
+
+    '<div class="tk-sec" style="margin-top:16px">코드 넣기</div>' +
+    '<div class="tk-card" style="padding:14px 15px">' +
+      '<input id="cdCode" class="tk-in" placeholder="PODO-XXXXXX-XXXXXX" ' +
+        'style="text-transform:uppercase;letter-spacing:1px">' +
+      '<button class="cta" style="margin-top:10px" data-pt2="cd-redeem">채우기</button>' +
+    "</div>" +
+
+    /* 내가 만든 방이 있으면 여기서 바로 나눠줄 수 있게 한다.
+       공장 사장이 직원 몫을 대신 채워주는 자리다. */
+    (function () {
+      var mine = [];
+      try {
+        mine = (svRooms() || []).filter(function (r) { return r && r.id && tokenOf(r.id); });
+      } catch (e) {}
+      if (!mine.length) return "";
+      return '<div class="tk-sec" style="margin-top:16px">내 방 사람들에게 나눠주기</div>' +
+        '<div class="tk-card" style="padding:6px 10px">' +
+          mine.slice(0, 20).map(function (r) {
+            return '<div class="pt2-blkrow"><span>' +
+              "<b>" + esc(r.name || "이름 없는 방") + "</b>" +
+              "<small>" + ((r.members || 1)) + "명</small></span>" +
+              '<button class="pt2-blkx" data-pt2="share-room" data-id="' + esc(r.id) +
+              '" data-n="' + ((r.members || 1)) + '">나눠주기</button></div>';
+          }).join("") +
+        "</div>" +
+        '<div class="pt2-sub" style="margin-top:8px">받는 분은 결제하지 않아도 통역을 쓸 수 있어요. <b>누가 얼마를 갖고 있는지는 서로 보이지 않습니다.</b></div>';
+    })() +
+
+    '<div class="tk-sec" style="margin-top:16px">어디에 쓰이나요</div>' +
+    '<div class="tk-card" style="padding:14px 15px">' +
+      '<div class="pt2-sub" style="line-height:2">' +
+        "· 채팅 · 일반채팅 — <b>무료</b><br>" +
+        "· 번역 — <b>말한 사람만</b> 냅니다. 방에 세 나라 말이 있으면 한 마디에 3크레딧<br>" +
+        "· AI 답 1회 — 1크레딧<br>" +
+        "· 마주보고 통역 1분 — 3크레딧<br>" +
+        "· 전화통역 1분 — 60크레딧" +
+      "</div>" +
+    "</div>" +
+    '<div class="pt2-sub" style="margin-top:10px;line-height:1.9">' +
+      "<b>듣기만 하면 한 푼도 안 듭니다.</b> 읽는 것은 언제나 무료예요.<br>" +
+      "내 AI 키를 넣으면 AI 는 크레딧 없이 쓸 수 있어요. 설정 → AI 연결." +
+    "</div>";
+  markTab("settings");
+  cdLoad(function () {
+    if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits();
+  });
+}
+function cdRedeem(){
+  var el = document.getElementById("cdCode");
+  var code = ((el && el.value) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!code) { say("코드를 넣어주세요"); return; }
+  say("확인 중…");
+  api("/talk/credits/redeem", { body: { uid: myUid(), code: code } }).then(function (d) {
+    if (d && d.ok) {
+      CDS.balance = d.balance;
+      say(Number(d.added || 0).toLocaleString() + "크레딧이 들어왔어요");
+      renderCredits();
+    } else {
+      say((d && d.error) || "코드를 확인해 주세요");
+    }
+  }, function (e) { say((e && e.message) || "코드를 확인해 주세요"); });
+}
+
+
+/* 방장이 방 사람들에게 크레딧을 나눠준다.
+   공장 사장이 직원 몫을 대신 채워주는 자리다. 직원은 결제하지 않는다.
+   남의 잔액은 서버가 알려주지 않는다. 누가 샀고 누가 안 샀는지
+   서로 보이면 방 안에서 눈치가 생기기 때문이다. */
+function shareSheet(id, n){
+  id = bare(id || (P.id ? P.id : ""));
+  if (!id) { say("나눠줄 방을 골라주세요"); return; }
+  if (!tokenOf(id)) { say("방을 만든 분만 나눠줄 수 있어요"); return; }
+  n = parseInt(n || 0) || ((P.room && P.room.members) || 0);
+  window.__shId = id;
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>🍇 크레딧 나눠주기</h3>" +
+    '<div class="sd">이 방 사람들에게 내 크레딧을 나눠줍니다. 받는 분은 결제하지 않아도 통역을 쓸 수 있어요.<br>' +
+    "<b>누가 얼마를 갖고 있는지는 아무에게도 보이지 않습니다.</b></div>" +
+    '<div class="pt2-sub" style="margin-top:10px">나 말고 <b>' + Math.max(0, n - 1) + "명</b>에게 한 사람당</div>" +
+    '<input id="shEach" class="tk-in" style="margin-top:8px" inputmode="numeric" placeholder="100" value="100">' +
+    '<div class="pt2-sub" id="shSum" style="margin-top:8px"></div>' +
+    '<button class="cta" style="margin-top:12px" data-pt2="share-go">나눠주기</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">취소</button>' +
+    "</div>";
+  document.body.appendChild(bg);
+  var calc = function () {
+    var e = parseInt((document.getElementById("shEach") || {}).value || "0") || 0;
+    var t = e * Math.max(0, n - 1);
+    var el = document.getElementById("shSum");
+    if (el) el.innerHTML = "모두 <b>" + t.toLocaleString() + "</b>크레딧이 나갑니다";
+  };
+  var inp = document.getElementById("shEach");
+  if (inp) inp.addEventListener("input", calc);
+  calc();
+}
+function shareGo(){
+  var id = window.__shId || (P.id ? bare(P.id) : "");
+  var e = parseInt((document.getElementById("shEach") || {}).value || "0") || 0;
+  if (!e) { say("얼마씩 줄지 넣어주세요"); return; }
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  say("나눠주는 중…");
+  api("/talk/credits/share", { body: { room_id: id, uid: myUid(), each: e }, token: tokenOf(id) })
+    .then(function (d) {
+      if (d && d.ok) {
+        say(d.people + "명에게 " + e + "크레딧씩 나눠줬어요");
+        CDS.balance = null; cdLoad();
+      } else say((d && d.error) || "나눠주지 못했어요");
+    }, function (er) { say((er && er.message) || "크레딧이 모자라요"); });
 }
 
 /* ══════════════ 포도AI ══════════════
@@ -1755,6 +1924,7 @@ window.renderTalk = function (sub, arg) {
   if (sub === "calllog") { renderPodo(arg || "log"); return; }
   if (sub === "quit") { renderQuit(); return; }
   if (sub === "podoya") { renderPodoya(); return; }
+  if (sub === "credits") { renderCredits(); return; }
   if (sub === "safety")  { renderSafety(); return; }
   if (sub === "blocked") { renderBlocked(); return; }
   if (sub === "new") { renderNew(); return; }
@@ -3670,6 +3840,11 @@ document.addEventListener("click", function (e) {
     blkAdd(el.getAttribute("data-u"), el.getAttribute("data-n")); return;
   }
   if (a === "blk-del") { blkDel(el.getAttribute("data-u")); return; }
+  if (a === "credits")   { location.hash = "#/talk/credits"; return; }
+  if (a === "cd-redeem") { cdRedeem(); return; }
+  if (a === "share")      { shareSheet(); return; }
+  if (a === "share-room") { shareSheet(el.getAttribute("data-id"), el.getAttribute("data-n")); return; }
+  if (a === "share-go") { shareGo(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
   if (a === "podoyaout") { try { window.open(PODOYA, "_blank"); } catch (e) { location.href = PODOYA; } return; }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
