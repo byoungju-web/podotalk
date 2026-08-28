@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "91";
+var PT2_VER = "92";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1501,12 +1501,47 @@ function banCheck(){
 /* ══════════════ 크레딧 ══════════════
    AI 는 우리 키로 돌아간다. 그래서 쓰는 만큼 크레딧이 깎인다.
    깎는 일은 전부 서버가 한다. 여기서는 보여주고 채우기만 한다. */
-var CDS = { balance: null, cost: null };
+var CDS = { balance: null, cost: null, packs: null };
 function cdLoad(cb){
   api("/talk/credits?uid=" + encodeURIComponent(myUid())).then(function (d) {
     if (d) { CDS.balance = d.balance; CDS.cost = d.cost || null; }
     if (cb) cb();
   }, function () { if (cb) cb(); });
+  if (!CDS.packs) {
+    api("/talk/credits/packs").then(function (d) {
+      if (d && d.packs) {
+        CDS.packs = d.packs;
+        if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits();
+      }
+    }, function () {});
+  }
+}
+
+/* 사기 — 결제는 아직 붙지 않았다. 무엇을 고르셨는지 알려드리고
+   메일로 코드를 받는 길을 열어둔다. 결제가 붙으면 이 자리만 바꾸면 된다. */
+function cdBuy(pid){
+  var k = null;
+  (CDS.packs || []).forEach(function (x) { if (x.id === pid) k = x; });
+  if (!k) return;
+  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+  var bg = document.createElement("div");
+  bg.className = "sheet-bg";
+  bg.setAttribute("data-action", "close-sheet");
+  bg.innerHTML = '<div class="sheet" data-action="stop">' +
+    "<h3>🍇 " + Number(k.credits).toLocaleString() + "크레딧</h3>" +
+    '<div class="sd"><b>' + Number(k.krw).toLocaleString() + "원</b>" +
+    (k.bonus ? " · " + esc(k.bonus) : "") + "<br>" +
+    "카드 결제는 준비 중이에요. 아래로 알려주시면 코드를 보내드립니다.</div>" +
+    '<a class="cta" style="display:block;text-align:center;text-decoration:none;margin-top:12px" ' +
+      'href="mailto:hasin5jk@gmail.com?subject=' +
+      encodeURIComponent("포도톡 크레딧 " + k.credits + " 구매") +
+      '&body=' + encodeURIComponent(
+        "크레딧: " + k.credits + "\n금액: " + k.krw + "원\n내 번호: " + myUid() +
+        "\n\n(이 번호가 있어야 크레딧을 넣어드릴 수 있어요. 지우지 마세요)"
+      ) + '">메일로 신청하기</a>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
+    "</div>";
+  document.body.appendChild(bg);
 }
 function renderCredits(){
   var head = ""; try { head = tkHeader("크레딧", "🍇 포도"); } catch (e) {}
@@ -1518,32 +1553,47 @@ function renderCredits(){
         (b === null ? "…" : Number(b).toLocaleString()) + "</div>" +
     "</div>" +
 
-    '<div class="tk-sec" style="margin-top:16px">코드 넣기</div>' +
+    /* 크레딧 사기 */
+    '<div class="tk-sec" style="margin-top:16px">크레딧 사기</div>' +
+    (CDS.packs && CDS.packs.length
+      ? '<div class="tk-card" style="padding:6px 10px">' +
+          CDS.packs.map(function (k) {
+            return '<div class="pt2-blkrow"><span>' +
+              "<b>" + Number(k.credits).toLocaleString() + "크레딧</b>" +
+              "<small>" + esc(k.label || "") + (k.bonus ? " · " + esc(k.bonus) : "") + "</small></span>" +
+              '<button class="pt2-blkx" data-pt2="cd-buy" data-p="' + esc(k.id) + '">' +
+              Number(k.krw).toLocaleString() + "원</button></div>";
+          }).join("") +
+        "</div>"
+      : '<div class="tk-card" style="padding:14px 15px"><div class="pt2-sub">불러오는 중…</div></div>') +
+    '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>' +
+
+    '<div class="tk-sec" style="margin-top:16px">코드로 채우기</div>' +
     '<div class="tk-card" style="padding:14px 15px">' +
       '<input id="cdCode" class="tk-in" placeholder="PODO-XXXXXX-XXXXXX" ' +
         'style="text-transform:uppercase;letter-spacing:1px">' +
       '<button class="cta" style="margin-top:10px" data-pt2="cd-redeem">채우기</button>' +
     "</div>" +
 
-    /* 내가 만든 방이 있으면 여기서 바로 나눠줄 수 있게 한다.
-       공장 사장이 직원 몫을 대신 채워주는 자리다. */
+    /* 내가 만든 방에 크레딧을 넣어둘 수 있다. 방 사람들이 말할 때 거기서
+       빠져나간다. 사람마다 나눠줄 필요가 없고, 안 쓴 몫은 되돌려받는다. */
     (function () {
       var mine = [];
       try {
         mine = (svRooms() || []).filter(function (r) { return r && r.id && tokenOf(r.id); });
       } catch (e) {}
       if (!mine.length) return "";
-      return '<div class="tk-sec" style="margin-top:16px">내 방 사람들에게 나눠주기</div>' +
+      return '<div class="tk-sec" style="margin-top:16px">내 방 지갑</div>' +
         '<div class="tk-card" style="padding:6px 10px">' +
           mine.slice(0, 20).map(function (r) {
             return '<div class="pt2-blkrow"><span>' +
               "<b>" + esc(r.name || "이름 없는 방") + "</b>" +
               "<small>" + ((r.members || 1)) + "명</small></span>" +
-              '<button class="pt2-blkx" data-pt2="share-room" data-id="' + esc(r.id) +
-              '" data-n="' + ((r.members || 1)) + '">나눠주기</button></div>';
+              '<button class="pt2-blkx" data-pt2="wallet" data-id="' + esc(r.id) +
+              '" data-rn="' + esc(r.name || "") + '">지갑</button></div>';
           }).join("") +
         "</div>" +
-        '<div class="pt2-sub" style="margin-top:8px">받는 분은 결제하지 않아도 통역을 쓸 수 있어요. <b>누가 얼마를 갖고 있는지는 서로 보이지 않습니다.</b></div>';
+        '<div class="pt2-sub" style="margin-top:8px">방에 크레딧을 넣어두면 <b>방 사람들이 말할 때 거기서 빠져나갑니다.</b> 직원은 결제하지 않아도 됩니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.</div>';
     })() +
 
     '<div class="tk-sec" style="margin-top:16px">어디에 쓰이나요</div>' +
@@ -1582,54 +1632,63 @@ function cdRedeem(){
 }
 
 
-/* 방장이 방 사람들에게 크레딧을 나눠준다.
-   공장 사장이 직원 몫을 대신 채워주는 자리다. 직원은 결제하지 않는다.
-   남의 잔액은 서버가 알려주지 않는다. 누가 샀고 누가 안 샀는지
-   서로 보이면 방 안에서 눈치가 생기기 때문이다. */
-function shareSheet(id, n){
+
+/* ══ 방 지갑 ══
+   사장이 방에 크레딧을 넣어둔다. 방 사람들이 말할 때 거기서 빠져나가므로
+   사람마다 나눠줄 필요가 없다. 안 쓴 몫은 언제든 되돌려받는다.
+   남의 잔액은 어디서도 보이지 않는다. */
+var WAL = { id: "", name: "", left: null };
+function walletSheet(id, name){
   id = bare(id || (P.id ? P.id : ""));
-  if (!id) { say("나눠줄 방을 골라주세요"); return; }
-  if (!tokenOf(id)) { say("방을 만든 분만 나눠줄 수 있어요"); return; }
-  n = parseInt(n || 0) || ((P.room && P.room.members) || 0);
-  window.__shId = id;
+  if (!id) { say("방을 골라주세요"); return; }
+  if (!tokenOf(id)) { say("방을 만든 분만 쓸 수 있어요"); return; }
+  WAL.id = id; WAL.name = name || "";
   var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
   var bg = document.createElement("div");
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>🍇 크레딧 나눠주기</h3>" +
-    '<div class="sd">이 방 사람들에게 내 크레딧을 나눠줍니다. 받는 분은 결제하지 않아도 통역을 쓸 수 있어요.<br>' +
-    "<b>누가 얼마를 갖고 있는지는 아무에게도 보이지 않습니다.</b></div>" +
-    '<div class="pt2-sub" style="margin-top:10px">나 말고 <b>' + Math.max(0, n - 1) + "명</b>에게 한 사람당</div>" +
-    '<input id="shEach" class="tk-in" style="margin-top:8px" inputmode="numeric" placeholder="100" value="100">' +
-    '<div class="pt2-sub" id="shSum" style="margin-top:8px"></div>' +
-    '<button class="cta" style="margin-top:12px" data-pt2="share-go">나눠주기</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">취소</button>' +
+    "<h3>🍇 " + esc(WAL.name || "방") + " 지갑</h3>" +
+    '<div class="sd">방에 넣어두면 <b>이 방 사람들이 말할 때 여기서 빠져나갑니다.</b> ' +
+    "직원은 결제하지 않아도 통역을 씁니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.<br>" +
+    "누가 얼마나 썼는지는 아무에게도 보이지 않습니다.</div>" +
+    '<div class="tk-card" style="padding:14px;text-align:center;margin-top:12px">' +
+      '<div class="pt2-sub">방에 남은 크레딧</div>' +
+      '<div id="walLeft" style="font-size:28px;font-weight:900;color:var(--tk-grape)">…</div>' +
+    "</div>" +
+    '<input id="walAmt" class="tk-in" style="margin-top:12px" inputmode="numeric" placeholder="넣을 크레딧" value="1000">' +
+    '<button class="cta" style="margin-top:10px" data-pt2="wal-in">방에 넣기</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="wal-out">남은 것 모두 되돌려받기</button>' +
+    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
-  var calc = function () {
-    var e = parseInt((document.getElementById("shEach") || {}).value || "0") || 0;
-    var t = e * Math.max(0, n - 1);
-    var el = document.getElementById("shSum");
-    if (el) el.innerHTML = "모두 <b>" + t.toLocaleString() + "</b>크레딧이 나갑니다";
-  };
-  var inp = document.getElementById("shEach");
-  if (inp) inp.addEventListener("input", calc);
-  calc();
+  walLoad();
 }
-function shareGo(){
-  var id = window.__shId || (P.id ? bare(P.id) : "");
-  var e = parseInt((document.getElementById("shEach") || {}).value || "0") || 0;
-  if (!e) { say("얼마씩 줄지 넣어주세요"); return; }
-  var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
-  say("나눠주는 중…");
-  api("/talk/credits/share", { body: { room_id: id, uid: myUid(), each: e }, token: tokenOf(id) })
+function walLoad(){
+  api("/talk/room/wallet?room_id=" + encodeURIComponent(WAL.id) +
+      "&uid=" + encodeURIComponent(myUid())).then(function (d) {
+    WAL.left = (d && d.wallet) || 0;
+    var el = document.getElementById("walLeft");
+    if (el) el.textContent = Number(WAL.left).toLocaleString();
+  }, function () {});
+}
+function walIn(){
+  var a = parseInt((document.getElementById("walAmt") || {}).value || "0") || 0;
+  if (!a) { say("넣을 크레딧을 적어주세요"); return; }
+  say("넣는 중…");
+  api("/talk/room/wallet", { body: { room_id: WAL.id, uid: myUid(), amount: a }, token: tokenOf(WAL.id) })
     .then(function (d) {
-      if (d && d.ok) {
-        say(d.people + "명에게 " + e + "크레딧씩 나눠줬어요");
-        CDS.balance = null; cdLoad();
-      } else say((d && d.error) || "나눠주지 못했어요");
-    }, function (er) { say((er && er.message) || "크레딧이 모자라요"); });
+      if (d && d.ok) { say(a.toLocaleString() + "크레딧을 방에 넣었어요"); walLoad(); cdLoad(); }
+      else say((d && d.error) || "넣지 못했어요");
+    }, function (e) { say((e && e.message) || "내 크레딧이 모자라요"); });
+}
+function walOut(){
+  say("되돌려받는 중…");
+  api("/talk/room/wallet", { body: { room_id: WAL.id, uid: myUid(), take: 1 }, token: tokenOf(WAL.id) })
+    .then(function (d) {
+      if (d && d.ok) { say(Number(d.back || 0).toLocaleString() + "크레딧을 되돌려받았어요"); walLoad(); cdLoad(); }
+      else say((d && d.error) || "되돌려받지 못했어요");
+    }, function (e) { say((e && e.message) || "되돌려받을 크레딧이 없어요"); });
 }
 
 /* ══════════════ 포도AI ══════════════
@@ -3842,9 +3901,10 @@ document.addEventListener("click", function (e) {
   if (a === "blk-del") { blkDel(el.getAttribute("data-u")); return; }
   if (a === "credits")   { location.hash = "#/talk/credits"; return; }
   if (a === "cd-redeem") { cdRedeem(); return; }
-  if (a === "share")      { shareSheet(); return; }
-  if (a === "share-room") { shareSheet(el.getAttribute("data-id"), el.getAttribute("data-n")); return; }
-  if (a === "share-go") { shareGo(); return; }
+  if (a === "cd-buy")    { cdBuy(el.getAttribute("data-p")); return; }
+  if (a === "wallet")  { walletSheet(el.getAttribute("data-id"), el.getAttribute("data-rn")); return; }
+  if (a === "wal-in")  { walIn(); return; }
+  if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
   if (a === "podoyaout") { try { window.open(PODOYA, "_blank"); } catch (e) { location.href = PODOYA; } return; }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
