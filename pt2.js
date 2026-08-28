@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "94";
+var PT2_VER = "95";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -351,6 +351,14 @@ function rich(s) {
     '.pt2-aiframe{width:100%;height:calc(100dvh - 190px);min-height:460px;border:0;display:block}',
     '.tk-in{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:15px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box}',
     '.tk-in:focus{border-color:var(--tk-grape)}',
+    '.pt2-price{font-size:14.5px;line-height:2.1;color:var(--tk-ink);font-weight:700}',
+    '.pt2-price b{font-weight:900;color:var(--tk-grape)}',
+    '.pt2-price-sub{display:block;font-size:12.5px;color:var(--tk-sub);font-weight:700;margin:-4px 0 4px 10px}',
+    '.pt2-note{margin-top:10px;font-size:13.5px;line-height:1.95;color:var(--tk-sub);font-weight:700}',
+    '.pt2-note b{color:var(--tk-ink);font-weight:900}',
+    '.pt2-pay{display:flex;gap:8px;margin-top:12px}',
+    '.pt2-pay button{flex:1;padding:13px 8px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-sub);font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1.45}',
+    '.pt2-pay button.on{border-color:var(--tk-grape);background:var(--tk-soft);color:var(--tk-grape)}',
     '.pt2-rep{margin-left:6px;border:none;background:none;color:#b9b2c9;font-size:15px;font-weight:900;line-height:1;padding:0 4px;cursor:pointer;font-family:inherit}',
     '.pt2-whys{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}',
     '.pt2-why{flex:1 1 44%;padding:11px 8px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}',
@@ -397,7 +405,7 @@ function injectSettings() {
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
     '<div class="tk-sec" style="margin-top:14px">크레딧</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="credits">잔액 보기 · 코드 넣기</button>' +
-    '<div class="pt2-sub" style="margin-top:8px">채팅과 통역톡은 크레딧 없이 씁니다. AI와 통역 통화에만 쓰입니다.</div>' +
+    '<div class="pt2-sub" style="margin-top:8px">채팅 · 일반채팅 · 1:1 동시통역은 무료입니다. 다중 통역 · 마주보기 · 전화통역 · AI에 크레딧이 쓰입니다.</div>' +
 
     '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
@@ -1675,24 +1683,33 @@ function renderCredits(){
               '" data-rn="' + esc(r.name || "") + '">지갑</button></div>';
           }).join("") +
         "</div>" +
-        '<div class="pt2-sub" style="margin-top:8px">방에 크레딧을 넣어두면 <b>방 사람들이 말할 때 거기서 빠져나갑니다.</b> 직원은 결제하지 않아도 됩니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.<br>' +
-        "1:1 통역 · 마주보기 · 전화통역은 <b>각자 자기 크레딧</b>으로 씁니다.</div>";
+        '<div class="pt2-note">방마다 <b>누가 낼지</b> 정할 수 있어요.<br>' +
+        "· <b>방장이 다 내기</b> — 방 지갑에 넣어두면 방 인원이 말할 때 거기서 빠져나갑니다. 방 인원은 결제하지 않아도 됩니다.<br>" +
+        "· <b>각자 내기</b> — 말한 사람이 자기 크레딧으로 냅니다.<br>" +
+        "안 쓴 몫은 언제든 되돌려받을 수 있어요.</div>";
     })() +
 
-    '<div class="tk-sec" style="margin-top:16px">어디에 쓰이나요</div>' +
-    '<div class="tk-card" style="padding:14px 15px">' +
-      '<div class="pt2-sub" style="line-height:2">' +
-        "· 채팅 · 일반채팅 — <b>무료</b><br>" +
-        "· 번역 — <b>말한 사람만</b> 냅니다. 방에 세 나라 말이 있으면 한 마디에 3크레딧<br>" +
-        "· AI 답 1회 — 1크레딧<br>" +
-        "· 마주보고 통역 1분 — 3크레딧<br>" +
-        "· 전화통역 1분 — 60크레딧" +
+    '<div class="tk-sec" style="margin-top:16px">무료로 쓰는 것</div>' +
+    '<div class="tk-card" style="padding:15px 16px">' +
+      '<div class="pt2-price">' +
+        "· 채팅 · 일반채팅<br>" +
+        "· <b>1:1 동시통역</b> — 둘이 쓰는 통역은 값을 받지 않아요<br>" +
+        "· 남의 말을 <b>듣고 읽는 것</b> — 언제나 무료" +
       "</div>" +
     "</div>" +
-    '<div class="pt2-sub" style="margin-top:10px;line-height:1.9">' +
-      "<b>듣기만 하면 한 푼도 안 듭니다.</b> 읽는 것은 언제나 무료예요.<br>" +
-      "내 AI 키를 넣으면 AI 는 크레딧 없이 쓸 수 있어요. 설정 → AI 연결." +
-    "</div>";
+
+    '<div class="tk-sec" style="margin-top:16px">크레딧이 드는 것</div>' +
+    '<div class="tk-card" style="padding:15px 16px">' +
+      '<div class="pt2-price">' +
+        "· <b>다중 동시통역</b> — 한 마디에 방 안의 언어 수만큼<br>" +
+        '<span class="pt2-price-sub">세 나라 말이 있으면 한 마디에 3크레딧</span>' +
+        "· <b>마주보기 통역</b> — 1분에 3크레딧<br>" +
+        "· <b>전화통역</b> — 1분에 60크레딧<br>" +
+        "· AI 답 — 1회에 1크레딧" +
+      "</div>" +
+    "</div>" +
+    '<div class="pt2-note"><b>통역은 말한 사람만 냅니다.</b> 듣기만 하는 사람은 한 푼도 안 듭니다.<br>' +
+      "다중 통역 · 마주보기 · 전화통역은 <b>내 AI 키가 있어도</b> 크레딧이 듭니다. AI 키는 @봇에만 쓰입니다.</div>";
   markTab("settings");
 
   /* 예전에는 잔액을 받아온 뒤 화면을 통째로 다시 그렸다. 그 바람에
@@ -1738,7 +1755,7 @@ function cdRedeem(){
    사장이 방에 크레딧을 넣어둔다. 방 사람들이 말할 때 거기서 빠져나가므로
    사람마다 나눠줄 필요가 없다. 안 쓴 몫은 언제든 되돌려받는다.
    남의 잔액은 어디서도 보이지 않는다. */
-var WAL = { id: "", name: "", left: null };
+var WAL = { id: "", name: "", left: null, pay: "wallet" };
 function walletSheet(id, name){
   id = rid(id || (P.id ? P.id : ""));
   if (!id) { say("방을 골라주세요"); return; }
@@ -1750,16 +1767,24 @@ function walletSheet(id, name){
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
     '<h3><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;vertical-align:-4px;margin-right:6px"> ' + esc(WAL.name || "방") + " 지갑</h3>" +
-    '<div class="sd">방에 넣어두면 <b>이 방 사람들이 말할 때 여기서 빠져나갑니다.</b> ' +
-    "직원은 결제하지 않아도 통역을 씁니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.<br>" +
+    '<div class="sd">이 방에서 <b>통역값을 누가 낼지</b> 정합니다.<br>' +
     "누가 얼마나 썼는지는 아무에게도 보이지 않습니다.</div>" +
-    '<div class="tk-card" style="padding:14px;text-align:center;margin-top:12px">' +
-      '<div class="pt2-sub">방에 남은 크레딧</div>' +
-      '<div id="walLeft" style="font-size:28px;font-weight:900;color:var(--tk-grape)">…</div>' +
+
+    '<div class="pt2-pay">' +
+      '<button id="payW" data-pt2="pay-w">방장이 다 내기<br><small>방 지갑에서</small></button>' +
+      '<button id="payE" data-pt2="pay-e">각자 내기<br><small>말한 사람이</small></button>' +
     "</div>" +
-    '<input id="walAmt" class="tk-in" style="margin-top:12px" inputmode="numeric" placeholder="넣을 크레딧" value="1000">' +
-    '<button class="cta" style="margin-top:10px" data-pt2="wal-in">방에 넣기</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="wal-out">남은 것 모두 되돌려받기</button>' +
+    '<div class="pt2-note" id="payNote"></div>' +
+
+    '<div id="walBox">' +
+      '<div class="tk-card" style="padding:14px;text-align:center;margin-top:12px">' +
+        '<div class="pt2-sub">방에 남은 크레딧</div>' +
+        '<div id="walLeft" style="font-size:30px;font-weight:900;color:var(--tk-grape)">…</div>' +
+      "</div>" +
+      '<input id="walAmt" class="tk-in" style="margin-top:12px" inputmode="numeric" placeholder="넣을 크레딧" value="1000">' +
+      '<button class="cta" style="margin-top:10px" data-pt2="wal-in">방에 넣기</button>' +
+      '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="wal-out">남은 것 모두 되돌려받기</button>' +
+    "</div>" +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
@@ -1769,9 +1794,35 @@ function walLoad(){
   api("/talk/room/wallet?room_id=" + encodeURIComponent(WAL.id) +
       "&uid=" + encodeURIComponent(myUid())).then(function (d) {
     WAL.left = (d && d.wallet) || 0;
+    WAL.pay = (d && d.pay) || "wallet";
     var el = document.getElementById("walLeft");
     if (el) el.textContent = Number(WAL.left).toLocaleString();
+    walPaint();
   }, function () {});
+}
+/* 고른 방식에 따라 화면을 바꾼다 */
+function walPaint(){
+  var w = document.getElementById("payW"), e = document.getElementById("payE");
+  var box = document.getElementById("walBox"), note = document.getElementById("payNote");
+  if (!w || !e) return;
+  var each = WAL.pay === "each";
+  w.classList.toggle("on", !each);
+  e.classList.toggle("on", each);
+  if (box) box.style.display = each ? "none" : "";
+  if (note) {
+    note.innerHTML = each
+      ? "방 인원이 <b>각자 자기 크레딧</b>으로 냅니다. 크레딧이 없는 분은 통역이 안 되고 원문만 전달돼요."
+      : "방 지갑에서 빠져나갑니다. <b>방 인원은 결제하지 않아도</b> 통역을 씁니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.";
+  }
+}
+function walPay(mode){
+  api("/talk/room/wallet", { body: { room_id: WAL.id, uid: myUid(), pay: mode }, token: tokenOf(WAL.id) })
+    .then(function (d) {
+      if (d && d.ok) {
+        WAL.pay = d.pay; walPaint();
+        say(mode === "each" ? "각자 내기로 바꿨어요" : "방장이 다 내기로 바꿨어요");
+      } else say((d && d.error) || "바꾸지 못했어요");
+    }, function () { say("바꾸지 못했어요"); });
 }
 function walIn(){
   var a = parseInt((document.getElementById("walAmt") || {}).value || "0") || 0;
@@ -4005,6 +4056,8 @@ document.addEventListener("click", function (e) {
   if (a === "cd-buy")    { cdBuy(el.getAttribute("data-p")); return; }
   if (a === "cd-check")  { cdCheck(); return; }
   if (a === "wallet")  { walletSheet(el.getAttribute("data-id"), el.getAttribute("data-rn")); return; }
+  if (a === "pay-w")   { walPay("wallet"); return; }
+  if (a === "pay-e")   { walPay("each"); return; }
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
