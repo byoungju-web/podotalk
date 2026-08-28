@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "93";
+var PT2_VER = "94";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -395,7 +395,7 @@ function injectSettings() {
     /* ── 전화통역 ──
        포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
-    '<div class="tk-sec" style="margin-top:14px">🍇 크레딧</div>' +
+    '<div class="tk-sec" style="margin-top:14px">크레딧</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="credits">잔액 보기 · 코드 넣기</button>' +
     '<div class="pt2-sub" style="margin-top:8px">채팅과 통역톡은 크레딧 없이 씁니다. AI와 통역 통화에만 쓰입니다.</div>' +
 
@@ -477,7 +477,51 @@ function injectSettings() {
     "";
   box.appendChild(wrap);
 
+  /* ── AI 키 칸 감추기 ──
+     이제 AI 는 크레딧으로 돕니다. 키를 받는 곳은 개발자나 직접 쓰고 싶은
+     분에게만 필요한데, 화면에 늘 보이면 "이걸 꼭 넣어야 하나" 하고 헷갈립니다.
+     그래서 접어두고, 원하는 분만 펴서 쓰게 합니다. */
+  try { hideKeys(box); } catch (e) {}
+
   if (STEP >= 6) paintPushSwitch();
+}
+
+function hideKeys(box) {
+  if (box.querySelector("[data-pt2-keys]")) return;
+  var secs = box.querySelectorAll(".tk-sec");
+  var head = null;
+  for (var i = 0; i < secs.length; i++) {
+    if ((secs[i].textContent || "").indexOf("AI 키") >= 0) { head = secs[i]; break; }
+  }
+  if (!head) return;
+
+  /* 제목 다음부터 다음 제목 전까지를 한 상자에 담아 접어둔다 */
+  var hold = document.createElement("div");
+  hold.setAttribute("data-pt2-keys", "1");
+  hold.style.display = "none";
+  var n = head.nextSibling, moved = [];
+  while (n) {
+    var nx = n.nextSibling;
+    if (n.nodeType === 1 && n.classList && n.classList.contains("tk-sec")) break;
+    if (n.nodeType === 1 && n.getAttribute && n.getAttribute("data-pt2-sec")) break;
+    moved.push(n); n = nx;
+  }
+  if (!moved.length) return;
+  head.parentNode.insertBefore(hold, moved[0]);
+  moved.forEach(function (x) { hold.appendChild(x); });
+
+  head.style.display = "none";
+  var link = document.createElement("div");
+  link.className = "pt2-sub";
+  link.style.cssText = "margin-top:14px;text-align:center;cursor:pointer;text-decoration:underline";
+  link.textContent = "고급 · 내 AI 키 직접 쓰기";
+  link.addEventListener("click", function () {
+    var on = hold.style.display === "none";
+    hold.style.display = on ? "" : "none";
+    head.style.display = on ? "" : "none";
+    link.textContent = on ? "고급 설정 접기" : "고급 · 내 AI 키 직접 쓰기";
+  });
+  hold.parentNode.insertBefore(link, hold);
 }
 
 window.renderTalkSettings = function () {
@@ -1545,7 +1589,7 @@ function cdOrderSheet(d){
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>🍇 " + Number(d.credits).toLocaleString() + "크레딧</h3>" +
+    '<h3><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;vertical-align:-4px;margin-right:6px"> ' + Number(d.credits).toLocaleString() + "크레딧</h3>" +
     '<div class="sd">아래 <b>주문번호</b>를 입금자명 뒤에 붙여 보내주세요. ' +
     "확인되면 크레딧이 <b>앱에 바로 들어옵니다.</b> 코드를 옮겨 적지 않아도 됩니다.</div>" +
     '<div class="tk-card" style="padding:16px;text-align:center;margin-top:12px">' +
@@ -1580,7 +1624,7 @@ function cdCheck(){
 }
 
 function renderCredits(){
-  var head = ""; try { head = tkHeader("크레딧", "🍇 포도"); } catch (e) {}
+  var head = ""; try { head = tkHeader("크레딧", '<img src="/podotalk-192.png" alt="" style="width:15px;height:15px;border-radius:5px;vertical-align:-2px;margin-right:4px">크레딧'); } catch (e) {}
   var b = CDS.balance;
   document.querySelector("#view").innerHTML = head +
     '<div class="tk-card" style="padding:18px 16px;text-align:center">' +
@@ -1606,10 +1650,22 @@ function renderCredits(){
     (function () {
       var mine = [];
       try {
-        mine = (svRooms() || []).filter(function (r) { return r && r.id && tokenOf(r.id); });
+        /* 다중 동시통역방만 지갑을 둔다.
+           채팅·일반채팅은 원래 공짜라 채워줄 것이 없고,
+           1:1 통역·마주보기·전화통역은 개인이 쓰는 것이라 각자 낸다.
+           방장이 남의 전화값까지 내주는 건 아무도 원하지 않는다. */
+        mine = (svRooms() || []).filter(function (r) {
+          return r && r.id && tokenOf(r.id) && liveKind(r.id) === "multi";
+        });
       } catch (e) {}
-      if (!mine.length) return "";
-      return '<div class="tk-sec" style="margin-top:16px">내 방 지갑</div>' +
+      if (!mine.length) {
+        return '<div class="tk-sec" style="margin-top:16px">방 지갑</div>' +
+          '<div class="tk-card" style="padding:14px 15px"><div class="pt2-sub" style="line-height:1.9">' +
+          "<b>다중 동시통역방</b>을 만들면 여기에 지갑이 생깁니다.<br>" +
+          "방에 크레딧을 넣어두면 방 사람들이 말할 때 거기서 빠져나가요. 직원은 결제하지 않아도 됩니다." +
+          "</div></div>";
+      }
+      return '<div class="tk-sec" style="margin-top:16px">다중 통역방 지갑</div>' +
         '<div class="tk-card" style="padding:6px 10px">' +
           mine.slice(0, 20).map(function (r) {
             return '<div class="pt2-blkrow"><span>' +
@@ -1619,7 +1675,8 @@ function renderCredits(){
               '" data-rn="' + esc(r.name || "") + '">지갑</button></div>';
           }).join("") +
         "</div>" +
-        '<div class="pt2-sub" style="margin-top:8px">방에 크레딧을 넣어두면 <b>방 사람들이 말할 때 거기서 빠져나갑니다.</b> 직원은 결제하지 않아도 됩니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.</div>';
+        '<div class="pt2-sub" style="margin-top:8px">방에 크레딧을 넣어두면 <b>방 사람들이 말할 때 거기서 빠져나갑니다.</b> 직원은 결제하지 않아도 됩니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.<br>' +
+        "1:1 통역 · 마주보기 · 전화통역은 <b>각자 자기 크레딧</b>으로 씁니다.</div>";
     })() +
 
     '<div class="tk-sec" style="margin-top:16px">어디에 쓰이나요</div>' +
@@ -1692,7 +1749,7 @@ function walletSheet(id, name){
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>🍇 " + esc(WAL.name || "방") + " 지갑</h3>" +
+    '<h3><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;vertical-align:-4px;margin-right:6px"> ' + esc(WAL.name || "방") + " 지갑</h3>" +
     '<div class="sd">방에 넣어두면 <b>이 방 사람들이 말할 때 여기서 빠져나갑니다.</b> ' +
     "직원은 결제하지 않아도 통역을 씁니다. 안 쓴 몫은 언제든 되돌려받을 수 있어요.<br>" +
     "누가 얼마나 썼는지는 아무에게도 보이지 않습니다.</div>" +
