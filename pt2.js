@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "96";
+var PT2_VER = "97";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -415,7 +415,7 @@ function injectSettings() {
     '<a class="pt2-legal" href="#/talk/calllog/set" data-pt2="calllog" data-k="set">' +
       '<span class="pt2-legal-t">전화통역 설정 · 말투 · 용어집</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="#/talk/calllog/my" data-pt2="calllog" data-k="my">' +
-      '<span class="pt2-legal-t">이용권 · 저장현황 · 기록 지우기</span><span class="pt2-legal-go">›</span></a>' +
+      '<span class="pt2-legal-t">저장현황 · 기록 지우기</span><span class="pt2-legal-go">›</span></a>' +
 
     /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
        스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
@@ -1400,7 +1400,10 @@ var PODOLANG_CALL = "https://podolang.kr/?call";
 /* 포도랑 화면을 창 하나에 담아 보여준다. 안쪽 스크롤은 없다.
    포도랑이 '내 키가 이만큼' 이라고 알려주면 그만큼 창을 늘린다. */
 function podoFrame(q){
-  return '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="https://podolang.kr/?' + q + '" ' +
+  /* 내 번호를 함께 넘긴다. 포도랑이 이걸로 포도톡 크레딧을 확인하고 깎는다.
+     이용권을 따로 사지 않아도 되게 하려고 붙였다. */
+  return '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="https://podolang.kr/?' + q +
+    "&uid=" + encodeURIComponent(myUid()) + '" ' +
     'allow="microphone; autoplay; clipboard-write" scrolling="no"></iframe></div>';
 }
 window.addEventListener("message", function (ev) {
@@ -1950,7 +1953,7 @@ function renderPodo(kind){
   var M = {
     log: ["통화기록", "log",  "건 번호와 주고받은 말이 남습니다. 이 폰 안에만 저장됩니다."],
     set: ["전화통역 설정", "set", "말투와 용어집을 정합니다. 전화 통역에만 쓰입니다."],
-    my:  ["이용권 · 저장현황", "my", "이용권 코드, 남은 시간, 통화기록 지우기가 여기 있습니다."]
+    my:  ["저장현황", "my", "저장된 양과 기록 지우기가 여기 있습니다. 크레딧은 설정 → 크레딧에서 봅니다."]
   };
   var m = M[kind] || M.log;
   var head = ""; try { head = tkHeader(m[0], "📞 전화통역"); } catch (e) {}
