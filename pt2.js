@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "95";
+var PT2_VER = "96";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -403,15 +403,19 @@ function injectSettings() {
     /* ── 전화통역 ──
        포도랑 아래쪽 차림표(통화기록 · 설정 · 마이)에 흩어져 있던 것들을
        전화통역과 관련된 것만 골라 이 한 칸에 모았다. */
+    /* 약관·정책 줄과 같은 모양으로 맞춘다. 이모지 없이 왼쪽부터, 검은 글씨. */
     '<div class="tk-sec" style="margin-top:14px">크레딧</div>' +
-    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="credits">잔액 보기 · 코드 넣기</button>' +
-    '<div class="pt2-sub" style="margin-top:8px">채팅 · 일반채팅 · 1:1 동시통역은 무료입니다. 다중 통역 · 마주보기 · 전화통역 · AI에 크레딧이 쓰입니다.</div>' +
+    '<a class="pt2-legal" href="#/talk/credits" data-pt2="credits">' +
+      '<span class="pt2-legal-t">크레딧 구입 · 잔액 보기</span><span class="pt2-legal-go">›</span></a>' +
+    '<div class="pt2-sub" style="margin-top:8px">채팅 · 일반채팅 · 1:1 동시통역은 무료입니다. 다중 통역 · 마주보기 · 전화통역에 크레딧이 쓰입니다.</div>' +
 
-    '<div class="tk-sec" style="margin-top:14px">📞 전화통역</div>' +
-    '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="log">🗂 통화기록</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="set">⚙️ 전화통역 설정 · 말투 · 용어집</button>' +
-    '<button class="cta" style="margin-top:8px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="calllog" data-k="my">🎟 이용권 · 저장현황 · 기록 지우기</button>' +
-    '<div class="pt2-sub" style="margin-top:8px">전화 통역은 포도랑이 맡습니다. 위 세 가지가 전화 통역에 관한 전부입니다.</div>' +
+    '<div class="tk-sec" style="margin-top:14px">전화통역</div>' +
+    '<a class="pt2-legal" href="#/talk/calllog/log" data-pt2="calllog" data-k="log">' +
+      '<span class="pt2-legal-t">통화기록</span><span class="pt2-legal-go">›</span></a>' +
+    '<a class="pt2-legal" href="#/talk/calllog/set" data-pt2="calllog" data-k="set">' +
+      '<span class="pt2-legal-t">전화통역 설정 · 말투 · 용어집</span><span class="pt2-legal-go">›</span></a>' +
+    '<a class="pt2-legal" href="#/talk/calllog/my" data-pt2="calllog" data-k="my">' +
+      '<span class="pt2-legal-t">이용권 · 저장현황 · 기록 지우기</span><span class="pt2-legal-go">›</span></a>' +
 
     /* '서버 방 사용' 스위치와 'API 주소' 칸은 뺐다.
        스위치는 끄면 앱이 아무것도 못 하는 상태가 되어 켜둘 수밖에 없고,
@@ -419,12 +423,12 @@ function injectSettings() {
     /* ── 서버 연결 확인 ──
        '연결하지 못했어요' 만으로는 폰 문제인지 서버 문제인지 알 수가 없다.
        실제 이유를 폰 화면에서 바로 보여준다. */
-    '<div class="tk-sec" style="margin-top:14px">🩺 서버 연결 확인</div>' +
+    '<div class="tk-sec" style="margin-top:14px">서버 연결 확인</div>' +
     '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="diag">지금 확인해 보기</button>' +
     '<div id="pt2Diag" class="pt2-sub" style="margin-top:8px;white-space:pre-wrap"></div>' +
 
     /* ── 내 계정 ── */
-    '<div class="tk-sec" style="margin-top:14px">🔐 내 계정</div>' +
+    '<div class="tk-sec" style="margin-top:14px">내 계정</div>' +
     (acct()
       ? '<div class="pt2-acct"><div class="pt2-acct-t">✅ 구글 계정에 연결됨</div>' +
           '<div class="pt2-acct-s">' + esc(acct().email || acct().name || "") + '</div></div>' +
@@ -437,7 +441,7 @@ function injectSettings() {
         '<div class="pt2-sub" style="margin-top:8px">비밀번호도 인증번호도 없어요. 크롬에 로그인된 구글 계정을 한 번 고르면 끝입니다.</div>') +
 
     /* ── 화면 언어 ── */
-    '<div class="tk-sec" style="margin-top:14px">🌐 화면 언어</div>' +
+    '<div class="tk-sec" style="margin-top:14px">화면 언어</div>' +
     '<div class="pt2-sub">국가를 고르면 앱 화면이 그 나라 말로 바뀌어요. <b>자동</b>이면 폰 시간대(현재 위치)로 알아서 골라요 — 해외에 가면 그 나라 말로 자동 번역됩니다.</div>' +
     '<div class="pt2-lang" data-pt2-noui="1">' +
       UI_LANGS.map(function (x) {
@@ -446,11 +450,10 @@ function injectSettings() {
       }).join("") +
     "</div>" +
     (uiWhere() ? '<div class="pt2-sub" style="margin-top:8px">📍 지금 위치 · <b>' + esc(uiWhere()) + "</b></div>" : "") +
-    '<div class="pt2-sub" style="margin-top:6px">한국어 외 언어는 화면 전체가 자동 번역돼요. <b>API 키 없이도</b> 무료 번역으로 동작합니다. 결과는 이 기기에 저장돼 다음부턴 즉시 표시됩니다.</div>' +
 
     /* 내 번호를 올려두면 남이 연락처에서 나를 찾아 바로 초대할 수 있다.
        번호 자체는 서버에 가지 않는다. 폰에서 해시로 바꿔 보낸다. */
-    '<div class="tk-sec" style="margin-top:14px">📇 연락처로 찾기</div>' +
+    '<div class="tk-sec" style="margin-top:14px">연락처로 찾기</div>' +
     '<div class="pt2-sub">내 번호를 등록해 두면, <b>내 번호를 폰에 저장해 둔 사람</b>이 연락처에서 나를 골라 바로 대화방에 부를 수 있어요.<br>번호는 알아볼 수 없는 글자로 바꿔서 보관하고, <b>다른 사람에게 내 번호가 보이지 않습니다.</b></div>' +
     '<div class="tk-field" style="margin-top:8px"><label>내 전화번호</label>' +
       '<input id="pt2Phone" type="tel" inputmode="tel" placeholder="010-0000-0000" value="' + esc(LS("pt2_ph_show") || "") + '"></div>' +
@@ -461,7 +464,7 @@ function injectSettings() {
     /* ── 약관 및 정책 ──
        포도랑과 같은 자리에 두되, 문구는 포도톡에 맞춰 다시 썼다.
        포도랑은 기록이 기기에만 남지만 포도톡은 서버에 남기 때문이다. */
-    '<div class="tk-sec" style="margin-top:16px">📄 약관 및 정책</div>' +
+    '<div class="tk-sec" style="margin-top:16px">약관 및 정책</div>' +
     '<a class="pt2-legal" href="/terms.html" target="_blank" rel="noopener">' +
       '<span class="pt2-legal-t">이용약관</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="/privacy.html" target="_blank" rel="noopener">' +
@@ -473,7 +476,7 @@ function injectSettings() {
       '<span class="pt2-legal-t">차단한 사람</span><span class="pt2-legal-go">›</span></a>' +
     '<a class="pt2-legal" href="#/talk/quit" data-pt2="quit">' +
       '<span class="pt2-legal-t">계정 탈퇴 · 내 자료 모두 지우기</span><span class="pt2-legal-go">›</span></a>' +
-    '<div class="pt2-sub" style="margin-top:8px">대화는 서버에 저장돼요. 광고에 쓰거나 팔지 않습니다. 전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다.</div>' +
+    '<div class="pt2-sub" style="margin-top:8px">전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다.</div>' +
 
     '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
@@ -1535,7 +1538,7 @@ function renderSafety(){
     '<div class="pt2-sub" style="margin-top:12px;line-height:1.9">' +
       "잘못 걸렸거나 급한 일은 <b>hasin5jk@gmail.com</b> 으로 알려주세요. 확인해서 풀어드립니다." +
     "</div>" +
-    '<button class="cta" style="margin-top:12px;background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none" data-pt2="blocked">차단한 사람 보기</button>';
+    '<a class="pt2-legal" style="margin-top:12px" href="#/talk/blocked" data-pt2="blocked"><span class="pt2-legal-t">차단한 사람 보기</span><span class="pt2-legal-go">›</span></a>';
   markTab("settings");
 }
 
@@ -4068,7 +4071,12 @@ document.addEventListener("click", function (e) {
     if (!confirm("한 번 더 확인합니다.\n\n지금 지우면 되돌릴 수 없습니다. 계속할까요?")) return;
     quitAll(); return;
   }
-  if (a === "calllog") { location.hash = "#/talk/calllog/" + (el.getAttribute("data-k") || "log"); return; }
+  if (a === "calllog") {
+    /* 주소를 바꿔서 들어간다. 그러면 폰의 뒤로가기가 바로 앞 화면(설정)으로
+       돌아온다. 예전에는 화면만 갈아끼워서 뒤로가기가 엉뚱한 데로 갔다. */
+    location.hash = "#/talk/calllog/" + (el.getAttribute("data-k") || "log");
+    return;
+  }
   if (a === "callout") { try { window.open(PODOLANG, "_blank"); } catch (e) { location.href = PODOLANG; } return; }
   if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
