@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "92";
+var PT2_VER = "93";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -151,6 +151,10 @@ function myUid()   { try { return mMe(); } catch (e) { return "u_anon"; } }
 function myNick()  { try { return talkNick() || "포도"; } catch (e) { return "포도"; } }
 function isSv(id)  { return typeof id === "string" && id.indexOf(PFX) === 0; }
 function bare(id)  { return String(id).slice(PFX.length); }
+/* bare 는 앞머리(sv_)가 있다고 믿고 무조건 세 글자를 자른다. 목록에서 온
+   방 id 는 앞머리가 없어서 앞 세 글자가 잘려나갔고, 그래서 내가 만든 방인데도
+   열쇠를 못 찾아 "방을 만든 분만" 이라고 나왔다. 붙어 있을 때만 자른다. */
+function rid(id)   { return isSv(id) ? bare(id) : String(id || ""); }
 function say(m)    { try { toast(m); } catch (e) {} }
 function esc(s)    { try { return escapeHtml(s); } catch (e) { return String(s == null ? "" : s); } }
 
@@ -1446,7 +1450,9 @@ function renderBlocked(){
     '<div class="pt2-sub" style="margin:-4px 0 10px">차단한 사람의 글은 보이지 않습니다. 상대는 차단된 사실을 알 수 없습니다.</div>' +
     '<div class="tk-card" style="padding:6px 10px">' + rows + "</div>";
   markTab("settings");
-  blkLoad(function () {
+  /* 한 번만 받아온다. 예전에는 받아온 뒤 다시 그리고, 그리면서 또 받아와
+     요청이 끝없이 되풀이됐다. */
+  if (!BLK.loaded) blkLoad(function () {
     if ((location.hash || "").indexOf("#/talk/blocked") === 0) renderBlocked();
   });
 }
@@ -1511,61 +1517,81 @@ function cdLoad(cb){
     api("/talk/credits/packs").then(function (d) {
       if (d && d.packs) {
         CDS.packs = d.packs;
-        if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits();
+        var pk = document.getElementById("cdPacks");
+        if (pk) pk.innerHTML = cdPacksHtml();
       }
     }, function () {});
   }
 }
 
-/* 사기 — 결제는 아직 붙지 않았다. 무엇을 고르셨는지 알려드리고
-   메일로 코드를 받는 길을 열어둔다. 결제가 붙으면 이 자리만 바꾸면 된다. */
+/* 사기 — 카드 결제가 붙기 전까지 쓰는 길이다.
+   누르면 주문번호가 나온다. 그 번호로 입금하면 사장님이 승인하고,
+   크레딧이 앱에 바로 들어온다. 코드를 옮겨 적을 일이 없다. */
 function cdBuy(pid){
   var k = null;
   (CDS.packs || []).forEach(function (x) { if (x.id === pid) k = x; });
   if (!k) return;
+  say("주문서를 만드는 중…");
+  api("/talk/order", { body: { uid: myUid(), pack: k.id, nick: myNick() } })
+    .then(function (d) {
+      if (!d || !d.ok) { say((d && d.error) || "주문하지 못했어요"); return; }
+      LSS("pt2_order_no", d.no);
+      cdOrderSheet(d);
+    }, function () { say("주문하지 못했어요"); });
+}
+function cdOrderSheet(d){
   var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
   var bg = document.createElement("div");
   bg.className = "sheet-bg";
   bg.setAttribute("data-action", "close-sheet");
   bg.innerHTML = '<div class="sheet" data-action="stop">' +
-    "<h3>🍇 " + Number(k.credits).toLocaleString() + "크레딧</h3>" +
-    '<div class="sd"><b>' + Number(k.krw).toLocaleString() + "원</b>" +
-    (k.bonus ? " · " + esc(k.bonus) : "") + "<br>" +
-    "카드 결제는 준비 중이에요. 아래로 알려주시면 코드를 보내드립니다.</div>" +
-    '<a class="cta" style="display:block;text-align:center;text-decoration:none;margin-top:12px" ' +
-      'href="mailto:hasin5jk@gmail.com?subject=' +
-      encodeURIComponent("포도톡 크레딧 " + k.credits + " 구매") +
-      '&body=' + encodeURIComponent(
-        "크레딧: " + k.credits + "\n금액: " + k.krw + "원\n내 번호: " + myUid() +
-        "\n\n(이 번호가 있어야 크레딧을 넣어드릴 수 있어요. 지우지 마세요)"
-      ) + '">메일로 신청하기</a>' +
+    "<h3>🍇 " + Number(d.credits).toLocaleString() + "크레딧</h3>" +
+    '<div class="sd">아래 <b>주문번호</b>를 입금자명 뒤에 붙여 보내주세요. ' +
+    "확인되면 크레딧이 <b>앱에 바로 들어옵니다.</b> 코드를 옮겨 적지 않아도 됩니다.</div>" +
+    '<div class="tk-card" style="padding:16px;text-align:center;margin-top:12px">' +
+      '<div class="pt2-sub">주문번호</div>' +
+      '<div style="font-size:30px;font-weight:900;color:var(--tk-grape);letter-spacing:2px">' +
+        esc(d.no) + "</div>" +
+      '<div class="pt2-sub" style="margin-top:8px">보낼 금액 <b>' +
+        Number(d.krw).toLocaleString() + "원</b></div>" +
+    "</div>" +
+    (d.bank ? '<div class="tk-card" style="padding:14px;margin-top:10px"><div class="pt2-sub" style="line-height:1.9">' +
+        esc(d.bank) + "</div></div>" : "") +
+    '<button class="cta" style="margin-top:12px" data-pt2="cd-check">입금했어요 · 확인하기</button>' +
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>' +
     "</div>";
   document.body.appendChild(bg);
 }
+/* 승인됐는지 확인 */
+function cdCheck(){
+  var no = LS("pt2_order_no");
+  if (!no) { say("주문 내역이 없어요"); return; }
+  say("확인 중…");
+  api("/talk/order?no=" + encodeURIComponent(no)).then(function (d) {
+    var o = d && d.order;
+    if (o && o.state === "done") {
+      var sb = document.querySelector(".sheet-bg"); if (sb) sb.remove();
+      say(Number(o.credits).toLocaleString() + "크레딧이 들어왔어요");
+      CDS.balance = null; cdLoad(function () { renderCredits(); });
+    } else {
+      say("아직 확인 전이에요. 입금 후 조금만 기다려 주세요");
+    }
+  }, function () { say("확인하지 못했어요"); });
+}
+
 function renderCredits(){
   var head = ""; try { head = tkHeader("크레딧", "🍇 포도"); } catch (e) {}
   var b = CDS.balance;
   document.querySelector("#view").innerHTML = head +
     '<div class="tk-card" style="padding:18px 16px;text-align:center">' +
       '<div class="pt2-sub" style="margin-bottom:6px">남은 크레딧</div>' +
-      '<div style="font-size:34px;font-weight:900;color:var(--tk-grape);line-height:1.2">' +
+      '<div id="cdBal" style="font-size:34px;font-weight:900;color:var(--tk-grape);line-height:1.2">' +
         (b === null ? "…" : Number(b).toLocaleString()) + "</div>" +
     "</div>" +
 
     /* 크레딧 사기 */
     '<div class="tk-sec" style="margin-top:16px">크레딧 사기</div>' +
-    (CDS.packs && CDS.packs.length
-      ? '<div class="tk-card" style="padding:6px 10px">' +
-          CDS.packs.map(function (k) {
-            return '<div class="pt2-blkrow"><span>' +
-              "<b>" + Number(k.credits).toLocaleString() + "크레딧</b>" +
-              "<small>" + esc(k.label || "") + (k.bonus ? " · " + esc(k.bonus) : "") + "</small></span>" +
-              '<button class="pt2-blkx" data-pt2="cd-buy" data-p="' + esc(k.id) + '">' +
-              Number(k.krw).toLocaleString() + "원</button></div>";
-          }).join("") +
-        "</div>"
-      : '<div class="tk-card" style="padding:14px 15px"><div class="pt2-sub">불러오는 중…</div></div>') +
+    '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
     '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>' +
 
     '<div class="tk-sec" style="margin-top:16px">코드로 채우기</div>' +
@@ -1611,9 +1637,27 @@ function renderCredits(){
       "내 AI 키를 넣으면 AI 는 크레딧 없이 쓸 수 있어요. 설정 → AI 연결." +
     "</div>";
   markTab("settings");
+
+  /* 예전에는 잔액을 받아온 뒤 화면을 통째로 다시 그렸다. 그 바람에
+     코드를 입력하는 중에 칸이 지워져 글자가 안 들어갔다.
+     이제는 숫자와 목록만 제자리에서 바꾼다. */
   cdLoad(function () {
-    if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits();
+    if ((location.hash || "").indexOf("#/talk/credits") !== 0) return;
+    var b = document.getElementById("cdBal");
+    if (b && CDS.balance !== null) b.textContent = Number(CDS.balance).toLocaleString();
+    var pk = document.getElementById("cdPacks");
+    if (pk && CDS.packs && CDS.packs.length) pk.innerHTML = cdPacksHtml();
   });
+}
+function cdPacksHtml(){
+  if (!CDS.packs || !CDS.packs.length) return '<div class="pt2-sub">불러오는 중…</div>';
+  return CDS.packs.map(function (k) {
+    return '<div class="pt2-blkrow"><span>' +
+      "<b>" + Number(k.credits).toLocaleString() + "크레딧</b>" +
+      "<small>" + esc(k.label || "") + (k.bonus ? " · " + esc(k.bonus) : "") + "</small></span>" +
+      '<button class="pt2-blkx" data-pt2="cd-buy" data-p="' + esc(k.id) + '">' +
+      Number(k.krw).toLocaleString() + "원</button></div>";
+  }).join("");
 }
 function cdRedeem(){
   var el = document.getElementById("cdCode");
@@ -1639,7 +1683,7 @@ function cdRedeem(){
    남의 잔액은 어디서도 보이지 않는다. */
 var WAL = { id: "", name: "", left: null };
 function walletSheet(id, name){
-  id = bare(id || (P.id ? P.id : ""));
+  id = rid(id || (P.id ? P.id : ""));
   if (!id) { say("방을 골라주세요"); return; }
   if (!tokenOf(id)) { say("방을 만든 분만 쓸 수 있어요"); return; }
   WAL.id = id; WAL.name = name || "";
@@ -3902,6 +3946,7 @@ document.addEventListener("click", function (e) {
   if (a === "credits")   { location.hash = "#/talk/credits"; return; }
   if (a === "cd-redeem") { cdRedeem(); return; }
   if (a === "cd-buy")    { cdBuy(el.getAttribute("data-p")); return; }
+  if (a === "cd-check")  { cdCheck(); return; }
   if (a === "wallet")  { walletSheet(el.getAttribute("data-id"), el.getAttribute("data-rn")); return; }
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
