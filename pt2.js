@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "97";
+var PT2_VER = "98";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -3531,15 +3531,62 @@ function trxAI(text, fromC, toC, done){
   }catch(e){ done(""); }
 }
 
-/* ── 폰이 읽어주기 ── */
+/* ── 폰이 읽어주기 ──
+   안드로이드 크롬에서 소리가 안 나던 것을 고쳤습니다. 걸림돌이 셋이었습니다.
+
+   ① 받아쓰기와 겹침 — 마이크가 켜져 있는 동안에는 폰이 소리를 내지 못합니다.
+      그래서 읽기 전에 마이크를 먼저 끕니다.
+   ② cancel() 바로 뒤 speak() — 크롬이 조용히 삼켜버립니다.
+      한 박자 쉬었다가 부릅니다.
+   ③ 목소리 목록이 늦게 옵니다 — 폰이 목소리를 다 불러오기 전에 부르면
+      아무 일도 안 일어납니다. 목록이 올 때까지 기다렸다가 부릅니다.
+
+   그리고 그 언어 목소리가 없으면 기본 목소리로라도 읽습니다.
+   예전에는 조용히 아무 소리도 안 났습니다. */
+function trxPickVoice(want){
+  try{
+    var vs = window.speechSynthesis.getVoices() || [];
+    if(!vs.length) return null;
+    var w = String(want||"").toLowerCase();
+    var base = w.split("-")[0];
+    for(var i=0;i<vs.length;i++) if(String(vs[i].lang||"").toLowerCase()===w) return vs[i];
+    for(var j=0;j<vs.length;j++) if(String(vs[j].lang||"").toLowerCase().indexOf(base)===0) return vs[j];
+    return null;
+  }catch(e){ return null; }
+}
 function trxSay(text, langC){
   if(!text || !window.speechSynthesis) return;
+  var want = trxBcp(langC);
+
+  var go = function(){
+    try{
+      var u = new SpeechSynthesisUtterance(String(text));
+      u.lang = want; u.rate = 1.0; u.volume = 1.0;
+      var v = trxPickVoice(want);
+      if(v) u.voice = v;                 /* 없으면 기본 목소리로 읽습니다 */
+      try{ window.speechSynthesis.resume(); }catch(e){}   /* 멈춰 있으면 깨웁니다 */
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  };
+
   try{
-    window.speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(text);
-    u.lang=trxBcp(langC); u.rate=1.0;
-    window.speechSynthesis.speak(u);
+    pt2MicStop();                        /* 마이크가 켜져 있으면 소리가 안 납니다 */
+    try{ trxMicStop(); }catch(e){}
   }catch(e){}
+
+  try{ window.speechSynthesis.cancel(); }catch(e){}
+
+  /* 목소리 목록이 아직 안 왔으면 기다립니다 */
+  var vs = [];
+  try{ vs = window.speechSynthesis.getVoices() || []; }catch(e){}
+  if(!vs.length){
+    var done = false;
+    var fire = function(){ if(done) return; done = true; setTimeout(go, 120); };
+    try{ window.speechSynthesis.addEventListener("voiceschanged", fire, { once:true }); }catch(e){}
+    setTimeout(fire, 700);               /* 안 오면 그냥 부릅니다 */
+    return;
+  }
+  setTimeout(go, 120);                   /* cancel 직후는 삼켜집니다 */
 }
 
 /* ── 마이크 ① 폰 받아쓰기 ── */
