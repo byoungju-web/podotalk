@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "103";
+var PT2_VER = "105";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -3715,15 +3715,21 @@ function srvGo(buf){
   return true;
 }
 
+/* 서버가 무엇을 보냈는지 적어둔다. 재생이 안 될 때 원인을 가리는 데 쓴다. */
+var srvCT = "";
+
 /* 소리길을 못 쓰는 기기를 위한 예비길 — 예전 방식 그대로 <audio> 로 틉니다 */
-function srvPlayBlob(ab){
+function srvPlayBlob(ab, n){
+  var tail = " (" + (srvCT || "형식없음") + " · " + (n || 0) + "바이트)";
   try{
     var url = URL.createObjectURL(new Blob([ab], { type: "audio/mpeg" }));
     var a = new Audio(url);
     a.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
     var p = a.play();
-    if(p && p["catch"]) p["catch"](function(){ say("소리를 재생하지 못했어요"); });
-  }catch(e){ say("소리를 재생하지 못했어요"); }
+    if(p && p["catch"]) p["catch"](function(err){
+      say("소리를 재생하지 못했어요" + tail + " " + ((err && err.name) || ""));
+    });
+  }catch(e){ say("소리를 재생하지 못했어요" + tail); }
 }
 
 var srvSayBusy = false;
@@ -3731,7 +3737,9 @@ function srvSay(text, langC, quiet){
   text = String(text || "").trim();
   if(!text || srvSayBusy) return;
   srvSayBusy = true;
-  if(!quiet) say("서버에서 소리를 만드는 중…");
+  /* 안내문구는 띄우지 않습니다. 1~2초면 소리가 나는데 그 사이에 검은 딱지가
+     떴다 사라지면 오히려 뭔가 잘못된 것처럼 보입니다. quiet 는 부르는 쪽에서
+     쓰던 것이라 자리는 그대로 둡니다. */
 
   fetch(TRX_API + "/api/speak", {
     method: "POST",
@@ -3742,6 +3750,7 @@ function srvSay(text, langC, quiet){
       uid: myUid()
     })
   }).then(function(r){
+    srvCT = String((r.headers && r.headers.get("content-type")) || "");
     if(!r.ok){
       return r.json().then(function(j){ throw new Error((j && j.error) || "소리를 만들지 못했어요"); },
                            function(){ throw new Error("소리를 만들지 못했어요"); });
@@ -3749,13 +3758,26 @@ function srvSay(text, langC, quiet){
     return r.arrayBuffer();
   }).then(function(ab){
     srvSayBusy = false;
+    var n = (ab && ab.byteLength) || 0;
+
+    /* ── 온 것이 소리가 맞는지 먼저 본다 ──
+       재생이 안 될 때 "소리를 재생하지 못했어요" 만 뜨면 폰 탓인지 서버 탓인지
+       알 수가 없다. 소리가 아니면 서버가 무슨 말을 보냈는지 그대로 보여준다.
+       mp3 는 아무리 짧아도 수 KB 는 된다. */
+    if(n < 1200 || srvCT.indexOf("audio") < 0){
+      var t = "";
+      try{ t = new TextDecoder("utf-8").decode(ab).slice(0, 140); }catch(e){}
+      say("소리가 아닙니다 [" + (srvCT || "형식없음") + " · " + n + "바이트] " + t);
+      return;
+    }
+
     var c = srvCtx();
-    if(!c){ srvPlayBlob(ab); return; }        /* 소리길을 못 쓰는 기기 */
+    if(!c){ srvPlayBlob(ab, n); return; }     /* 소리길을 못 쓰는 기기 */
     try{
       c.decodeAudioData(ab.slice(0),
         function(buf){ srvGo(buf); },
-        function(){ srvPlayBlob(ab); });      /* 못 풀면 예비길로 */
-    }catch(e){ srvPlayBlob(ab); }
+        function(){ srvPlayBlob(ab, n); });   /* 못 풀면 예비길로 */
+    }catch(e){ srvPlayBlob(ab, n); }
   })["catch"](function(e){
     srvSayBusy = false;
     say((e && e.message) || "소리를 만들지 못했어요");
