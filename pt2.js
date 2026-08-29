@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "99";
+var PT2_VER = "100";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1099,7 +1099,14 @@ function poll(first) {
 /* ── 서버 방 받아쓰기 : 내 언어로 말하면 그대로 글이 되어 전송된다 ── */
 var pt2Rec = null;
 function pt2MicStop(){
-  if (pt2Rec) { try { pt2Rec.stop(); } catch (e) {} }
+  /* stop() 만 부르면 안드로이드가 엔진을 몇 백 밀리초 더 물고 있습니다.
+     그동안에는 읽어주기가 synthesis-failed 로 실패합니다.
+     abort() 로 확실히 끊고, 붙어 있던 손잡이도 떼어냅니다. */
+  if (pt2Rec) {
+    try { pt2Rec.onresult = pt2Rec.onend = pt2Rec.onerror = null; } catch (e) {}
+    try { pt2Rec.abort(); } catch (e) {}
+    try { pt2Rec.stop(); } catch (e) {}
+  }
   pt2Rec = null;
   var b = document.getElementById("pt2Mic");
   if (b) b.classList.remove("rec");
@@ -3563,39 +3570,57 @@ function trxSay(text, langC){
     return;
   }
   var want = trxBcp(langC);
+  var S = window.speechSynthesis;
 
-  /* 마이크가 켜져 있으면 폰이 소리를 못 냅니다 */
+  /* 마이크가 돌고 있었으면 안드로이드가 엔진을 놓을 때까지 잠깐 기다립니다.
+     바로 읽으면 synthesis-failed 가 납니다. 이게 소리가 안 나던 이유입니다. */
+  var wasBusy = false;
+  try{ wasBusy = micBusy(); }catch(e){}
   try{ pt2MicStop(); }catch(e){}
   try{ trxMicStop(); }catch(e){}
+  try{ if(typeof trxSrvStop === "function" && typeof trxMR !== "undefined" && trxMR) trxSrvStop(); }catch(e){}
 
-  var S = window.speechSynthesis;
-  try{ if(S.speaking || S.pending) S.cancel(); }catch(e){}
-  try{ if(S.paused) S.resume(); }catch(e){}
+  var tries = 0;
+  var run = function(){
+    tries++;
+    try{ if(S.speaking || S.pending) S.cancel(); }catch(e){}
+    try{ if(S.paused) S.resume(); }catch(e){}
 
-  var u = new SpeechSynthesisUtterance(text);
-  u.lang = want; u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
-  var v = trxPickVoice(want);
-  if(v) u.voice = v;              /* 없으면 폰 기본 목소리로 읽습니다 */
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = want; u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+    var v = trxPickVoice(want);
+    if(v) u.voice = v;                 /* 없으면 폰 기본 목소리로 읽습니다 */
 
-  var started = false;
-  u.onstart = function(){ started = true; };
-  u.onerror = function(ev){
-    var why = (ev && ev.error) || "";
-    if(why === "interrupted" || why === "canceled") return;
-    say("소리를 내지 못했어요 (" + (why || "알 수 없음") + ")");
+    var started = false;
+    u.onstart = function(){ started = true; };
+    u.onerror = function(ev){
+      var why = (ev && ev.error) || "";
+      if(why === "interrupted" || why === "canceled") return;
+      /* 엔진이 아직 안 풀렸을 수 있습니다. 조금 더 기다렸다가 한 번 더. */
+      if(tries < 3){ setTimeout(run, 450 * tries); return; }
+      say("소리를 내지 못했어요 (" + (why || "알 수 없음") + ")");
+    };
+
+    try{ S.speak(u); }
+    catch(e){
+      if(tries < 3){ setTimeout(run, 450 * tries); return; }
+      say("읽어주기를 시작하지 못했어요");
+      return;
+    }
+
+    setTimeout(function(){
+      if(started || S.speaking || S.pending) return;
+      if(tries < 3){ run(); return; }
+      var n = trxVoices().length;
+      if(!n) say("폰에 읽어줄 목소리가 없어요. 설정 → 텍스트 음성 변환에서 받아주세요");
+      else   say("소리가 나오지 않아요. 미디어 볼륨과 무음 모드를 봐주세요");
+    }, 1200);
   };
 
-  /* 여기서 바로 부릅니다. 미루면 크롬이 막습니다. */
-  try{ S.speak(u); }catch(e){ say("읽어주기를 시작하지 못했어요"); return; }
-
-  /* 아무 일도 안 일어나면 알려줍니다. 조용히 넘어가면 원인을 알 수 없습니다. */
-  setTimeout(function(){
-    if(started) return;
-    if(S.speaking || S.pending) return;
-    var n = trxVoices().length;
-    if(!n) say("폰에 읽어줄 목소리가 없어요. 설정 → 텍스트 음성 변환에서 받아주세요");
-    else   say("소리가 나오지 않아요. 미디어 볼륨과 무음 모드를 봐주세요");
-  }, 1200);
+  /* 마이크를 쓰던 중이었으면 한 박자 쉬고, 아니면 바로 읽습니다.
+     바로 읽어야 크롬이 "사용자가 누른 것" 으로 봐줍니다. */
+  if(wasBusy) setTimeout(run, 350);
+  else run();
 }
 
 /* 설정에서 눌러보는 소리 시험. 폰이 어떤 상태인지 바로 알려줍니다. */
@@ -3613,11 +3638,18 @@ function trxSayTest(){
 var trxRec=null;
 function trxMicSupported(){ return !!(window.SpeechRecognition||window.webkitSpeechRecognition); }
 function trxMicStop(){
-  if(trxRec){ try{ trxRec.stop(); }catch(e){} }
+  /* stop() 만으로는 안드로이드가 엔진을 놓지 않습니다. abort() 로 끊습니다. */
+  if(trxRec){
+    try{ trxRec.onresult = trxRec.onend = trxRec.onerror = null; }catch(e){}
+    try{ trxRec.abort(); }catch(e){}
+    try{ trxRec.stop(); }catch(e){}
+  }
   trxRec=null;
   var b=document.getElementById("trxMic"); if(b) b.classList.remove("rec");
   var h=document.getElementById("trxHint"); if(h) h.textContent="";
 }
+/* 마이크가 돌고 있는가 */
+function micBusy(){ return !!(pt2Rec || trxRec || (typeof trxMR !== "undefined" && trxMR)); }
 function trxMicStart(id){
   var r=trxFind(id); if(!r) return;
   if(trxMR){ trxSrvStop(); return; }
