@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "105";
+var PT2_VER = "106";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -3474,7 +3474,12 @@ function trxPut(room){
 function trxMsgs(id){ return LSJ("pt2_trx_m_"+id, []); }
 function trxSaveMsgs(id, v){ LSS("pt2_trx_m_"+id, JSON.stringify((v||[]).slice(-300))); }
 function trxFlipOn(){ return LS("pt2_trx_flip") === "1"; }
-function trxEngine(){ return LS("pt2_trx_engine") === "free" ? "free" : "podo"; }
+/* 번역은 한 길만 씁니다. 예전에는 화면에서 "정밀번역 / 무료 번역" 을 고르게
+   했는데, '정밀' 은 기준이 사람마다 다르고 '무료' 도 듣기에 크레딧이 나가므로
+   이름이 실제와 맞지 않았습니다. 고르는 칸을 없애고 포도랑 쪽으로 모았습니다.
+   나중에 반대로 바꾸려면 아래 "podo" 를 "free" 로 고치면 됩니다.
+   예전에 폰에 저장해 둔 값(pt2_trx_engine)은 이제 보지 않습니다. */
+function trxEngine(){ return "podo"; }
 
 /* ── 번역 엔진 ── */
 function trxTr(text, fromC, toC, ok){
@@ -3990,10 +3995,6 @@ function trxRoom(id){
         '<div class="trx-lsel b"><label>'+esc(r.bName)+"</label>"+
           '<select id="trxB" data-action="trx-lang" data-id="'+esc(id)+'" data-w="b">'+trxOpts(r.bLang)+"</select></div>"+
       "</div>"+
-      '<div class="trx-engbar">'+
-        '<button class="trx-eng'+(trxEngine()==="podo"?" on":"")+'" data-action="trx-eng" data-v="podo" data-id="'+esc(id)+'">🍇 포도랑 정밀번역</button>'+
-        '<button class="trx-eng'+(trxEngine()==="free"?" on":"")+'" data-action="trx-eng" data-v="free" data-id="'+esc(id)+'">⚡ 무료 번역</button>'+
-      "</div>"+
       (flip ? '<div class="trx-flipnote">🔄 마주보기 · '+esc(r.bName)+'님이 읽을 글은 뒤집혀 있어요. 폰을 두 사람 사이에 놓으세요</div>' : "")+
       '<div class="trx-msgs" id="trxMsgs">'+rows+"</div>"+
     "</div>"+
@@ -4079,13 +4080,6 @@ document.addEventListener("click", function(e){
   if(a==="trx-open"){ location.hash="#/talk/trans/"+id; return; }
   if(a==="trx-send"){ trxSend(id); return; }
   if(a==="trx-mic"){ trxMicStart(id); return; }
-  if(a==="trx-eng"){
-    var v=el.getAttribute("data-v");
-    LSS("pt2_trx_engine", v==="free"?"free":"podo");
-    trxRoom(id);
-    say(v==="podo" ? "🍇 포도랑 정밀번역으로 바꿨어요" : "⚡ 무료 번역으로 바꿨어요");
-    return;
-  }
   if(a==="trx-set"){ location.hash="#/talk/transset/"+id; return; }
   if(a==="trx-flip"){
     var on2=!trxFlipOn();
