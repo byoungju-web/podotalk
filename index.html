@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-29 v79";</script>
+<script>window.PODOTALK_BUILD = "2026-08-29 v80";</script>
 <!-- ── 첫 화면 깜빡임 막기 ───────────────────────────────────────
      pt2.js 는 이 문서 맨 아래에서 불려온다. 그래서 브라우저가 index.html
      화면을 먼저 그려서 보여준 뒤에 pt2.js 가 도착해 다시 그린다. 옛 화면이
@@ -6759,14 +6759,14 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=100"></script>
+<script src="/pt2.js?v=101"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고
      캐시를 비운 뒤 한 번만 다시 받아온다. 실패해도 한 번만 하고 멈춘다. -->
 <script>
 (function () {
-  var WANT = "100";                    // pt2.js 의 PT2_VER 과 같게 둔다
+  var WANT = "101";                    // pt2.js 의 PT2_VER 과 같게 둔다
   var MARK = "pt2_fix_" + WANT;
   function fix(why) {
     try { if (sessionStorage.getItem(MARK)) return; sessionStorage.setItem(MARK, "1"); } catch (e) { return; }
