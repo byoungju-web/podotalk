@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "98";
+var PT2_VER = "99";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -408,6 +408,9 @@ function injectSettings() {
     '<a class="pt2-legal" href="#/talk/credits" data-pt2="credits">' +
       '<span class="pt2-legal-t">크레딧 구입 · 잔액 보기</span><span class="pt2-legal-go">›</span></a>' +
     '<div class="pt2-sub" style="margin-top:8px">채팅 · 일반채팅 · 1:1 동시통역은 무료입니다. 다중 통역 · 마주보기 · 전화통역에 크레딧이 쓰입니다.</div>' +
+
+    '<a class="pt2-legal" href="#" data-pt2="saytest">' +
+      '<span class="pt2-legal-t">소리 시험 · 읽어주기가 되는지</span><span class="pt2-legal-go">›</span></a>' +
 
     '<div class="tk-sec" style="margin-top:14px">전화통역</div>' +
     '<a class="pt2-legal" href="#/talk/calllog/log" data-pt2="calllog" data-k="log">' +
@@ -3532,61 +3535,78 @@ function trxAI(text, fromC, toC, done){
 }
 
 /* ── 폰이 읽어주기 ──
-   안드로이드 크롬에서 소리가 안 나던 것을 고쳤습니다. 걸림돌이 셋이었습니다.
+   안드로이드 크롬은 까다롭습니다.
+   ① 버튼을 누른 그 순간에 바로 speak() 를 불러야 합니다.
+      setTimeout 으로 한 박자 미루면 "사용자가 누른 것" 이 아니게 되어 막힙니다.
+   ② 받아쓰기(마이크)가 켜져 있으면 소리가 나오지 않습니다.
+   ③ cancel() 직후에는 삼켜지는 일이 있어, 상태를 보고 필요할 때만 부릅니다.
+   ④ 목소리 목록이 늦게 오면 그 언어 목소리를 못 찾습니다. 그때는 기본 목소리로 읽습니다.
 
-   ① 받아쓰기와 겹침 — 마이크가 켜져 있는 동안에는 폰이 소리를 내지 못합니다.
-      그래서 읽기 전에 마이크를 먼저 끕니다.
-   ② cancel() 바로 뒤 speak() — 크롬이 조용히 삼켜버립니다.
-      한 박자 쉬었다가 부릅니다.
-   ③ 목소리 목록이 늦게 옵니다 — 폰이 목소리를 다 불러오기 전에 부르면
-      아무 일도 안 일어납니다. 목록이 올 때까지 기다렸다가 부릅니다.
-
-   그리고 그 언어 목소리가 없으면 기본 목소리로라도 읽습니다.
-   예전에는 조용히 아무 소리도 안 났습니다. */
+   그리고 소리가 정말 안 나면 조용히 있지 않고 화면에 알려줍니다.
+   예전에는 실패해도 아무 말이 없어서 무엇이 문제인지 알 수가 없었습니다. */
+function trxVoices(){
+  try{ return window.speechSynthesis.getVoices() || []; }catch(e){ return []; }
+}
 function trxPickVoice(want){
-  try{
-    var vs = window.speechSynthesis.getVoices() || [];
-    if(!vs.length) return null;
-    var w = String(want||"").toLowerCase();
-    var base = w.split("-")[0];
-    for(var i=0;i<vs.length;i++) if(String(vs[i].lang||"").toLowerCase()===w) return vs[i];
-    for(var j=0;j<vs.length;j++) if(String(vs[j].lang||"").toLowerCase().indexOf(base)===0) return vs[j];
-    return null;
-  }catch(e){ return null; }
+  var vs = trxVoices();
+  if(!vs.length) return null;
+  var w = String(want||"").toLowerCase(), base = w.split("-")[0];
+  for(var i=0;i<vs.length;i++) if(String(vs[i].lang||"").toLowerCase()===w) return vs[i];
+  for(var j=0;j<vs.length;j++) if(String(vs[j].lang||"").toLowerCase().replace("_","-").indexOf(base)===0) return vs[j];
+  return null;
 }
 function trxSay(text, langC){
-  if(!text || !window.speechSynthesis) return;
-  var want = trxBcp(langC);
-
-  var go = function(){
-    try{
-      var u = new SpeechSynthesisUtterance(String(text));
-      u.lang = want; u.rate = 1.0; u.volume = 1.0;
-      var v = trxPickVoice(want);
-      if(v) u.voice = v;                 /* 없으면 기본 목소리로 읽습니다 */
-      try{ window.speechSynthesis.resume(); }catch(e){}   /* 멈춰 있으면 깨웁니다 */
-      window.speechSynthesis.speak(u);
-    }catch(e){}
-  };
-
-  try{
-    pt2MicStop();                        /* 마이크가 켜져 있으면 소리가 안 납니다 */
-    try{ trxMicStop(); }catch(e){}
-  }catch(e){}
-
-  try{ window.speechSynthesis.cancel(); }catch(e){}
-
-  /* 목소리 목록이 아직 안 왔으면 기다립니다 */
-  var vs = [];
-  try{ vs = window.speechSynthesis.getVoices() || []; }catch(e){}
-  if(!vs.length){
-    var done = false;
-    var fire = function(){ if(done) return; done = true; setTimeout(go, 120); };
-    try{ window.speechSynthesis.addEventListener("voiceschanged", fire, { once:true }); }catch(e){}
-    setTimeout(fire, 700);               /* 안 오면 그냥 부릅니다 */
+  text = String(text || "").trim();
+  if(!text) return;
+  if(!window.speechSynthesis || !window.SpeechSynthesisUtterance){
+    say("이 브라우저는 읽어주기를 지원하지 않아요");
     return;
   }
-  setTimeout(go, 120);                   /* cancel 직후는 삼켜집니다 */
+  var want = trxBcp(langC);
+
+  /* 마이크가 켜져 있으면 폰이 소리를 못 냅니다 */
+  try{ pt2MicStop(); }catch(e){}
+  try{ trxMicStop(); }catch(e){}
+
+  var S = window.speechSynthesis;
+  try{ if(S.speaking || S.pending) S.cancel(); }catch(e){}
+  try{ if(S.paused) S.resume(); }catch(e){}
+
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = want; u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+  var v = trxPickVoice(want);
+  if(v) u.voice = v;              /* 없으면 폰 기본 목소리로 읽습니다 */
+
+  var started = false;
+  u.onstart = function(){ started = true; };
+  u.onerror = function(ev){
+    var why = (ev && ev.error) || "";
+    if(why === "interrupted" || why === "canceled") return;
+    say("소리를 내지 못했어요 (" + (why || "알 수 없음") + ")");
+  };
+
+  /* 여기서 바로 부릅니다. 미루면 크롬이 막습니다. */
+  try{ S.speak(u); }catch(e){ say("읽어주기를 시작하지 못했어요"); return; }
+
+  /* 아무 일도 안 일어나면 알려줍니다. 조용히 넘어가면 원인을 알 수 없습니다. */
+  setTimeout(function(){
+    if(started) return;
+    if(S.speaking || S.pending) return;
+    var n = trxVoices().length;
+    if(!n) say("폰에 읽어줄 목소리가 없어요. 설정 → 텍스트 음성 변환에서 받아주세요");
+    else   say("소리가 나오지 않아요. 미디어 볼륨과 무음 모드를 봐주세요");
+  }, 1200);
+}
+
+/* 설정에서 눌러보는 소리 시험. 폰이 어떤 상태인지 바로 알려줍니다. */
+function trxSayTest(){
+  var n = trxVoices().length;
+  if(!n){
+    say("폰에 목소리가 하나도 없어요. 안드로이드 설정 → 일반 → 텍스트 음성 변환에서 받아주세요");
+    return;
+  }
+  say("목소리 " + n + "개 · 소리를 냅니다");
+  trxSay("소리 시험입니다. 잘 들리시나요?", "KO");
 }
 
 /* ── 마이크 ① 폰 받아쓰기 ── */
@@ -4104,6 +4124,7 @@ document.addEventListener("click", function (e) {
     blkAdd(el.getAttribute("data-u"), el.getAttribute("data-n")); return;
   }
   if (a === "blk-del") { blkDel(el.getAttribute("data-u")); return; }
+  if (a === "saytest")   { try { trxSayTest(); } catch (e) { say("읽어주기를 부르지 못했어요"); } return; }
   if (a === "credits")   { location.hash = "#/talk/credits"; return; }
   if (a === "cd-redeem") { cdRedeem(); return; }
   if (a === "cd-buy")    { cdBuy(el.getAttribute("data-p")); return; }
@@ -4639,6 +4660,16 @@ if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
 
 /* 차단 목록과 내 제한 상태를 미리 받아둔다 */
 try { blkLoad(); } catch (e) {}
+/* 안드로이드는 getVoices() 를 한 번 불러야 목록이 채워집니다.
+   미리 깨워두면 처음 듣기를 눌렀을 때 조용한 일이 줄어듭니다. */
+try {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", function () {
+      try { window.speechSynthesis.getVoices(); } catch (e) {}
+    });
+  }
+} catch (e) {}
 try { setTimeout(banCheck, 1200); } catch (e) {}
 
 })();
