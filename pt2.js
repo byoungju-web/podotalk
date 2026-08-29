@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "107";
+var PT2_VER = "108";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -870,11 +870,12 @@ function msgHtml(m) {
      100명 방이어도 서버는 언어 수만큼만 번역하므로, 받는 폰은 아무것도
      요청하지 않는다. 아직 안 왔으면 예전처럼 폰이 스스로 번역한다. */
   var tr = mine ? null
-    : (m.tr && trOn(P.id) ? { text: m.tr } : trFor(m.body));
+    : (m.tr && trOn(P.id) ? { text: m.tr } : trFor(m.body, m.created));
   var main = (tr && tr.text) ? tr.text : m.body;
   var sub = "";
   if (tr && tr.text) sub = '<div class="pt2-orig">' + esc(m.body) + "</div>";
   else if (tr && tr.pending) sub = '<div class="pt2-orig">🌐 번역 중…</div>';
+  else if (tr && tr.nocredit) sub = '<div class="pt2-orig">🔒 번역되지 않았어요 · 말한 분의 크레딧이 부족합니다</div>';
 
   if (m.kind === "bot") {
     var icon = "🤖";
@@ -988,8 +989,24 @@ function trStep(){
 }
 
 /* 이 메시지를 내 언어로 바꾼 결과. 아직 없으면 줄 세우고 '번역 중'을 돌려준다 */
-function trFor(text){
+function trFor(text, when){
   if (!P.id || !trOn(P.id) || !text) return null;
+
+  /* ── 다중 동시통역방(👪) ──
+     이 방은 말한 사람이 크레딧을 내고, 서버가 방 안의 언어들로 미리 번역해
+     메시지에 붙여 보냅니다(m.tr). 그것이 없다는 건 말한 사람에게 크레딧이
+     없었다는 뜻입니다. 그때 받는 폰이 스스로 번역해 버리면 아무도 내지 않고
+     쓰는 셈이 되고, 그 값(Workers AI)은 우리가 냅니다. 그래서 이 방에서는
+     폰이 대신 번역하지 않습니다.
+     단, 보낸 직후에는 서버가 아직 번역 중일 수 있으므로 15초는 기다립니다.
+     1:1 통역방과 일반 채팅은 원래 무료라 그대로 둡니다. */
+  try {
+    if (P.room && P.room.emoji === "👪") {
+      if (when && (Date.now() - when) < 15000) return { pending: true };
+      return { nocredit: true };
+    }
+  } catch (e) {}
+
   var tgt = myLang();
   var sc = scriptOf(text);
   if (sc !== "la" && sc === scriptOfLang(tgt)) return null;   /* 이미 내 문자 */
@@ -3492,20 +3509,33 @@ function trxTr(text, fromC, toC, ok){
     });
   };
   if(trxEngine()==="free"){ free(); return; }
-  trxPodolang(text, fromC, toC, function(o,e){ ok(o,e); }, free);
+  /* 크레딧이 없을 때(402)는 무료 번역기로 넘어가지 않습니다. 넘어가면 아무도
+     내지 않고 쓰는 길이 열립니다. 서버가 잠깐 안 될 때(그물망·시간초과)는
+     예전처럼 예비길로 갑니다. 그건 손님 잘못이 아니기 때문입니다. */
+  trxPodolang(text, fromC, toC, function(o,e){ ok(o,e); }, free, function(){
+    say("크레딧이 필요해요. 설정 → 크레딧에서 채워주세요");
+    ok("", "🔒 크레딧 필요");
+  });
 }
-function trxPodolang(text, fromC, toC, ok, fail){
+function trxPodolang(text, fromC, toC, ok, fail, noCredit){
   try{
     var to=setTimeout(function(){ to=null; fail(); }, 12000);
     fetch(TRX_API+"/api/translate", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ text:text, sourceLang:fromC, targetLang:toC, uid:myUid() }) })
-      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(r){
+        /* 402 는 '크레딧 없음' 입니다. 다른 실패와 구별해야 합니다. */
+        if(r.status===402){ var ec=new Error("nocredit"); ec.nocredit=1; throw ec; }
+        if(!r.ok) throw 0; return r.json(); })
       .then(function(d){
         if(to===null) return; clearTimeout(to);
         var out = d && d.translated ? String(d.translated).trim() : "";
         if(!out){ fail(); return; }
         ok(out, "포도랑·"+(d.engine||"GPT"));
-      })["catch"](function(){ if(to===null) return; clearTimeout(to); fail(); });
+      })["catch"](function(ec){
+        if(to===null) return; clearTimeout(to);
+        if(ec && ec.nocredit && noCredit){ noCredit(); return; }
+        fail();
+      });
   }catch(e){ fail(); }
 }
 function trxGoogle(text, f, t, ok, fail){
@@ -3889,6 +3919,9 @@ function trxSrvSend(id, blob, side, from, to){
   fd.append("audio", blob, "voice.webm");
   fd.append("sourceLang", from);
   fd.append("targetLang", to);
+  /* 이게 없으면 크레딧이 아무리 많아도 서버가 '사용자 정보가 없습니다' 로 막습니다.
+     폰이 받아쓰기를 지원하지 않는 기기(아이폰 사파리 등)만 이 길로 옵니다. */
+  fd.append("uid", myUid());
   fetch(TRX_API+"/api/podolang", { method:"POST", body:fd })
     .then(function(r){ return r.json(); })
     .then(function(d){
