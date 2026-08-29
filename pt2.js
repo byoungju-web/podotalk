@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "100";
+var PT2_VER = "101";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1720,6 +1720,8 @@ function renderCredits(){
         "· <b>다중 동시통역</b> — 한 마디에 방 안의 언어 수만큼<br>" +
         '<span class="pt2-price-sub">세 나라 말이 있으면 한 마디에 3크레딧</span>' +
         "· <b>마주보기 통역</b> — 1분에 3크레딧<br>" +
+        "· <b>서버 읽어주기</b> — 1회에 1크레딧<br>" +
+        '<span class="pt2-price-sub">폰이 직접 읽어주면 공짜입니다. 폰이 못 읽을 때만 서버가 대신합니다</span>' +
         "· <b>전화통역</b> — 1분에 60크레딧<br>" +
         "· AI 답 — 1회에 1크레딧" +
       "</div>" +
@@ -3566,7 +3568,7 @@ function trxSay(text, langC){
   text = String(text || "").trim();
   if(!text) return;
   if(!window.speechSynthesis || !window.SpeechSynthesisUtterance){
-    say("이 브라우저는 읽어주기를 지원하지 않아요");
+    srvSay(text, langC);           /* 폰이 못 읽으면 서버가 만들어 줍니다 */
     return;
   }
   var want = trxBcp(langC);
@@ -3597,23 +3599,22 @@ function trxSay(text, langC){
       var why = (ev && ev.error) || "";
       if(why === "interrupted" || why === "canceled") return;
       /* 엔진이 아직 안 풀렸을 수 있습니다. 조금 더 기다렸다가 한 번 더. */
-      if(tries < 3){ setTimeout(run, 450 * tries); return; }
-      say("소리를 내지 못했어요 (" + (why || "알 수 없음") + ")");
+      if(tries < 2){ setTimeout(run, 450 * tries); return; }
+      srvSay(text, langC);          /* 그래도 안 되면 서버가 만들어 줍니다 */
     };
 
     try{ S.speak(u); }
     catch(e){
-      if(tries < 3){ setTimeout(run, 450 * tries); return; }
-      say("읽어주기를 시작하지 못했어요");
+      if(tries < 2){ setTimeout(run, 450 * tries); return; }
+      srvSay(text, langC);
       return;
     }
 
     setTimeout(function(){
       if(started || S.speaking || S.pending) return;
-      if(tries < 3){ run(); return; }
-      var n = trxVoices().length;
-      if(!n) say("폰에 읽어줄 목소리가 없어요. 설정 → 텍스트 음성 변환에서 받아주세요");
-      else   say("소리가 나오지 않아요. 미디어 볼륨과 무음 모드를 봐주세요");
+      if(tries < 2){ run(); return; }
+      /* 폰이 못 읽습니다. 서버에 소리를 청합니다. (크레딧 1) */
+      srvSay(text, langC);
     }, 1200);
   };
 
@@ -3623,13 +3624,50 @@ function trxSay(text, langC){
   else run();
 }
 
+/* ── 서버가 소리를 만들어 보내주기 ──
+   폰이 읽어주지 못하는 기기가 있습니다. 목소리가 92개나 있어도
+   크롬이 소리를 못 내는 경우가 실제로 있었습니다.
+   그럴 때만 서버(포도랑 ElevenLabs)에 소리를 청해 mp3 로 받아 재생합니다.
+   보통 소리 파일이라 폰 상태와 무관하게 확실히 납니다.
+
+   돈이 드는 길이라 크레딧 1개를 받습니다.
+   폰으로 되는 분은 여전히 공짜입니다. */
+var srvSayBusy = false;
+function srvSay(text, langC, quiet){
+  text = String(text || "").trim();
+  if(!text || srvSayBusy) return;
+  srvSayBusy = true;
+  if(!quiet) say("서버에서 소리를 만드는 중…");
+
+  fetch(TRX_API + "/api/speak", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: text.slice(0, 500),
+      lang: trxG(langC),
+      uid: myUid()
+    })
+  }).then(function(r){
+    if(!r.ok){
+      return r.json().then(function(j){ throw new Error((j && j.error) || "소리를 만들지 못했어요"); },
+                           function(){ throw new Error("소리를 만들지 못했어요"); });
+    }
+    return r.blob();
+  }).then(function(b){
+    srvSayBusy = false;
+    var url = URL.createObjectURL(b);
+    var a = new Audio(url);
+    a.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
+    a.play()["catch"](function(){ say("소리를 재생하지 못했어요"); });
+  })["catch"](function(e){
+    srvSayBusy = false;
+    say((e && e.message) || "소리를 만들지 못했어요");
+  });
+}
+
 /* 설정에서 눌러보는 소리 시험. 폰이 어떤 상태인지 바로 알려줍니다. */
 function trxSayTest(){
   var n = trxVoices().length;
-  if(!n){
-    say("폰에 목소리가 하나도 없어요. 안드로이드 설정 → 일반 → 텍스트 음성 변환에서 받아주세요");
-    return;
-  }
   say("목소리 " + n + "개 · 소리를 냅니다");
   trxSay("소리 시험입니다. 잘 들리시나요?", "KO");
 }
