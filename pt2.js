@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "101";
+var PT2_VER = "102";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -3567,6 +3567,8 @@ function trxPickVoice(want){
 function trxSay(text, langC){
   text = String(text || "").trim();
   if(!text) return;
+  /* 누른 그 순간에 소리통을 열어둡니다. 뒤로 미루면 크롬이 막습니다. */
+  try{ srvAudioUnlock(); }catch(e){}
   if(!window.speechSynthesis || !window.SpeechSynthesisUtterance){
     srvSay(text, langC);           /* 폰이 못 읽으면 서버가 만들어 줍니다 */
     return;
@@ -3632,6 +3634,46 @@ function trxSay(text, langC){
 
    돈이 드는 길이라 크레딧 1개를 받습니다.
    폰으로 되는 분은 여전히 공짜입니다. */
+/* ── 소리 잠금 풀기 ──
+   안드로이드 크롬은 사람이 누른 그 순간에만 소리를 허용합니다.
+   서버에서 mp3 를 받아오는 데 몇 초가 걸리므로, 그때서야 새로 만든 소리는
+   "사람이 누른 게 아니다" 라고 보고 막힙니다. 이게 "소리를 재생하지
+   못했어요" 가 뜨던 이유입니다.
+
+   그래서 소리통을 하나만 만들어 두고, 앱을 열고 처음 화면을 누를 때
+   미리 열어둡니다. 한 번 열어두면 페이지가 살아 있는 동안 계속 쓸 수
+   있어서, 나중에 mp3 가 도착해도 그 자리에 넣기만 하면 바로 납니다. */
+var srvAudioEl = null, srvAudioOpen = false;
+var SRV_SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=";
+function srvAudio(){
+  if(!srvAudioEl){
+    srvAudioEl = new Audio();
+    srvAudioEl.preload = "auto";
+    try{ srvAudioEl.playsInline = true; srvAudioEl.setAttribute("playsinline",""); }catch(e){}
+  }
+  return srvAudioEl;
+}
+function srvAudioUnlock(){
+  if(srvAudioOpen) return;
+  var a = srvAudio();
+  try{
+    a.src = SRV_SILENT;
+    var p = a.play();
+    if(p && p.then){
+      p.then(function(){ srvAudioOpen = true; try{ a.pause(); a.currentTime = 0; }catch(e){} },
+             function(){});
+    } else {
+      srvAudioOpen = true;
+      try{ a.pause(); }catch(e){}
+    }
+  }catch(e){}
+}
+/* 앱에서 무엇을 누르든 그때 한 번 열어둡니다. 이미 열려 있으면 바로 돌아옵니다. */
+try{
+  document.addEventListener("touchend", srvAudioUnlock, true);
+  document.addEventListener("click", srvAudioUnlock, true);
+}catch(e){}
+
 var srvSayBusy = false;
 function srvSay(text, langC, quiet){
   text = String(text || "").trim();
@@ -3656,9 +3698,23 @@ function srvSay(text, langC, quiet){
   }).then(function(b){
     srvSayBusy = false;
     var url = URL.createObjectURL(b);
-    var a = new Audio(url);
+    var a = srvAudio();                      /* 미리 열어둔 소리통에 넣습니다 */
     a.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
-    a.play()["catch"](function(){ say("소리를 재생하지 못했어요"); });
+    a.src = url;
+    try{ a.currentTime = 0; }catch(e){}
+    var p = a.play();
+    if(p && p["catch"]) p["catch"](function(){
+      /* 그래도 막히면 다음에 누르는 순간 틀어드립니다. 크레딧은 이미 냈으니
+         다시 받아오지 않고 받아둔 소리를 그대로 씁니다. */
+      say("화면을 한 번 누르면 소리가 나요");
+      var go = function(){
+        document.removeEventListener("touchend", go, true);
+        document.removeEventListener("click", go, true);
+        try{ a.play(); }catch(e){}
+      };
+      document.addEventListener("touchend", go, true);
+      document.addEventListener("click", go, true);
+    });
   })["catch"](function(e){
     srvSayBusy = false;
     say((e && e.message) || "소리를 만들지 못했어요");
