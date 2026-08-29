@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "106";
+var PT2_VER = "107";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1404,8 +1404,9 @@ function segBarHtml(cur){
    포도랑(podolang.kr)의 전화 통역 화면을 그대로 불러온다.
    포도랑 쪽은 주소에 ?call 이 붙으면 전화 통역 칸부터 열게 해 뒀다.
    여기서는 화면을 띄우기만 한다. 통역·통화는 전부 포도랑이 맡는다. */
-var PODOLANG      = "https://podolang.kr/";
-var PODOLANG_CALL = "https://podolang.kr/?call";
+/* 예전에는 '포도랑에서 바로 열기' 버튼이 있어서 여기에 주소를 두었다.
+   손님이 보는 앱을 포도톡 하나로 모으면서 그 버튼을 뺐고, 주소도 함께 뺐다.
+   아래 podoFrame 이 창 안에 불러오는 주소는 그대로다. 전화통역은 그대로 돈다. */
 
 /* 포도랑 화면을 창 하나에 담아 보여준다. 안쪽 스크롤은 없다.
    포도랑이 '내 키가 이만큼' 이라고 알려주면 그만큼 창을 늘린다. */
@@ -1432,8 +1433,6 @@ function renderCall(){
     '<b>이어폰을 쓰세요.</b> 스피커로 들으면 통역 음성을 마이크가 다시 주워서 말이 꼬입니다.</div>' +
     podoFrame("call") +
     '<div class="tk-tools" style="margin-top:10px">' +
-      '<button class="tk-tool" data-pt2="callout">↗ 포도랑에서 바로 열기</button>' +
-    "</div>" +
     '<div class="pt2-sub" style="text-align:center;margin:10px 0 14px">전화 통역은 포도랑 이용권이 필요합니다 · PT2 v' + PT2_VER + "</div>";
   markTab("lang");
 }
@@ -3499,7 +3498,7 @@ function trxPodolang(text, fromC, toC, ok, fail){
   try{
     var to=setTimeout(function(){ to=null; fail(); }, 12000);
     fetch(TRX_API+"/api/translate", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ text:text, sourceLang:fromC, targetLang:toC }) })
+      body: JSON.stringify({ text:text, sourceLang:fromC, targetLang:toC, uid:myUid() }) })
       .then(function(r){ if(!r.ok) throw 0; return r.json(); })
       .then(function(d){
         if(to===null) return; clearTimeout(to);
@@ -4331,7 +4330,6 @@ document.addEventListener("click", function (e) {
     location.hash = "#/talk/calllog/" + (el.getAttribute("data-k") || "log");
     return;
   }
-  if (a === "callout") { try { window.open(PODOLANG, "_blank"); } catch (e) { location.href = PODOLANG; } return; }
   if (a === "live-new") { newScreen(el.getAttribute("data-m") === "multi" ? "livemulti" : "live1"); return; }
   if (a === "rowmenu") { rowMenu(el.getAttribute("data-id")); return; }
   if (a === "row-noti") {
