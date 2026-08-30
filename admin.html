@@ -35,6 +35,25 @@ button:disabled{opacity:.45}
 .row{display:flex;gap:8px}
 .row input{flex:1}
 .note{font-size:12.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+
+/* ── 목록 (주문 · 신고) ──────────────────────────────────
+   한 줄에 내용과 버튼을 나란히 둔다. 폰에서 엄지로 누르기 좋게
+   버튼을 충분히 크게 잡았다. */
+.list{margin-top:12px;display:none}
+.list.on{display:block}
+.item{border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-bottom:9px;background:var(--paper)}
+.item .t{font-size:14.5px;font-weight:800;letter-spacing:-.02em}
+.item .s{font-size:12.5px;color:var(--muted);margin-top:3px;word-break:break-all}
+.item .q{font-size:12.5px;margin-top:6px;padding:8px 10px;background:#fff;border:1px solid var(--line);
+  border-radius:10px;color:#42177A;white-space:pre-wrap;word-break:break-all}
+.item button{margin-top:10px;padding:11px;font-size:14px}
+.item button.warn{background:#FFEDE6;color:var(--warn)}
+.item button.done{background:#E6F5EC;color:#1F6B45}
+.empty{font-size:13px;color:var(--muted);padding:14px 2px}
+.codes{margin-top:10px;font-size:13.5px;font-weight:700;letter-spacing:.02em;line-height:1.9;
+  word-break:break-all;color:#42177A}
+.bar{height:9px;border-radius:5px;background:var(--lilac);overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;background:var(--grape)}
 </style>
 </head>
 <body>
@@ -51,9 +70,55 @@ button:disabled{opacity:.45}
   <div class="out" id="oHealth"></div>
 </section>
 
+<!-- ══ 입금 확인 · 크레딧 지급 ══
+     지금까지 D1 콘솔에서 손으로 하던 일이다. 표 두 개와 기록을 직접 맞춰야 해서
+     실수하면 크레딧을 두 번 주거나 아예 안 주게 된다. 여기 승인 버튼은 서버가
+     "기다리는 주문일 때만" 잠그고 지급하므로 두 번 눌러도 한 번만 들어간다. -->
+<section>
+  <h2>입금 기다리는 주문</h2>
+  <p>손님이 신청하고 입금을 기다리는 목록입니다. 통장에서 입금자명(주문번호)을 확인한 뒤 승인하세요.</p>
+  <button class="sub" id="orders">주문 불러오기</button>
+  <div class="out" id="oOrders"></div>
+  <div class="list" id="lOrders"></div>
+</section>
+
+<!-- ══ 신고 · 이용 제한 ══
+     지금까지 신고가 쌓여도 볼 방법이 없었다. 자동 규칙이 잘못 걸어버린 손님을
+     풀어줄 길도 없었다. 억울한 정지를 되돌리는 것이 이 칸의 목적이다. -->
+<section>
+  <h2>신고 · 이용 제한</h2>
+  <p>신고가 쌓인 사람과 지금 글쓰기가 막힌 사람입니다. 잘못 걸린 손님은 여기서 풀어주세요.</p>
+  <button class="sub" id="reports">신고 불러오기</button>
+  <div class="out" id="oReports"></div>
+  <div class="list" id="lReports"></div>
+</section>
+
+<!-- ══ 크레딧 코드 ══ -->
+<section>
+  <h2>크레딧 코드 만들기</h2>
+  <p>손님이 앱에서 입력하면 크레딧이 들어갑니다. 한 코드는 한 번만 쓸 수 있습니다.</p>
+  <div class="row">
+    <label style="flex:1.2"><span>코드당 크레딧</span><input id="cAmt" type="number" value="1000" min="1"/></label>
+    <label style="flex:1"><span>몇 장</span><input id="cCnt" type="number" value="1" min="1" max="200"/></label>
+    <label style="flex:1"><span>유효일 (0=무기한)</span><input id="cDays" type="number" value="0" min="0"/></label>
+  </div>
+  <button id="make">코드 만들기</button>
+  <div class="out" id="oMake"></div>
+  <div class="codes" id="cList"></div>
+</section>
+
+<!-- ══ 이번 달 AI 사용량 ══ -->
+<section>
+  <h2>이번 달 AI 사용량</h2>
+  <p>우리 키로 부른 횟수입니다. 상한에 닿으면 앱이 스스로 AI를 잠시 끕니다.</p>
+  <button class="sub" id="meter">사용량 보기</button>
+  <div class="out" id="oMeter"></div>
+  <div class="list" id="lMeter"></div>
+</section>
+
 <section>
   <h2>기본 봇 심기</h2>
-  <p>@summary @translate @idea @quiz @shopping 다섯 개를 등록합니다. 여러 번 눌러도 중복되지 않습니다.</p>
+  <p>@summary @reply @notice @fix @translate @idea 여섯 개를 등록합니다. 여러 번 눌러도 중복되지 않습니다.</p>
   <button id="seed">기본 봇 심기</button>
   <div class="out" id="oSeed"></div>
 </section>
@@ -81,7 +146,7 @@ button:disabled{opacity:.45}
 <div class="note">
   이 페이지는 검색에 노출되지 않지만, 주소를 아는 사람은 열 수 있습니다.
   관리자 키가 없으면 아무 작업도 되지 않으니 키만 잘 지키면 됩니다.
-  더 안전하게 하려면 봇 설정을 끝낸 뒤 저장소에서 이 파일을 지우세요.
+  폰을 잃어버렸다면 Worker 설정에서 ADMIN_KEY 만 바꾸면 그 즉시 무효가 됩니다.
 </div>
 
 <script>
@@ -97,6 +162,19 @@ function show(el, text, kind) {
 }
 const api = () => $("api").value.trim().replace(/\/+$/, "");
 const key = () => $("key").value.trim();
+
+/* 화면에 그대로 넣을 값은 반드시 걸러낸다. 손님 닉네임처럼 남이 정한 글자가
+   섞여 들어오므로, 안 거르면 그 글자가 화면을 망가뜨릴 수 있다. */
+const esc = (v) => String(v == null ? "" : v)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+const won = (n) => Number(n || 0).toLocaleString("ko-KR");
+function when(ts) {
+  if (!ts) return "";
+  try { return new Date(Number(ts)).toLocaleString("ko-KR", { hour12: false }); }
+  catch (e) { return ""; }
+}
 
 async function call(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -122,6 +200,177 @@ $("save").onclick = async () => {
   }
 };
 
+/* ══ 입금 기다리는 주문 ══════════════════════════════════ */
+async function loadOrders() {
+  const el = $("oOrders"), box = $("lOrders");
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  show(el, "불러오는 중…");
+  box.className = "list";
+  try {
+    const d = await call("/talk/orders", { admin: true });
+    if (!d.ok) return show(el, d.error || "불러오지 못했습니다.", "err");
+    const list = d.orders || [];
+    if (!list.length) {
+      show(el, "기다리는 주문이 없습니다.", "ok");
+      box.innerHTML = ""; return;
+    }
+    show(el, `${list.length}건이 입금을 기다립니다.`, "ok");
+    box.className = "list on";
+    box.innerHTML = list.map((o) =>
+      '<div class="item" data-no="' + esc(o.no) + '">' +
+        '<div class="t">' + esc(o.no) + ' · ' + won(o.krw) + '원</div>' +
+        '<div class="s">크레딧 ' + won(o.credits) + ' · ' + esc(o.nick || "이름없음") + '</div>' +
+        '<div class="s">' + when(o.ts) + '</div>' +
+        '<button class="ok-btn">✅ 입금 확인 · 크레딧 주기</button>' +
+      '</div>'
+    ).join("");
+    box.querySelectorAll(".ok-btn").forEach((b) => {
+      b.onclick = () => approve(b.closest(".item"));
+    });
+  } catch (e) { show(el, "불러오지 못했습니다.", "err"); }
+}
+$("orders").onclick = loadOrders;
+
+async function approve(item) {
+  const no = item.getAttribute("data-no");
+  const b = item.querySelector("button");
+  if (!confirm(no + " 주문에 크레딧을 지급합니다.\n통장에서 입금을 확인하셨나요?")) return;
+  b.disabled = true; b.textContent = "지급하는 중…";
+  try {
+    const d = await call("/talk/order/ok", { admin: true, body: { no } });
+    if (d.ok) {
+      b.className = "done";
+      b.textContent = "✅ 크레딧 " + won(d.credits) + " 지급 완료";
+      item.style.opacity = ".6";
+    } else {
+      b.disabled = false; b.className = "warn";
+      b.textContent = d.error || "실패했습니다";
+    }
+  } catch (e) {
+    b.disabled = false; b.className = "warn"; b.textContent = "요청에 실패했습니다";
+  }
+}
+
+/* ══ 신고 · 이용 제한 ════════════════════════════════════ */
+async function loadReports() {
+  const el = $("oReports"), box = $("lReports");
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  show(el, "불러오는 중…");
+  box.className = "list";
+  try {
+    const d = await call("/talk/reports", { admin: true });
+    if (!d.ok) return show(el, d.error || "불러오지 못했습니다.", "err");
+
+    const now = Date.now();
+    const reports = d.reports || [];
+    /* 기한이 지난 제한은 이미 풀린 것이나 마찬가지라 빼고 보여준다 */
+    const bans = (d.bans || []).filter((x) => !x.until || Number(x.until) > now);
+    const banOf = {};
+    bans.forEach((x) => { banOf[x.uid] = x; });
+
+    if (!reports.length && !bans.length) {
+      show(el, "신고도 제한도 없습니다.", "ok");
+      box.innerHTML = ""; return;
+    }
+    show(el, `신고 ${reports.length}명 · 제한 중 ${bans.length}명`, bans.length ? "" : "ok");
+    box.className = "list on";
+
+    /* 제한 중인 사람을 위에 둔다. 급한 것은 억울한 정지를 푸는 일이다. */
+    const seen = {};
+    const rows = [];
+    bans.forEach((x) => {
+      seen[x.uid] = 1;
+      const r = reports.filter((y) => y.target_uid === x.uid)[0] || {};
+      rows.push(row(x.uid, r, x));
+    });
+    reports.forEach((r) => {
+      if (seen[r.target_uid]) return;
+      rows.push(row(r.target_uid, r, null));
+    });
+    box.innerHTML = rows.join("");
+
+    box.querySelectorAll(".unban-btn").forEach((b) => {
+      b.onclick = () => unban(b.closest(".item"));
+    });
+  } catch (e) { show(el, "불러오지 못했습니다.", "err"); }
+
+  function row(uid, r, ban) {
+    return '<div class="item" data-uid="' + esc(uid) + '">' +
+      '<div class="t">' + (ban ? "🔒 제한 중" : "신고 " + (r.n || 0) + "건") + '</div>' +
+      '<div class="s">' + esc(uid) + '</div>' +
+      (ban ? '<div class="s">' + esc(ban.reason || "") + ' · ' + when(ban.until) + '까지</div>' : "") +
+      (r.reason ? '<div class="s">최근 사유 · ' + esc(r.reason) + '</div>' : "") +
+      (r.body ? '<div class="q">' + esc(String(r.body).slice(0, 300)) + '</div>' : "") +
+      (ban ? '<button class="unban-btn">🔓 제한 풀기</button>' : "") +
+    '</div>';
+  }
+}
+$("reports").onclick = loadReports;
+
+async function unban(item) {
+  const uid = item.getAttribute("data-uid");
+  const b = item.querySelector("button");
+  if (!confirm(uid + "\n이 사람의 글쓰기 제한을 풉니다.")) return;
+  b.disabled = true; b.textContent = "푸는 중…";
+  try {
+    const d = await call("/talk/ban", { admin: true, body: { uid, remove: 1 } });
+    if (d.ok) { b.className = "done"; b.textContent = "✅ 풀렸습니다"; item.style.opacity = ".6"; }
+    else { b.disabled = false; b.className = "warn"; b.textContent = d.error || "실패했습니다"; }
+  } catch (e) {
+    b.disabled = false; b.className = "warn"; b.textContent = "요청에 실패했습니다";
+  }
+}
+
+/* ══ 크레딧 코드 만들기 ═══════════════════════════════════ */
+$("make").onclick = async (e) => {
+  const el = $("oMake"), box = $("cList");
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  const amount = parseInt($("cAmt").value, 10) || 0;
+  const count = parseInt($("cCnt").value, 10) || 0;
+  const days = parseInt($("cDays").value, 10) || 0;
+  if (amount < 1 || count < 1) return show(el, "크레딧과 장수를 1 이상으로 넣으세요.", "err");
+  if (count > 200) return show(el, "한 번에 200장까지 만들 수 있습니다.", "err");
+
+  e.target.disabled = true; show(el, "만드는 중…"); box.textContent = "";
+  try {
+    const d = await call("/talk/credits/make", { admin: true, body: { amount, count, days } });
+    if (d.ok) {
+      show(el, `${(d.codes || []).length}장을 만들었습니다. 코드당 ${won(d.amount)}크레딧.`, "ok");
+      box.textContent = (d.codes || []).join("\n");
+    } else show(el, d.error || "실패했습니다.", "err");
+  } catch (e2) { show(el, "요청에 실패했습니다.", "err"); }
+  e.target.disabled = false;
+};
+
+/* ══ 이번 달 AI 사용량 ════════════════════════════════════ */
+$("meter").onclick = async () => {
+  const el = $("oMeter"), box = $("lMeter");
+  if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
+  show(el, "불러오는 중…"); box.className = "list";
+  try {
+    const d = await call("/talk/aimeter", { admin: true });
+    if (!d.ok) return show(el, d.error || "불러오지 못했습니다.", "err");
+    const cap = Number(d.cap || 0);
+    const months = d.months || [];
+    if (!months.length) {
+      show(el, "아직 우리 키로 부른 기록이 없습니다.", "ok");
+      box.innerHTML = ""; return;
+    }
+    const now = months[0];
+    const pct = cap ? Math.min(100, Math.round((Number(now.n || 0) / cap) * 100)) : 0;
+    show(el, `이번 달 ${won(now.n)}회 · 상한 ${won(cap)}회 (${pct}%)`, pct >= 80 ? "err" : "ok");
+    box.className = "list on";
+    box.innerHTML = months.map((m) => {
+      const p = cap ? Math.min(100, Math.round((Number(m.n || 0) / cap) * 100)) : 0;
+      return '<div class="item">' +
+        '<div class="t">' + esc(m.mon) + ' · ' + won(m.n) + '회</div>' +
+        '<div class="bar"><i style="width:' + p + '%"></i></div>' +
+      '</div>';
+    }).join("");
+  } catch (e) { show(el, "불러오지 못했습니다.", "err"); }
+};
+
+/* ══ 봇 ═════════════════════════════════════════════════ */
 $("seed").onclick = async (e) => {
   const el = $("oSeed");
   if (!key()) return show(el, "관리자 키를 먼저 입력하세요.", "err");
