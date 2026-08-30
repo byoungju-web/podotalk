@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "109";
+var PT2_VER = "110";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -348,7 +348,8 @@ function rich(s) {
     '.pt2-seg4 button{font-size:10.5px;padding:8px 1px;line-height:1.3;white-space:normal}',
     '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
     '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
-    '.pt2-aiframe{width:100%;height:calc(100dvh - 190px);min-height:460px;border:0;display:block}',
+    /* 아래 탭바 바로 위까지 채운다. 190 은 너무 크게 잡아 화면 아래가 남았다. */
+    '.pt2-aiframe{width:100%;height:calc(100dvh - 138px);min-height:380px;border:0;display:block}',
     '.tk-in{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:15px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box}',
     '.tk-in:focus{border-color:var(--tk-grape)}',
     '.pt2-price{font-size:14.5px;line-height:2.1;color:var(--tk-ink);font-weight:700}',
@@ -2018,16 +2019,40 @@ function renderPodo(kind){
     podoFrame(m[1], 1);
   markTab("settings");
   toTop();
+  var fr = null;
   try {
-    var fr = document.querySelector(".pt2-callframe");
+    fr = document.querySelector(".pt2-callframe");
     var u = fr && fr.getAttribute("data-src");
     if (fr && u) {
       if (fr.contentWindow && fr.contentWindow.location.replace) fr.contentWindow.location.replace(u);
       else fr.src = u;
     }
   } catch (e) {
-    try { var f2 = document.querySelector(".pt2-callframe"); if (f2) f2.src = f2.getAttribute("data-src"); } catch (e2) {}
+    try { fr = document.querySelector(".pt2-callframe"); if (fr) fr.src = fr.getAttribute("data-src"); } catch (e2) {}
   }
+  podoBackGuard(fr);
+}
+
+/* ── 뒤로가기를 한 번에 ──
+   창 안(포도랑)에서 화면이 바뀔 때마다 뒤로가기 기록이 한 칸씩 쌓인다.
+   그래서 뒤로가기를 눌러도 설정으로 안 가고 창 안에서만 되돌아갔다.
+   창이 새로 뜰 때마다 우리 표식을 하나씩 맨 위에 올려둔다. 그러면 뒤로가기가
+   항상 우리 표식을 먼저 만나고, 그때 설정으로 곧장 보낸다. */
+var podoPop = null;
+function podoBackGuard(fr){
+  var mark = function(){ try { history.pushState({ pt2: "podo" }, ""); } catch (e) {} };
+  try { if (fr) fr.addEventListener("load", mark); } catch (e) {}
+  mark();
+
+  if (podoPop) { try { window.removeEventListener("popstate", podoPop); } catch (e) {} }
+  podoPop = function(){
+    try { window.removeEventListener("popstate", podoPop); } catch (e) {}
+    podoPop = null;
+    try { if (fr) fr.removeEventListener("load", mark); } catch (e) {}
+    var b = document.getElementById("tk-tab-settings");
+    if (b) b.click(); else { try { location.hash = "#/talk"; } catch (e) {} }
+  };
+  window.addEventListener("popstate", podoPop);
 }
 
 /* 서버에서 받은 목록과 이 기기 기록을 합친다 */
@@ -2205,10 +2230,10 @@ window.renderTalk = function (sub, arg) {
     });
     return;
   }
-  if (sub === "calllog") { renderPodo(arg || "log"); return; }
+  if (sub === "calllog") { renderPodo(arg || "log"); toTop(); return; }
   if (sub === "quit") { renderQuit(); return; }
   if (sub === "podoya") { renderPodoya(); return; }
-  if (sub === "credits") { renderCredits(); return; }
+  if (sub === "credits") { renderCredits(); toTop(); return; }
   if (sub === "safety")  { renderSafety(); return; }
   if (sub === "blocked") { renderBlocked(); return; }
   if (sub === "new") { renderNew(); return; }
