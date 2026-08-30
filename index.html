@@ -17,7 +17,7 @@
      index.html 을 고칠 때마다 v 숫자를 올린다.
      아래 </body> 의 <script src="/pt2.js?v=NN"> 숫자와 pt2.js 의 PT2_VER 은
      서로 맞춰 둔다. 어긋나면 설정 화면이 '캐시 불일치' 라고 알려준다. -->
-<script>window.PODOTALK_BUILD = "2026-08-30 v88";</script>
+<script>window.PODOTALK_BUILD = "2026-08-30 v89";</script>
 <!-- ── 첫 화면 깜빡임 막기 ───────────────────────────────────────
      pt2.js 는 이 문서 맨 아래에서 불려온다. 그래서 브라우저가 index.html
      화면을 먼저 그려서 보여준 뒤에 pt2.js 가 도착해 다시 그린다. 옛 화면이
@@ -5822,18 +5822,18 @@ function renderTalkSettings(){
   var ai = talkAIOn();
   var hasKey = talkHasAIKey();
   var av=talkAvatar();
-  var emojiRow=TK_EMOJIS.map(function(e){ return '<button class="tk-emo'+(e===av?" on":"")+'" data-action="talk-set-emoji" data-e="'+e+'">'+e+'</button>'; }).join("");
   $("#view").innerHTML = tkHeader("포도톡 설정","") +
     '<div class="tk-set">'+
       '<div class="tk-prof">'+
-        '<div class="tk-prof-av">'+avInner(av)+'</div>'+
+        /* 사진을 안 넣었으면 이모지 대신 단색 원 하나만 보여준다.
+           이모지를 고르게 하면 고르는 것도 일이고 방마다 다르게 보여 헷갈렸다. */
+        '<div class="tk-prof-av">'+(isPhoto(av)?avInner(av):'<span style="display:inline-block;width:100%;height:100%;border-radius:50%;background:#8b35e0"></span>')+'</div>'+
         '<div class="tk-prof-mid"><div class="tk-prof-nm">'+escapeHtml(talkNick())+'</div><div class="tk-prof-sub">내 프로필</div></div>'+
         '<button class="tk-prof-btn" data-action="talk-pick-photo">사진 변경</button>'+
       '</div>'+
       '<input id="tkAvatarFile" type="file" accept="image/*" style="display:none">'+
-      '<div class="tk-field"><label>프로필 이모지</label><div class="tk-emos">'+emojiRow+'</div></div>'+
       '<div class="tk-field"><label>내 대화명(닉네임)</label><input id="tkNick" value="'+escapeHtml(talkNick())+'" placeholder="포도" autocomplete="off"></div>'+
-      '<button class="cta grape" data-action="talk-save-nick">닉네임 저장</button>'+
+      '<button class="cta" style="background:#fff;color:#111;border:1.5px solid var(--tk-line);box-shadow:none" data-action="talk-save-nick">닉네임 저장</button>'+
       '<div class="tk-toggle">알림 받기<span class="tk-sw'+(noti?" on":"")+'" data-action="talk-toggle-noti"></span></div>'+
       '<button class="cta" style="background:#fff;color:var(--tk-grape);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-action="nav" data-to="#/talk/alarm">🔔 알림 보기</button>'+
       /* AI 키는 이 한 곳에서만 받는다. 발급 방법과 바로 가는 링크를
@@ -6759,14 +6759,14 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=109"></script>
+<script src="/pt2.js?v=110"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고
      캐시를 비운 뒤 한 번만 다시 받아온다. 실패해도 한 번만 하고 멈춘다. -->
 <script>
 (function () {
-  var WANT = "109";                    // pt2.js 의 PT2_VER 과 같게 둔다
+  var WANT = "110";                    // pt2.js 의 PT2_VER 과 같게 둔다
   var MARK = "pt2_fix_" + WANT;
   function fix(why) {
     try { if (sessionStorage.getItem(MARK)) return; sessionStorage.setItem(MARK, "1"); } catch (e) { return; }
