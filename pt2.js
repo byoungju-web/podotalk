@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "108";
+var PT2_VER = "109";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -481,11 +481,17 @@ function injectSettings() {
       '<span class="pt2-legal-t">계정 탈퇴 · 내 자료 모두 지우기</span><span class="pt2-legal-go">›</span></a>' +
     '<div class="pt2-sub" style="margin-top:8px">전화 통역은 통화를 녹음하지 않고, 기록은 이 폰 안에만 남습니다.</div>' +
 
-    '<div class="pt2-sub" style="margin-top:14px">' + stampHtml() + "</div>" +
     (STEP >= 6
       ? '<div class="tk-toggle" style="margin-top:10px">🔔 새 메시지 알림<span class="tk-sw" id="pt2PushSw" data-pt2="push"></span></div>' +
         '<button class="cta" style="background:#fff;color:var(--tk-sub);border:1.5px solid var(--tk-line);box-shadow:none;margin-top:8px" data-pt2="push-test">알림 테스트 보내기</button>'
       : "") +
+    /* 버전 표시는 맨 아래에 둔다. 쓰는 분이 늘 볼 것은 아니고,
+       문제가 생겼을 때 물어보기 위한 값이다. */
+    '<div class="pt2-sub" style="margin-top:18px;text-align:center;line-height:1.7">' +
+      stampHtml() +
+      '<div style="margin-top:4px;color:var(--tk-sub);font-size:11.5px">' +
+        '© 2026 BJ LEE · All rights reserved.</div>' +
+    "</div>" +
     /* '예전 대화 옮기기' 는 뺐다. 이 폰에만 있던 옛 방은 이제 목록에도
        안 나오고, 모든 방이 처음부터 서버에 만들어진다. */
     "";
@@ -1427,11 +1433,14 @@ function segBarHtml(cur){
 
 /* 포도랑 화면을 창 하나에 담아 보여준다. 안쪽 스크롤은 없다.
    포도랑이 '내 키가 이만큼' 이라고 알려주면 그만큼 창을 늘린다. */
-function podoFrame(q){
+function podoFrame(q, later){
   /* 내 번호를 함께 넘긴다. 포도랑이 이걸로 포도톡 크레딧을 확인하고 깎는다.
-     이용권을 따로 사지 않아도 되게 하려고 붙였다. */
-  return '<div class="pt2-callwrap"><iframe class="pt2-callframe" src="https://podolang.kr/?' + q +
-    "&uid=" + encodeURIComponent(myUid()) + '" ' +
+     이용권을 따로 사지 않아도 되게 하려고 붙였다.
+     later 를 주면 주소를 src 가 아니라 data-src 에 담아 둔다. 부르는 쪽이
+     replace 로 채우면 뒤로가기 기록에 한 칸이 안 쌓인다. */
+  var u = "https://podolang.kr/?" + q + "&uid=" + encodeURIComponent(myUid());
+  return '<div class="pt2-callwrap"><iframe class="pt2-callframe" ' +
+    (later ? 'data-src="' + esc(u) + '"' : 'src="' + esc(u) + '"') + ' ' +
     'allow="microphone; autoplay; clipboard-write" scrolling="no"></iframe></div>';
 }
 window.addEventListener("message", function (ev) {
@@ -1663,6 +1672,21 @@ function cdCheck(){
   }, function () { say("확인하지 못했어요"); });
 }
 
+/* 화면을 새로 그리면 스크롤이 앞 화면 위치에 그대로 남아, 새 화면의
+   한가운데나 아래쪽이 먼저 보인다. 그래서 그릴 때마다 맨 위로 올린다. */
+function toTop(){
+  try {
+    var v = document.querySelector("#view"); if (v) v.scrollTop = 0;
+    window.scrollTo(0, 0);
+    [60, 200, 500].forEach(function (ms) {
+      setTimeout(function () {
+        var v2 = document.querySelector("#view"); if (v2) v2.scrollTop = 0;
+        try { window.scrollTo(0, 0); } catch (e) {}
+      }, ms);
+    });
+  } catch (e) {}
+}
+
 function renderCredits(){
   var head = ""; try { head = tkHeader("크레딧", '<img src="/podotalk-192.png" alt="" style="width:15px;height:15px;border-radius:5px;vertical-align:-2px;margin-right:4px">크레딧'); } catch (e) {}
   var b = CDS.balance;
@@ -1885,10 +1909,11 @@ function renderPodoya(){
   var head = ""; try { head = tkHeader("포도AI", "🍇 포도야"); } catch (e) {}
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + '" ' +
-      'allow="microphone; clipboard-write"></iframe></div>' +
-    '<div class="tk-tools" style="margin-top:10px">' +
-      '<button class="tk-tool" data-pt2="podoyaout">↗ 포도야에서 바로 열기</button>' +
-    "</div>";
+      'allow="microphone; clipboard-write"></iframe></div>';
+    /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
+       '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
+       그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
+       같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
 }
 
@@ -1985,10 +2010,24 @@ function renderPodo(kind){
   };
   var m = M[kind] || M.log;
   var head = ""; try { head = tkHeader(m[0], "📞 전화통역"); } catch (e) {}
+  /* 창을 주소와 함께 만들면 그 첫 화면이 뒤로가기 기록에 한 칸 쌓인다.
+     그래서 뒤로가기를 눌러도 설정으로 안 가고 창 안에서만 움직였다.
+     빈 창을 먼저 만들고 replace 로 채우면 기록에 쌓이지 않는다. */
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-sub" style="margin:-4px 0 10px">' + m[2] + "</div>" +
-    podoFrame(m[1]);
+    podoFrame(m[1], 1);
   markTab("settings");
+  toTop();
+  try {
+    var fr = document.querySelector(".pt2-callframe");
+    var u = fr && fr.getAttribute("data-src");
+    if (fr && u) {
+      if (fr.contentWindow && fr.contentWindow.location.replace) fr.contentWindow.location.replace(u);
+      else fr.src = u;
+    }
+  } catch (e) {
+    try { var f2 = document.querySelector(".pt2-callframe"); if (f2) f2.src = f2.getAttribute("data-src"); } catch (e2) {}
+  }
 }
 
 /* 서버에서 받은 목록과 이 기기 기록을 합친다 */
@@ -2923,22 +2962,24 @@ function matchContacts(list, cb) {
    그래서 나는 내 사진, 남은 이름 첫 글자를 딴 동그라미로 보여준다. */
 /* 프로필 편집 — 설정 전체가 아니라 사진·이모지·닉네임까지만.
    설정 화면 전부를 열면 알림이며 키며 다 딸려 나와서 정작 고칠 것을 찾기 힘들다. */
-var PROF_EMOJI = ["😀", "😎", "🧑", "👩", "👨", "🌸", "⭐", "🍑", "🧑‍🍳", "🌷"];
+/* 사진을 안 넣은 분에게 보여줄 기본 얼굴. 이모지를 고르게 하면 고르는 것도
+   일이고, 방마다 다르게 보여 헷갈렸다. 사진이 없으면 단색 원 하나만 둔다. */
+function solidAv(){
+  return '<span style="display:inline-block;width:100%;height:100%;border-radius:50%;' +
+         'background:#8b35e0"></span>';
+}
 
 function renderProfile() {
   var av = "";
   try { av = window.talkAvatar ? window.talkAvatar() : ""; } catch (e) {}
   var isPh = false;
   try { isPh = !!(window.isPhoto && window.isPhoto(av)); } catch (e) {}
-  var face = isPh ? imgAv(av) : '<span style="font-size:34px">' + esc(av || "😀") + "</span>";
-  var row = PROF_EMOJI.map(function (x) {
-    return '<button class="tk-emo' + (x === av ? " on" : "") + '" data-action="talk-set-emoji" data-e="' + x + '">' + x + "</button>";
-  }).join("");
+  var face = isPh ? imgAv(av) : solidAv();
 
   document.querySelector("#view").innerHTML =
     '<div class="tk-rhead"><span class="tk-back" data-pt2="prof-back">‹</span>' +
       '<div class="tk-rh-mid"><div class="tk-hi">프로필 편집</div>' +
-      '<div class="tk-hs">사진 · 이모지 · 대화명</div></div></div>' +
+      '<div class="tk-hs">사진 · 대화명</div></div></div>' +
     '<div class="tk-set">' +
       '<div class="tk-prof">' +
         '<div class="tk-prof-av">' + face + "</div>" +
@@ -2947,10 +2988,9 @@ function renderProfile() {
         '<button class="tk-prof-btn" data-action="talk-pick-photo">사진 변경</button>' +
       "</div>" +
       '<input id="tkAvatarFile" type="file" accept="image/*" style="display:none">' +
-      '<div class="tk-field"><label>프로필 이모지</label><div class="tk-emos">' + row + "</div></div>" +
       '<div class="tk-field"><label>내 대화명(닉네임)</label>' +
         '<input id="tkNick" value="' + esc(myNick()) + '" placeholder="포도" autocomplete="off"></div>' +
-      '<button class="cta grape" data-action="talk-save-nick">닉네임 저장</button>' +
+      '<button class="cta" style="background:#fff;color:#111;border:1.5px solid var(--tk-line);box-shadow:none" data-action="talk-save-nick">닉네임 저장</button>' +
       '<div class="pt2-sub" style="margin-top:10px">사진과 대화명은 이 기기에 저장돼요. 대화방에서는 대화명이 상대에게 보입니다.</div>' +
     "</div>";
   markTab("settings");
@@ -4350,7 +4390,6 @@ document.addEventListener("click", function (e) {
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
-  if (a === "podoyaout") { try { window.open(PODOYA, "_blank"); } catch (e) { location.href = PODOYA; } return; }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
   if (a === "quit-go") {
     if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
@@ -4516,22 +4555,24 @@ document.addEventListener("click", function (e) {
     var out = document.getElementById("pt2Diag");
     var w = function (t) { if (out) out.textContent = t; };
     var base = apiBase();
-    var lines = ["주소 · " + base,
-                 "인터넷 · " + ((navigator.onLine === false) ? "끊김 ❌" : "연결됨 ✅"),
+    /* 서버 주소는 띄우지 않는다. 비밀은 아니지만(앱 파일 안에 들어 있다)
+       쓰는 분이 고칠 일이 없는 값이고, 화면에 보이면 눌러보거나 옮겨 적게 된다.
+       확인에 필요한 것은 '닿았는가' 뿐이다. */
+    var lines = ["인터넷 · " + ((navigator.onLine === false) ? "끊김 ❌" : "연결됨 ✅"),
                  "확인하는 중…"];
     w(lines.join("\n"));
 
     /* ① 그냥 열어보기 (CORS 검사 없음) */
     fetch(base + "/health", { mode: "no-cors" }).then(function () {
-      lines[2] = "서버까지 닿음 ✅";
+      lines[1] = "서버까지 닿음 ✅";
     })["catch"](function (e) {
-      lines[2] = "서버까지 못 닿음 ❌ (" + (e && e.message ? e.message : "원인 불명") + ")";
+      lines[1] = "서버까지 못 닿음 ❌ (" + (e && e.message ? e.message : "원인 불명") + ")";
     }).then(function () {
       /* ② 앱이 쓰는 방식 그대로 (CORS 검사 포함) */
       w(lines.join("\n") + "\n앱 방식으로 확인 중…");
       return fetch(base + "/health", { headers: { "Content-Type": "application/json" } })
         .then(function (r) { return r.text().then(function (t) {
-          lines[3] = "앱 방식 · " + r.status + " " + (t.indexOf('"ok":true') >= 0 ? "정상 ✅" : "응답 이상 ⚠️");
+          lines[2] = "앱 방식 · " + r.status + " " + (t.indexOf('"ok":true') >= 0 ? "정상 ✅" : "응답 이상 ⚠️");
         }); })
         ["catch"](function (e2) {
           lines[3] = "앱 방식 · 막힘 ❌\n같은 주소를 브라우저로 열면 되는데 앱에서만 막히면 CORS 설정(ALLOW_ORIGIN)이 지금 주소와 다른 경우입니다.\n지금 주소 · " + location.origin +
