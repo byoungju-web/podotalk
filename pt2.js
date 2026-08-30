@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "110";
+var PT2_VER = "111";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -348,8 +348,10 @@ function rich(s) {
     '.pt2-seg4 button{font-size:10.5px;padding:8px 1px;line-height:1.3;white-space:normal}',
     '.pt2-callwrap{border:1.5px solid var(--tk-line);border-radius:14px;overflow:hidden;background:#fff}',
     '.pt2-callframe{width:100%;height:520px;border:0;display:block;transition:height .12s}',
-    /* 아래 탭바 바로 위까지 채운다. 190 은 너무 크게 잡아 화면 아래가 남았다. */
-    '.pt2-aiframe{width:100%;height:calc(100dvh - 138px);min-height:380px;border:0;display:block}',
+    /* 여기 숫자는 처음 뜰 때만 쓰는 어림값이다. 폰마다 위 칸과 탭바 높이가
+       달라서 숫자로 맞추면 어느 폰에서는 남고 어느 폰에서는 넘친다.
+       그래서 아래 fitAiFrame 이 실제로 재서 탭바 바로 위까지 딱 채운다. */
+    '.pt2-aiframe{width:100%;height:calc(100dvh - 138px);min-height:320px;border:0;display:block}',
     '.tk-in{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--tk-line);background:#fff;color:var(--tk-ink);font-size:15px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box}',
     '.tk-in:focus{border-color:var(--tk-grape)}',
     '.pt2-price{font-size:14.5px;line-height:2.1;color:var(--tk-ink);font-weight:700}',
@@ -1916,7 +1918,33 @@ function renderPodoya(){
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
        같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
+  fitAiSoon();
 }
+
+/* ── 포도야 창을 탭바 바로 위까지 ──
+   창이 시작하는 자리와 탭바 높이를 실제로 재서 남는 만큼 정확히 채운다.
+   숫자로 어림잡으면 폰마다 간격이 남거나 넘친다. 화면을 돌리거나 주소창이
+   접혔다 펴져도 다시 맞춘다. */
+function fitAiFrame(){
+  try {
+    var f = document.querySelector(".pt2-aiframe");
+    if (!f) return;
+    var wrap = f.parentNode || f;
+    var top = wrap.getBoundingClientRect().top;
+    var bar = document.getElementById("talkbar");
+    var barH = bar ? bar.getBoundingClientRect().height : 62;
+    var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    var h = Math.round(vh - top - barH);
+    if (h > 260) f.style.height = h + "px";
+  } catch (e) {}
+}
+/* 화면이 자리를 잡는 데 시간이 걸리므로 몇 번 더 맞춘다 */
+function fitAiSoon(){ [0, 120, 400, 900].forEach(function (ms){ setTimeout(fitAiFrame, ms); }); }
+try {
+  window.addEventListener("resize", fitAiFrame);
+  window.addEventListener("orientationchange", fitAiSoon);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fitAiFrame);
+} catch (e) {}
 
 /* ══════════════ 계정 탈퇴 ══════════════
    쓰시는 분이 직접 지울 수 있어야 한다. 운영자에게 메일을 보내 기다리게 하지 않는다. */
