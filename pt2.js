@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "112";
+var PT2_VER = "113";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -4963,7 +4963,7 @@ try { uiWatch(); } catch (e) {}
     else {
       /* 주소만 치고 들어오면 포도AI 를 먼저 보여준다.
          주소도 #/talk/podoya 로 맞춰 둬야 새로고침해도 같은 화면이 나온다. */
-      try { location.replace(location.pathname + location.search + "#/talk/podoya"); } catch (e2) {}
+      try { history.replaceState(null, "", "#/talk/podoya"); } catch (e2) {}
       window.renderTalk("podoya", null);
     }
   } catch (e) {}
