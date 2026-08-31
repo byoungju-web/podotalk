@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "111";
+var PT2_VER = "112";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1363,10 +1363,12 @@ function fixTabbar() {
   bar.innerHTML =
     /* 쇼핑은 포도다(pododa.kr)로 넘기는 문이었다. 포도톡에서 쇼핑까지
        하려면 아직 갈 길이 멀어서 탭에서 뺐다. 필요해지면 되살리면 된다. */
+    /* 순서 : 포도AI · 채팅 · 일반채팅 · 통역톡 · 설정
+       앱을 열면 포도AI 가 먼저 나오므로 탭도 맨 앞에 둔다. */
+    '<button data-pt2="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
     '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">👥</span>일반채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
-    '<button data-pt2="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
     '<button data-action="talk-tab" data-v="settings" id="tk-tab-settings"><span class="ti">⚙️</span>설정</button>';
 }
 function markTab(id) {
@@ -1909,9 +1911,16 @@ function walOut(){
    사라져서 돌아올 길이 없었다. 여기서 열면 탭이 그대로 남는다. */
 var PODOYA = "https://podoya.ai.kr/";
 function renderPodoya(){
-  var head = ""; try { head = tkHeader("포도AI", "🍇 포도야"); } catch (e) {}
+  /* 머리말 오른쪽 표시를 아래 탭의 포도AI 아이콘과 같은 그림으로 맞춘다.
+     한쪽은 포도 이모지, 한쪽은 앱 아이콘이라 같은 곳인지 헷갈렸다. */
+  var badge = '<img src="/podotalk-192.png" alt="" style="width:16px;height:16px;' +
+              'border-radius:5px;vertical-align:-3px;margin-right:4px;object-fit:cover">포도야';
+  var head = ""; try { head = tkHeader("포도AI", badge); } catch (e) {}
+  /* ?in=podotalk 을 붙여 보낸다. 포도야가 이 표시를 보고 자기 화면의
+     '포도톡' 칸을 숨긴다. 포도톡 안에서 여는 것이라 그 버튼이 또 있으면
+     같은 자리를 맴돌게 된다. podoya.ai.kr 을 직접 열면 표시가 없으니 그대로 나온다. */
   document.querySelector("#view").innerHTML = head +
-    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + '" ' +
+    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + '?in=podotalk" ' +
       'allow="microphone; clipboard-write"></iframe></div>';
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
@@ -4951,7 +4960,12 @@ try { uiWatch(); } catch (e) {}
   var arg = seg2[2] ? decodeURIComponent(seg2[2]) : null;
   try {
     if (sub) window.renderTalk(sub, arg);
-    else window.renderTalkList("direct");
+    else {
+      /* 주소만 치고 들어오면 포도AI 를 먼저 보여준다.
+         주소도 #/talk/podoya 로 맞춰 둬야 새로고침해도 같은 화면이 나온다. */
+      try { location.replace(location.pathname + location.search + "#/talk/podoya"); } catch (e2) {}
+      window.renderTalk("podoya", null);
+    }
   } catch (e) {}
 })();
 
