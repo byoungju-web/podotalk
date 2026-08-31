@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "113";
+var PT2_VER = "114";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1702,6 +1702,10 @@ function renderCredits(){
         (b === null ? "…" : Number(b).toLocaleString()) + "</div>" +
     "</div>" +
 
+    /* 포도AI와 지갑 합치기 — 처음 오신 분이 가장 먼저 보게 둔다 */
+    '<div class="tk-sec" style="margin-top:16px">포도AI 연결</div>' +
+    pkCardHtml() +
+
     /* 크레딧 사기 */
     '<div class="tk-sec" style="margin-top:16px">크레딧 사기</div>' +
     '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
@@ -1768,11 +1772,14 @@ function renderCredits(){
         "· <b>서버 읽어주기</b> — 1회에 1크레딧<br>" +
         '<span class="pt2-price-sub">폰이 직접 읽어주면 공짜입니다. 폰이 못 읽을 때만 서버가 대신합니다</span>' +
         "· <b>전화통역</b> — 1분에 60크레딧<br>" +
-        "· AI 답 — 1회에 1크레딧" +
+        "· <b>채팅방 AI 답</b> — 1회에 1크레딧<br>" +
+        "· <b>포도AI 대화</b> — 빠름 2크레딧 · 고품질 8크레딧<br>" +
+        '<span class="pt2-price-sub">내 AI 키를 넣으면 절반만 듭니다 (빠름 1 · 고품질 4)</span>' +
+        "· <b>포도AI 웹검색</b> — 1회에 3크레딧" +
       "</div>" +
     "</div>" +
     '<div class="pt2-note"><b>통역은 말한 사람만 냅니다.</b> 듣기만 하는 사람은 한 푼도 안 듭니다.<br>' +
-      "다중 통역 · 마주보기 · 전화통역은 <b>내 AI 키가 있어도</b> 크레딧이 듭니다. AI 키는 @봇에만 쓰입니다.</div>";
+      "다중 통역 · 마주보기 · 전화통역은 <b>내 AI 키가 있어도</b> 크레딧이 듭니다.</div>";
   markTab("settings");
 
   /* 예전에는 잔액을 받아온 뒤 화면을 통째로 다시 그렸다. 그 바람에
@@ -1919,8 +1926,14 @@ function renderPodoya(){
   /* ?in=podotalk 을 붙여 보낸다. 포도야가 이 표시를 보고 자기 화면의
      '포도톡' 칸을 숨긴다. 포도톡 안에서 여는 것이라 그 버튼이 또 있으면
      같은 자리를 맴돌게 된다. podoya.ai.kr 을 직접 열면 표시가 없으니 그대로 나온다. */
+  /* 기기 토큰을 함께 넘긴다. 포도야가 이걸로 같은 지갑을 본다.
+     열쇠(PODO-XXXX-XXXX)가 아니라 기한이 있는 토큰을 넘긴다 —
+     주소에 남는 값이므로 새더라도 피해가 작아야 한다.
+     아직 열쇠를 안 만든 분은 예전처럼 그냥 열린다(무료 기능만). */
+  var _pt = ""; try { _pt = pkToken(); } catch (e) {}
+  var _q = "?in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
-    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + '?in=podotalk" ' +
+    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
       'allow="microphone; clipboard-write"></iframe></div>';
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
@@ -2743,6 +2756,96 @@ function gLogin() {
       });
     } catch (e) { say("구글 로그인을 열지 못했어요"); }
   });
+}
+
+/* 로그인 창을 열어 그 자리에서 받은 증명서를 넘겨준다.
+   gLogin 은 받은 증명서로 계정을 묶는 일까지 하지만, 계정 열쇠를
+   받을 때는 증명서만 필요하다. 그래서 따로 둔다. */
+function gAsk(cb) {
+  if (!G_CLIENT_ID) { say("구글 로그인이 준비되지 않았어요"); return; }
+  gLoad(function (ok2) {
+    if (!ok2) { say("구글 로그인을 불러오지 못했어요"); return; }
+    try {
+      google.accounts.id.initialize({
+        client_id: G_CLIENT_ID,
+        callback: function (res) { if (res && res.credential) cb(res.credential); },
+        auto_select: true
+      });
+      google.accounts.id.prompt(function (n) {
+        if (n && n.isNotDisplayed && n.isNotDisplayed()) {
+          say("구글 계정 선택 창이 막혔어요. 크롬에서 구글에 로그인돼 있는지 확인해 주세요");
+        }
+      });
+    } catch (e) { say("구글 로그인을 열지 못했어요"); }
+  });
+}
+
+/* ══════════════ 계정 열쇠 ══════════════
+   포도야(podoya.ai.kr)는 주소가 달라서, 포도톡 안에 떠 있어도 크롬이
+   저장소를 다른 칸으로 관리한다. 그래서 포도야는 이 폰의 크레딧을
+   볼 수가 없다. 열쇠를 한 번 넣어주면 그때부터 같은 지갑을 쓴다.
+
+   열쇠는 구글 로그인을 거친 분에게만 내준다. uid 는 참여자 목록에
+   그대로 드러나므로 그것만으로는 주인을 확인할 수 없기 때문이다. */
+function pkGet()  { return LSJ("pt2_pkey", null); }
+function pkSave(o){ LSS("pt2_pkey", JSON.stringify(o)); }
+function pkToken(){ var o = pkGet(); return (o && o.token) || ""; }
+
+function pkMake(renew) {
+  say("구글 확인 중…");
+  gAsk(function (cred) {
+    api("/talk/account/key", { body: { uid: myUid(), id_token: cred, renew: renew ? 1 : 0 } })
+      .then(function (d) {
+        if (!d || !d.ok) { say((d && d.error) || "열쇠를 만들지 못했어요"); return; }
+        pkSave({ key: d.key, token: d.token, ts: Date.now() });
+        /* 서버가 정해준 계정 uid 로 이 폰을 맞춘다 */
+        try { if (d.uid) window.DB.set("pododa_uid", d.uid); } catch (e) {}
+        say(renew ? "새 열쇠를 만들었어요. 옛 열쇠는 이제 못 씁니다" : "열쇠를 만들었어요 🍇");
+        if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits();
+      });
+  });
+}
+function pkCopy() {
+  var o = pkGet();
+  if (!o || !o.key) { say("먼저 열쇠를 만들어주세요"); return; }
+  try {
+    navigator.clipboard.writeText(o.key);
+    say("열쇠를 복사했어요");
+  } catch (e) { say("복사가 안 되면 글자를 길게 눌러 복사해 주세요"); }
+}
+function pkRenew() {
+  if (!confirm("새 열쇠를 만들면 지금 열쇠는 그 자리에서 못 쓰게 됩니다.\n" +
+               "포도야에 다시 넣어야 합니다.\n\n계속할까요?")) return;
+  pkMake(1);
+}
+
+/* 열쇠 칸 — 처음 보는 분이 바로 알아볼 수 있게 크게 둔다 */
+function pkCardHtml() {
+  var o = pkGet();
+  if (!o || !o.key) {
+    return '<div class="tk-card" style="padding:16px">' +
+      '<div style="font-size:15px;font-weight:800;margin-bottom:6px">🍇 포도AI에서도 이 크레딧 쓰기</div>' +
+      '<div class="pt2-sub" style="line-height:1.7;margin-bottom:12px">' +
+        '포도AI는 주소가 달라서 이 크레딧을 못 봅니다.<br>' +
+        '열쇠를 한 번 만들어 넣어주면 지갑 하나로 같이 씁니다.</div>' +
+      '<button class="cta" data-pt2="pk-make">열쇠 만들기</button>' +
+      '<div class="pt2-sub" style="margin-top:9px;font-size:11px">구글 로그인 한 번이 필요합니다. ' +
+        '폰을 바꿔도 크레딧이 따라오게 하려면 어차피 필요한 절차입니다.</div>' +
+    "</div>";
+  }
+  return '<div class="tk-card" style="padding:16px">' +
+    '<div style="font-size:15px;font-weight:800;margin-bottom:8px">🍇 내 계정 열쇠</div>' +
+    '<div style="background:var(--tk-bg2,#f4f6fb);border-radius:12px;padding:14px;text-align:center;' +
+      'font-size:21px;font-weight:900;letter-spacing:2px;word-break:break-all">' + esc(o.key) + "</div>" +
+    '<button class="cta" style="margin-top:11px" data-pt2="pk-copy">열쇠 복사</button>' +
+    '<div class="pt2-sub" style="margin-top:10px;line-height:1.7">' +
+      '포도AI 화면 → 마이 탭 → <b>계정 열쇠</b> 칸에 넣으면 됩니다.<br>' +
+      '포도톡 안에서 여는 포도AI는 자동으로 붙습니다.</div>' +
+    '<div style="text-align:center;margin-top:10px">' +
+      '<button data-pt2="pk-renew" style="border:none;background:none;color:var(--tk-sub);' +
+        'font-size:11.5px;text-decoration:underline;cursor:pointer;font-family:inherit">' +
+        "열쇠가 샜어요 · 새로 만들기</button></div>" +
+  "</div>";
 }
 
 function gLogout() {
@@ -4444,6 +4547,9 @@ document.addEventListener("click", function (e) {
   if (a === "saytest")   { try { trxSayTest(); } catch (e) { say("읽어주기를 부르지 못했어요"); } return; }
   if (a === "credits")   { location.hash = "#/talk/credits"; return; }
   if (a === "cd-redeem") { cdRedeem(); return; }
+  if (a === "pk-make")   { pkMake(0); return; }
+  if (a === "pk-copy")   { pkCopy(); return; }
+  if (a === "pk-renew")  { pkRenew(); return; }
   if (a === "cd-buy")    { cdBuy(el.getAttribute("data-p")); return; }
   if (a === "cd-check")  { cdCheck(); return; }
   if (a === "wallet")  { walletSheet(el.getAttribute("data-id"), el.getAttribute("data-rn")); return; }
