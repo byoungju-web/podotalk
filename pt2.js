@@ -1711,11 +1711,14 @@ function renderCredits(){
     '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
     '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>' +
 
-    '<div class="tk-sec" style="margin-top:16px">코드로 채우기</div>' +
+    '<div class="tk-sec" style="margin-top:16px">충전 코드로 채우기</div>' +
     '<div class="tk-card" style="padding:14px 15px">' +
-      '<input id="cdCode" class="tk-in" placeholder="PODO-XXXXXX-XXXXXX" ' +
+      '<input id="cdCode" class="tk-in" placeholder="PODOABCD1234EFGH" ' +
         'style="text-transform:uppercase;letter-spacing:1px">' +
       '<button class="cta" style="margin-top:10px" data-pt2="cd-redeem">채우기</button>' +
+      '<div class="pt2-sub" style="margin-top:9px;line-height:1.6">' +
+        '크레딧을 사고 받은 <b>충전 코드</b>를 넣는 칸입니다 (대시 없이 16자).<br>' +
+        '위의 <b>계정 열쇠</b>(PODO-XXXX-XXXX)는 여기 넣는 것이 아닙니다.</div>' +
     "</div>" +
 
     /* 내가 만든 방에 크레딧을 넣어둘 수 있다. 방 사람들이 말할 때 거기서
