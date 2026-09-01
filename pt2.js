@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "116";
+var PT2_VER = "117";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1762,32 +1762,50 @@ function renderCredits(){
         "안 쓴 몫은 언제든 되돌려받을 수 있어요.</div>";
     })() +
 
-    '<div class="tk-sec" style="margin-top:16px">무료로 쓰는 것</div>' +
-    '<div class="tk-card" style="padding:15px 16px">' +
-      '<div class="pt2-price">' +
-        "· 채팅 · 일반채팅<br>" +
-        "· <b>1:1 동시통역</b> — 둘이 쓰는 통역은 값을 받지 않아요<br>" +
-        "· 남의 말을 <b>듣고 읽는 것</b> — 언제나 무료" +
-      "</div>" +
-    "</div>" +
+    /* ── 요금표 ──
+       예전에는 줄글이라 눈이 어디를 봐야 할지 몰랐다. 사람은 값을 볼 때
+       "무엇이 얼마인가" 두 개만 본다. 그래서 왼쪽에 이름, 오른쪽에 숫자로
+       줄을 맞춘다. 무료는 0 이 아니라 '무료' 라고 적는다 —
+       0 은 눈에 안 들어오고 '무료' 는 들어온다. */
+    '<div class="tk-sec" style="margin-top:18px">무엇이 얼마</div>' +
+    (function () {
+      var line = function (name, val, sub, free) {
+        return '<div style="display:flex;align-items:baseline;gap:10px;padding:9px 0;' +
+            'border-bottom:1px solid rgba(0,0,0,.05)">' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:13.5px;font-weight:700">' + name + "</div>" +
+              (sub ? '<div style="font-size:11px;color:var(--tk-sub,#7b7490);margin-top:2px;' +
+                     'line-height:1.5">' + sub + "</div>" : "") +
+            "</div>" +
+            '<div style="flex:0 0 auto;font-size:14px;font-weight:900;' +
+              (free ? "color:#16a34a" : "color:var(--tk-grape,#6d28d9)") + '">' + val + "</div>" +
+          "</div>";
+      };
+      return '<div class="tk-card" style="padding:4px 16px 10px">' +
+        line("채팅 · 일반채팅", "무료", "", 1) +
+        line("1:1 동시통역", "무료", "둘이 쓰는 통역은 값을 받지 않아요", 1) +
+        line("남의 말 듣고 읽기", "무료", "", 1) +
+        line("말하기 (받아쓰기)", "1", "") +
+        line("채팅방 AI 답", "1", "") +
+        line("포도AI · 빠른 답", "2", "") +
+        line("다중 동시통역", "3", "한 마디에 방 안의 언어 수만큼 · 세 나라 말이면 3") +
+        line("마주보기 통역", "3", "1분에") +
+        line("포도AI · 웹검색", "4", "") +
+        line("포도AI · 고품질 답", "8", "") +
+        line("전화통역", "60", "1분에") +
+      "</div>";
+    })() +
 
-    '<div class="tk-sec" style="margin-top:16px">크레딧이 드는 것</div>' +
-    '<div class="tk-card" style="padding:15px 16px">' +
-      '<div class="pt2-price">' +
-        "· <b>다중 동시통역</b> — 한 마디에 방 안의 언어 수만큼<br>" +
-        '<span class="pt2-price-sub">세 나라 말이 있으면 한 마디에 3크레딧</span>' +
-        "· <b>마주보기 통역</b> — 1분에 3크레딧<br>" +
-        "· <b>서버 읽어주기</b> — 1회에 1크레딧<br>" +
-        '<span class="pt2-price-sub">폰이 직접 읽어주면 공짜입니다. 폰이 못 읽을 때만 서버가 대신합니다</span>' +
-        "· <b>전화통역</b> — 1분에 60크레딧<br>" +
-        "· <b>채팅방 AI 답</b> — 1회에 1크레딧<br>" +
-        "· <b>포도AI 대화</b> — 빠름 2크레딧 · 고품질 8크레딧<br>" +
-        '<span class="pt2-price-sub">내 AI 키를 넣으면 절반만 듭니다 (빠름 1 · 고품질 4)</span>' +
-        "· <b>포도AI 웹검색</b> — 1회에 3크레딧" +
+    '<div class="tk-card" style="padding:14px 16px;margin-top:10px">' +
+      '<div style="font-size:12.5px;font-weight:800;margin-bottom:7px">알아두면 좋은 것</div>' +
+      '<div class="pt2-sub" style="line-height:1.85">' +
+        "· <b>말한 사람만 냅니다.</b> 듣기만 하면 한 푼도 안 듭니다<br>" +
+        "· <b>내 AI 키</b>를 넣으면 포도AI 값이 <b>절반</b>이 됩니다<br>" +
+        "· 통역은 내 AI 키가 있어도 크레딧이 듭니다<br>" +
+        "· 답을 못 받으면 크레딧을 <b>도로 넣어드립니다</b><br>" +
+        "· 폰이 직접 읽어주면 공짜, 폰이 못 읽을 때만 서버가 대신합니다" +
       "</div>" +
-    "</div>" +
-    '<div class="pt2-note"><b>통역은 말한 사람만 냅니다.</b> 듣기만 하는 사람은 한 푼도 안 듭니다.<br>' +
-      "다중 통역 · 마주보기 · 전화통역은 <b>내 AI 키가 있어도</b> 크레딧이 듭니다.</div>";
+    "</div>";
   markTab("settings");
 
   /* 예전에는 잔액을 받아온 뒤 화면을 통째로 다시 그렸다. 그 바람에
@@ -1926,11 +1944,10 @@ function walOut(){
    사라져서 돌아올 길이 없었다. 여기서 열면 탭이 그대로 남는다. */
 var PODOYA = "https://podoya.ai.kr/";
 function renderPodoya(){
-  /* 머리말 오른쪽 표시를 아래 탭의 포도AI 아이콘과 같은 그림으로 맞춘다.
-     한쪽은 포도 이모지, 한쪽은 앱 아이콘이라 같은 곳인지 헷갈렸다. */
-  var badge = '<img src="/podotalk-192.png" alt="" style="width:16px;height:16px;' +
-              'border-radius:5px;vertical-align:-3px;margin-right:4px;object-fit:cover">포도야';
-  var head = ""; try { head = tkHeader("포도AI", badge); } catch (e) {}
+  /* 머리말을 두지 않는다. 아래 탭에 이미 '포도AI' 라고 적혀 있어서
+     같은 말이 위아래로 두 번 나왔고, 그만큼 화면이 좁아졌다.
+     좁은 폰에서는 한 줄이 아깝다. */
+  var head = "";
   /* ?in=podotalk 을 붙여 보낸다. 포도야가 이 표시를 보고 자기 화면의
      '포도톡' 칸을 숨긴다. 포도톡 안에서 여는 것이라 그 버튼이 또 있으면
      같은 자리를 맴돌게 된다. podoya.ai.kr 을 직접 열면 표시가 없으니 그대로 나온다. */
@@ -2878,56 +2895,82 @@ function pkCardHtml() {
    로그인하면 떼어내고, 로그아웃하면 다시 덮는다. */
 function gateOn() { return !acct(); }
 
+/* ── 권한은 미리 못 받아둔다 ──
+   브라우저는 "쓸 때" 묻는다. 그래서 여기서 하는 일은 그 물음을 지금
+   한 번에 띄워주는 것뿐이다. 각 버튼이 사용자의 누름(제스처)이라야
+   크롬이 창을 띄워준다. 그래서 한꺼번에 세 개를 자동으로 부르지 않고
+   버튼을 셋으로 나눠 둔다.
+   알림과 연락처는 여기서 묻지 않는다. 처음 화면에서 다섯 개를 물으면
+   대부분 다 거절한다. 그 둘은 실제로 쓸 때 묻는 편이 훨씬 잘 허용된다. */
+function gatePerm(kind, btn) {
+  var done = function (ok) {
+    if (!btn) return;
+    btn.textContent = ok ? "켜짐" : "거절됨";
+    btn.style.background = ok ? "#dcfce7" : "#f1f0f5";
+    btn.style.color = ok ? "#166534" : "#8a8598";
+    btn.disabled = true;
+  };
+  try {
+    if (kind === "geo") {
+      if (!navigator.geolocation) { done(false); return; }
+      navigator.geolocation.getCurrentPosition(function () { done(true); },
+        function () { done(false); }, { timeout: 8000 });
+      return;
+    }
+    var want = (kind === "cam") ? { video: true } : { audio: true };
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { done(false); return; }
+    navigator.mediaDevices.getUserMedia(want).then(function (st) {
+      /* 확인만 하고 바로 끈다. 켜둔 채로 두면 카메라 불이 계속 켜져 있다. */
+      try { st.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      done(true);
+    })["catch"](function () { done(false); });
+  } catch (e) { done(false); }
+}
+
 function gateHtml() {
   var ic = '<img src="/podotalk-192.png" alt="" ' +
-    'style="width:74px;height:74px;border-radius:22px;display:block;margin:0 auto 16px">';
-  /* 브라우저는 권한을 미리 못 받는다. 그래서 이 화면은 허가를 받는
-     화면이 아니라, 곧 무엇을 왜 물어볼지 미리 알려주는 화면이다.
-     미리 알려주면 실제 팝업에서 허용하는 비율이 크게 오른다.
-     웹에는 '전화통화' 권한이 없다. 전화통역도 마이크만 쓴다. */
+    'style="width:62px;height:62px;border-radius:19px;display:block;margin:0 auto 13px">';
   var perms = [
-    ["🎤", "마이크", "말하기 · 통역할 때"],
-    ["📷", "카메라", "사진을 찍어 올릴 때"],
-    ["📍", "위치", "날씨 · 길안내할 때"],
-    ["🔔", "알림", "새 메시지가 왔을 때"],
-    ["👤", "연락처", "아는 사람을 초대할 때"]
+    ["mic", "🎤", "마이크", "말하기 · 통역할 때"],
+    ["cam", "📷", "카메라", "사진을 찍어 올릴 때"],
+    ["geo", "📍", "위치", "날씨 · 길안내할 때"]
   ];
   var rows = "";
   for (var i = 0; i < perms.length; i++) {
-    rows += '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0">' +
-      '<span style="font-size:16px;width:22px;flex:0 0 22px;text-align:center">' + perms[i][0] + "</span>" +
-      '<span style="font-size:13px;font-weight:700;width:52px;flex:0 0 52px">' + perms[i][1] + "</span>" +
-      '<span style="font-size:12.5px;color:var(--tk-sub,#7b7490);line-height:1.5">' + perms[i][2] + "</span>" +
+    rows += '<div style="display:flex;gap:9px;align-items:center;padding:7px 0">' +
+      '<span style="font-size:16px;width:21px;flex:0 0 21px;text-align:center">' + perms[i][1] + "</span>" +
+      '<span style="flex:1;min-width:0">' +
+        '<span style="font-size:13px;font-weight:700;display:block">' + perms[i][2] + "</span>" +
+        '<span style="font-size:11.5px;color:var(--tk-sub,#7b7490)">' + perms[i][3] + "</span>" +
+      "</span>" +
+      '<button data-perm="' + perms[i][0] + '" style="flex:0 0 auto;border:none;border-radius:9px;' +
+        'padding:7px 13px;background:#ede9fe;color:#6d28d9;font-size:12px;font-weight:800;' +
+        'cursor:pointer;font-family:inherit">허용</button>' +
     "</div>";
   }
-  return '<div id="pt2-gate" style="position:fixed;inset:0;z-index:99999;overflow:auto;' +
-      'background:var(--tk-bg,#f4f1fa);padding:38px 22px 40px;-webkit-overflow-scrolling:touch">' +
-    '<div style="max-width:420px;margin:0 auto">' +
-      '<div style="text-align:center;margin-bottom:26px">' + ic +
-        '<div style="font-size:25px;font-weight:900;letter-spacing:-.5px">포도톡</div>' +
-        '<div style="font-size:13.5px;color:var(--tk-sub,#7b7490);margin-top:7px">' +
+  return '<div id="pt2-gate" style="position:fixed;inset:0;z-index:99999;display:flex;' +
+      'align-items:center;justify-content:center;padding:20px;' +
+      'background:rgba(30,22,52,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)">' +
+    '<div style="width:100%;max-width:360px;max-height:92vh;overflow:auto;background:#fff;' +
+      'border-radius:22px;padding:26px 20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.28)">' +
+      '<div style="text-align:center;margin-bottom:20px">' + ic +
+        '<div style="font-size:22px;font-weight:900;letter-spacing:-.5px">포도톡</div>' +
+        '<div style="font-size:13px;color:var(--tk-sub,#7b7490);margin-top:6px">' +
           "AI 자동화 · 통역을 한 곳에서</div>" +
       "</div>" +
 
-      '<button id="pt2-gate-go" class="cta" style="font-size:15px;padding:15px">' +
-        "구글로 시작하기</button>" +
+      '<button id="pt2-gate-go" style="width:100%;border:none;border-radius:14px;padding:15px;' +
+        'background:#ede9fe;color:#5b21b6;font-size:15px;font-weight:800;cursor:pointer;' +
+        'font-family:inherit">구글로 시작하기</button>' +
       '<div id="pt2-gate-msg" style="font-size:12px;color:var(--tk-sub,#7b7490);' +
-        'text-align:center;margin-top:10px;min-height:17px"></div>' +
+        'text-align:center;margin-top:9px;min-height:16px"></div>' +
 
-      '<div style="margin-top:26px;background:#fff;border-radius:16px;padding:16px 17px">' +
-        '<div style="font-size:12.5px;font-weight:800;margin-bottom:8px">쓰면서 아래를 물어봅니다</div>' +
+      '<div style="margin-top:16px;border-top:1px solid rgba(0,0,0,.08);padding-top:12px">' +
+        '<div style="font-size:12px;font-weight:800;margin-bottom:4px">먼저 켜두면 편한 것</div>' +
         rows +
-        '<div style="font-size:11.5px;color:var(--tk-sub,#7b7490);line-height:1.75;' +
-          'margin-top:11px;border-top:1px solid rgba(0,0,0,.07);padding-top:11px">' +
-          "지금은 아무것도 켜지 않습니다.<br>" +
-          "그 기능을 처음 쓸 때 하나씩 물어봅니다.<br>" +
-          "전부 거절해도 앱은 그대로 쓸 수 있습니다.</div>" +
+        '<div style="font-size:11px;color:var(--tk-sub,#7b7490);margin-top:8px;line-height:1.6">' +
+          "알림 · 연락처는 나중에 필요할 때 물어봅니다.</div>" +
       "</div>" +
-
-      '<div style="font-size:11.5px;color:var(--tk-sub,#7b7490);text-align:center;' +
-        'margin-top:18px;line-height:1.7">' +
-        "구글에서 받는 것은 <b>이름과 이메일</b>뿐입니다.<br>" +
-        "연락처나 메일 내용은 보지 않습니다.</div>" +
     "</div></div>";
 }
 
@@ -2935,12 +2978,19 @@ function gateShow() {
   if (document.getElementById("pt2-gate")) return;
   var d = document.createElement("div");
   d.innerHTML = gateHtml();
-  document.body.appendChild(d.firstChild);
+  var g = d.firstChild;
+  document.body.appendChild(g);
   var b = document.getElementById("pt2-gate-go");
   if (b) b.addEventListener("click", function () {
     var m = document.getElementById("pt2-gate-msg");
     if (m) m.textContent = "구글 계정을 확인하는 중…";
     gLogin();
+  });
+  g.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute("data-perm")) {
+      gatePerm(t.getAttribute("data-perm"), t);
+    }
   });
 }
 function gateHide() {
