@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "117";
+var PT2_VER = "118";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -2959,9 +2959,16 @@ function gateHtml() {
           "AI 자동화 · 통역을 한 곳에서</div>" +
       "</div>" +
 
-      '<button id="pt2-gate-go" style="width:100%;border:none;border-radius:14px;padding:15px;' +
-        'background:#ede9fe;color:#5b21b6;font-size:15px;font-weight:800;cursor:pointer;' +
-        'font-family:inherit">구글로 시작하기</button>' +
+      /* 보이는 것은 우리 버튼, 실제로 눌리는 것은 그 위에 투명하게 덮은
+         구글 버튼이다. google.accounts.id.prompt() 는 크롬이 자주
+         억눌러서 아무 일도 안 일어난다. 구글이 직접 그린 버튼은 확실히
+         계정 선택 창을 띄운다. */
+      '<div style="position:relative">' +
+        '<button id="pt2-gate-go" style="width:100%;border:none;border-radius:14px;padding:15px;' +
+          'background:#ede9fe;color:#5b21b6;font-size:15px;font-weight:800;cursor:pointer;' +
+          'font-family:inherit">구글로 시작하기</button>' +
+        '<div id="pt2-gbtn" style="position:absolute;inset:0;opacity:.001;overflow:hidden"></div>' +
+      "</div>" +
       '<div id="pt2-gate-msg" style="font-size:12px;color:var(--tk-sub,#7b7490);' +
         'text-align:center;margin-top:9px;min-height:16px"></div>' +
 
@@ -2980,6 +2987,9 @@ function gateShow() {
   d.innerHTML = gateHtml();
   var g = d.firstChild;
   document.body.appendChild(g);
+  /* 구글 버튼을 겹쳐 그린다. 스크립트를 못 받아오면 우리 버튼이
+     예전 방식(One Tap)으로 대신 동작한다. */
+  gateDrawGoogle();
   var b = document.getElementById("pt2-gate-go");
   if (b) b.addEventListener("click", function () {
     var m = document.getElementById("pt2-gate-msg");
@@ -2991,6 +3001,29 @@ function gateShow() {
     if (t && t.getAttribute && t.getAttribute("data-perm")) {
       gatePerm(t.getAttribute("data-perm"), t);
     }
+  });
+}
+function gateDrawGoogle() {
+  gLoad(function (ok2) {
+    var box = document.getElementById("pt2-gbtn");
+    if (!ok2 || !box) return;
+    try {
+      google.accounts.id.initialize({
+        client_id: G_CLIENT_ID,
+        callback: function (res) {
+          var m = document.getElementById("pt2-gate-msg");
+          if (m) m.textContent = "구글 계정을 확인하는 중…";
+          if (res && res.credential) gSend(res.credential);
+        },
+        auto_select: false
+      });
+      var w = Math.round(box.getBoundingClientRect().width) || 300;
+      if (w < 200) w = 200; if (w > 400) w = 400;
+      google.accounts.id.renderButton(box, {
+        type: "standard", theme: "outline", size: "large",
+        text: "continue_with", width: w
+      });
+    } catch (e) {}
   });
 }
 function gateHide() {
