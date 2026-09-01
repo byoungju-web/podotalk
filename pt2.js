@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "115";
+var PT2_VER = "116";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -2734,11 +2734,18 @@ function gLoad(cb) {
 function gSend(idToken) {
   say("로그인 확인 중…");
   api("/talk/auth/google", { body: { id_token: idToken, uid: myUid() } }).then(function (d) {
-    if (!d || !d.ok) { say((d && d.error) || "로그인하지 못했어요"); return; }
+    if (!d || !d.ok) {
+      var gm = document.getElementById("pt2-gate-msg");
+      if (gm) gm.textContent = (d && d.error) || "로그인하지 못했어요";
+      say((d && d.error) || "로그인하지 못했어요"); return;
+    }
     /* 서버가 정해준 계정 uid 로 이 폰을 맞춘다. 이게 곧 계정 이어받기다. */
     try { window.DB.set("pododa_uid", d.uid); } catch (e) {}
     LSS("pt2_acct", JSON.stringify({ email: d.email || "", name: d.name || "" }));
-    say(d.moved ? d.moved + "개 방을 계정으로 옮겼어요 🍇" : "로그인했어요 🍇");
+    try { gateHide(); } catch (e3) {}
+    if (d.gift) say("환영합니다 · 크레딧 " + d.gift + "개를 드렸어요");
+    else if (d.moved) say(d.moved + "개 방을 계정으로 옮겼어요");
+    else say("로그인했어요");
     refreshRooms(function () { try { renderTalkSettings(); } catch (e2) {} });
   });
 }
@@ -2857,12 +2864,98 @@ function pkCardHtml() {
   "</div>";
 }
 
+/* ══════════════ 로그인 문 ══════════════
+   앱 전체에 문을 하나만 둔다. 포도AI·채팅·통역톡이 크레딧 지갑 하나를
+   같이 쓰기로 했으니, 로그인도 한 번이면 된다. 기능마다 따로 물어보면
+   같은 사람에게 세 번 묻는 꼴이 된다.
+
+   문을 세우는 이유는 두 가지다.
+     ① 폰을 바꿔도 크레딧과 방이 따라오게 하려면 계정이 있어야 한다.
+     ② 가입 선물을 uid 로 주면 앱을 지웠다 깔기를 반복해 얼마든지
+        받아갈 수 있다. 구글 계정 번호로 줘야 한 번으로 끝난다.
+
+   화면 위에 덮는 방식이라 기존 라우팅은 건드리지 않는다.
+   로그인하면 떼어내고, 로그아웃하면 다시 덮는다. */
+function gateOn() { return !acct(); }
+
+function gateHtml() {
+  var ic = '<img src="/podotalk-192.png" alt="" ' +
+    'style="width:74px;height:74px;border-radius:22px;display:block;margin:0 auto 16px">';
+  /* 브라우저는 권한을 미리 못 받는다. 그래서 이 화면은 허가를 받는
+     화면이 아니라, 곧 무엇을 왜 물어볼지 미리 알려주는 화면이다.
+     미리 알려주면 실제 팝업에서 허용하는 비율이 크게 오른다.
+     웹에는 '전화통화' 권한이 없다. 전화통역도 마이크만 쓴다. */
+  var perms = [
+    ["🎤", "마이크", "말하기 · 통역할 때"],
+    ["📷", "카메라", "사진을 찍어 올릴 때"],
+    ["📍", "위치", "날씨 · 길안내할 때"],
+    ["🔔", "알림", "새 메시지가 왔을 때"],
+    ["👤", "연락처", "아는 사람을 초대할 때"]
+  ];
+  var rows = "";
+  for (var i = 0; i < perms.length; i++) {
+    rows += '<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0">' +
+      '<span style="font-size:16px;width:22px;flex:0 0 22px;text-align:center">' + perms[i][0] + "</span>" +
+      '<span style="font-size:13px;font-weight:700;width:52px;flex:0 0 52px">' + perms[i][1] + "</span>" +
+      '<span style="font-size:12.5px;color:var(--tk-sub,#7b7490);line-height:1.5">' + perms[i][2] + "</span>" +
+    "</div>";
+  }
+  return '<div id="pt2-gate" style="position:fixed;inset:0;z-index:99999;overflow:auto;' +
+      'background:var(--tk-bg,#f4f1fa);padding:38px 22px 40px;-webkit-overflow-scrolling:touch">' +
+    '<div style="max-width:420px;margin:0 auto">' +
+      '<div style="text-align:center;margin-bottom:26px">' + ic +
+        '<div style="font-size:25px;font-weight:900;letter-spacing:-.5px">포도톡</div>' +
+        '<div style="font-size:13.5px;color:var(--tk-sub,#7b7490);margin-top:7px">' +
+          "AI 자동화 · 통역을 한 곳에서</div>" +
+      "</div>" +
+
+      '<button id="pt2-gate-go" class="cta" style="font-size:15px;padding:15px">' +
+        "구글로 시작하기</button>" +
+      '<div id="pt2-gate-msg" style="font-size:12px;color:var(--tk-sub,#7b7490);' +
+        'text-align:center;margin-top:10px;min-height:17px"></div>' +
+
+      '<div style="margin-top:26px;background:#fff;border-radius:16px;padding:16px 17px">' +
+        '<div style="font-size:12.5px;font-weight:800;margin-bottom:8px">쓰면서 아래를 물어봅니다</div>' +
+        rows +
+        '<div style="font-size:11.5px;color:var(--tk-sub,#7b7490);line-height:1.75;' +
+          'margin-top:11px;border-top:1px solid rgba(0,0,0,.07);padding-top:11px">' +
+          "지금은 아무것도 켜지 않습니다.<br>" +
+          "그 기능을 처음 쓸 때 하나씩 물어봅니다.<br>" +
+          "전부 거절해도 앱은 그대로 쓸 수 있습니다.</div>" +
+      "</div>" +
+
+      '<div style="font-size:11.5px;color:var(--tk-sub,#7b7490);text-align:center;' +
+        'margin-top:18px;line-height:1.7">' +
+        "구글에서 받는 것은 <b>이름과 이메일</b>뿐입니다.<br>" +
+        "연락처나 메일 내용은 보지 않습니다.</div>" +
+    "</div></div>";
+}
+
+function gateShow() {
+  if (document.getElementById("pt2-gate")) return;
+  var d = document.createElement("div");
+  d.innerHTML = gateHtml();
+  document.body.appendChild(d.firstChild);
+  var b = document.getElementById("pt2-gate-go");
+  if (b) b.addEventListener("click", function () {
+    var m = document.getElementById("pt2-gate-msg");
+    if (m) m.textContent = "구글 계정을 확인하는 중…";
+    gLogin();
+  });
+}
+function gateHide() {
+  var g = document.getElementById("pt2-gate");
+  if (g) g.remove();
+}
+function gateCheck() { if (gateOn()) gateShow(); else gateHide(); }
+
 function gLogout() {
   if (!confirm("로그아웃하면 이 폰에서 방 목록이 비워집니다.\n다시 로그인하면 그대로 돌아옵니다.\n\n로그아웃할까요?")) return;
   try { localStorage.removeItem("pt2_acct"); } catch (e) {}
   /* uid 를 새로 만들어 이 폰을 빈 상태로 되돌린다. 서버 자료는 지우지 않는다. */
   try { window.DB.set("pododa_uid", "u_" + Math.random().toString(36).slice(2, 10)); } catch (e2) {}
   say("로그아웃했어요");
+  try { gateShow(); } catch (e4) {}
   refreshRooms(function () { try { renderTalkSettings(); } catch (e3) {} });
 }
 
@@ -5088,6 +5181,10 @@ try { uiWatch(); } catch (e) {}
    index.html 이 <html> 에 pt2-boot 을 붙여 화면을 감춰두고, 여기서 다 그린
    뒤에 떼어낸다. 이 파일이 안 실려도 index.html 쪽 시간제한이 대신 떼어낸다. */
 try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
+
+/* 화면을 다 그린 뒤에 문을 덮는다. 먼저 덮으면 뒤에서 그리는 동안
+   빈 화면이 스쳐 보인다. */
+try { gateCheck(); } catch (e) {}
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
 try { fixTabbar(); } catch (e) {}
