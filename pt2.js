@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "121";
+var PT2_VER = "122";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -412,7 +412,9 @@ function injectSettings() {
       '<span class="pt2-legal-t">크레딧 구입 · 잔액 보기</span><span class="pt2-legal-go">›</span></a>' +
     '<div class="pt2-sub" style="margin-top:8px">채팅 · 일반채팅 · 1:1 동시통역은 무료입니다. 다중 통역 · 마주보기 · 전화통역에 크레딧이 쓰입니다.</div>' +
 
-    '<a class="pt2-legal" href="#" data-pt2="saytest">' +
+    /* href="#" 를 쓰면 주소가 '#' 으로 바뀌면서 화면이 엉뚱한 데로 간다.
+       누르는 것만 받고 주소는 건드리지 않는다. */
+    '<a class="pt2-legal" href="javascript:void(0)" data-pt2="saytest">' +
       '<span class="pt2-legal-t">소리 시험 · 읽어주기가 되는지</span><span class="pt2-legal-go">›</span></a>' +
 
     '<div class="tk-sec" style="margin-top:14px">전화통역</div>' +
@@ -5289,24 +5291,35 @@ try { uiWatch(); } catch (e) {}
 try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
 
 /* ── 뒤로가기 ──
-   지금까지 설정 안쪽 화면에서 뒤로가기를 누르면 앱이 통째로 꺼졌다.
-   화면 이동을 주소(#해시)로만 하고 있어서, 브라우저가 보기에는
-   더 돌아갈 곳이 없었기 때문이다.
+   설정 안쪽에서 뒤로가기를 누르면 앱이 통째로 꺼졌다. 화면 이동을
+   주소(#해시)로만 하고 있어서 브라우저가 보기엔 더 돌아갈 곳이
+   없었기 때문이다. 그래서 한 칸을 미리 깔아둔다.
 
-   한 칸을 미리 깔아둔다. 뒤로가기를 누르면 그 칸을 먼저 만나고,
-   우리가 포도AI 로 보낸다. 이미 포도AI 에 있으면 그때는 막지 않는다 —
-   나가고 싶은 사람을 가두면 그게 더 나쁘다. */
+   ★ 조심할 것 ★
+   크롬은 '뒤로가기' 뿐 아니라 '주소를 바꿔 앞으로 갈 때' 도 popstate 를
+   부른다. 그걸 구분하지 않고 홈으로 보냈더니 탭을 누를 때마다
+   포도AI 로 튀었다. 그래서 주소가 실제로 바뀌었는지를 먼저 본다.
+   주소가 바뀌었으면 평범한 이동이므로 아무것도 하지 않는다. */
 (function () {
   var HOME = "#/talk/podoya";
+  var last = String(location.hash || "");
+
   function atHome() {
     var h = String(location.hash || "");
     return !h || h === "#" || h.indexOf(HOME) === 0;
   }
   function pad() { try { history.pushState({ pt2: "pad" }, ""); } catch (e) {} }
-  try { if (!history.state || !history.state.pt2) pad(); } catch (e) {}
+  try { pad(); } catch (e) {}
+
+  window.addEventListener("hashchange", function () {
+    last = String(location.hash || "");
+  });
 
   window.addEventListener("popstate", function () {
-    /* 열려 있는 여닫이(드롭다운)를 먼저 접는다 */
+    var h = String(location.hash || "");
+    if (h !== last) { last = h; return; }   /* 평범한 화면 이동이다 */
+
+    /* 여기까지 왔으면 더 돌아갈 곳이 없다는 뜻이다 */
     var closed = false;
     try {
       var ds = document.querySelectorAll("details[open]");
@@ -5314,8 +5327,8 @@ try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
     } catch (e) {}
     if (closed) { pad(); return; }
 
-    if (atHome()) return;              /* 홈이면 그대로 나가게 둔다 */
-    try { location.hash = HOME; } catch (e) {}
+    if (atHome()) return;                   /* 홈이면 나가게 둔다 */
+    try { location.hash = HOME; last = HOME; } catch (e) {}
     pad();
   });
 })();
