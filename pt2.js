@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "122";
+var PT2_VER = "123";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -4233,11 +4233,43 @@ function srvSay(text, langC, quiet){
   });
 }
 
-/* 설정에서 눌러보는 소리 시험. 폰이 어떤 상태인지 바로 알려줍니다. */
+/* ── 설정에서 눌러보는 소리 시험 ──
+   전에는 "목소리 92개 · 소리를 냅니다" 만 띄우고 끝이었다. 소리가 안 나도
+   왜 안 나는지 알 길이 없었고, 안 되면 조용히 서버 소리로 넘어가 크레딧만
+   나갔다. 시험은 결과를 말해줘야 시험이다.
+
+   그래서 여기서는 폰 읽기 엔진을 '직접' 부른다. 누른 그 순간에 부르는 것이
+   중요하다. 크롬은 사람이 누른 직후가 아니면 소리를 막는다. 사이에 다른
+   일을 끼우면 그것만으로 막힌다.
+   폰이 못 읽으면 그 이유를 적어주고, 그때만 서버 소리로 넘어간다. */
 function trxSayTest(){
-  var n = trxVoices().length;
-  say("목소리 " + n + "개 · 소리를 냅니다");
-  trxSay("소리 시험입니다. 잘 들리시나요?", "KO");
+  var n = 0; try{ n = trxVoices().length; }catch(e){}
+  var S = window.speechSynthesis;
+  if(!S || !window.SpeechSynthesisUtterance){
+    say("이 폰은 읽어주기를 지원하지 않아요 · 서버 소리로 시험합니다");
+    try{ srvSay("소리 시험입니다. 잘 들리시나요?", "KO"); }catch(e){}
+    return;
+  }
+
+  var u = new SpeechSynthesisUtterance("소리 시험입니다. 잘 들리시나요?");
+  u.lang = "ko-KR"; u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
+  try{ var v = trxPickVoice("ko-KR"); if(v) u.voice = v; }catch(e){}
+
+  var started = false, why = "";
+  u.onstart = function(){ started = true; say("🔊 소리가 나오고 있어요"); };
+  u.onerror = function(ev){ why = (ev && ev.error) || "알 수 없음"; };
+
+  try{ S.resume(); }catch(e){}
+  try{ S.speak(u); }
+  catch(e){ why = "speak 실패"; }
+
+  setTimeout(function(){
+    if(started || S.speaking || S.pending) return;
+    /* 폰이 못 읽었다. 무엇 때문인지 알려주고 서버 소리로 넘어간다. */
+    say("폰이 소리를 못 냈어요 (" + (why || "이유 없음") + ") · 목소리 " + n +
+        "개 · 미디어 볼륨과 무음모드를 확인해 주세요");
+    try{ srvSay("소리 시험입니다. 잘 들리시나요?", "KO"); }catch(e){}
+  }, 1400);
 }
 
 /* ── 마이크 ① 폰 받아쓰기 ── */
