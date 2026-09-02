@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "119";
+var PT2_VER = "120";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1958,10 +1958,30 @@ function renderPodoya(){
      주소에 남는 값이므로 새더라도 피해가 작아야 한다.
      아직 열쇠를 안 만든 분은 예전처럼 그냥 열린다(무료 기능만). */
   var _pt = ""; try { _pt = pkToken(); } catch (e) {}
-  var _q = "?in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
+  /* 주소 끝에 여는 시각을 붙인다. 같은 주소를 다시 열 때 브라우저가
+     빈 화면을 그대로 재활용하는 일이 있었다. 시각이 매번 달라지면
+     반드시 새로 불러온다. */
+  var _q = "?in=podotalk&t=" + Date.now() + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
-    '<div class="pt2-callwrap"><iframe class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
-      'allow="microphone; clipboard-write"></iframe></div>';
+    '<div class="pt2-callwrap" style="position:relative">' +
+      '<iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
+        'allow="microphone; clipboard-write"></iframe>' +
+      /* 화면이 하얗게 뜨거나 안 열릴 때 손으로 다시 부를 수 있게 둔다.
+         원인을 못 찾았을 때 사용자가 앱을 지우지 않게 하는 마지막 문이다. */
+      '<button data-pt2="ai-reload" style="position:absolute;right:10px;bottom:10px;' +
+        'border:none;border-radius:11px;padding:8px 12px;background:rgba(30,22,52,.72);' +
+        'color:#fff;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;' +
+        'z-index:5">다시 열기</button>' +
+      '<div id="pt2-ai-diag" style="position:absolute;left:10px;bottom:10px;z-index:5;' +
+        'font-size:10.5px;color:#9a93ad"></div>' +
+    "</div>";
+
+  /* 지갑이 안 붙었으면 그 사실을 화면에 적어둔다. 조용히 안 되면
+     "말하기가 안 된다" 로만 보이고 원인을 알 길이 없다. */
+  try {
+    var dg = document.getElementById("pt2-ai-diag");
+    if (dg && !_pt) dg.textContent = "지갑 미연결 · 설정 → 크레딧에서 지갑 만들기";
+  } catch (e) {}
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
@@ -4763,6 +4783,11 @@ document.addEventListener("click", function (e) {
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
+  if (a === "ai-reload") {
+    /* 탭을 다시 그린다. 주소에 새 시각이 붙어 확실히 새로 불러온다. */
+    try { renderPodoya(); } catch (e) { location.reload(); }
+    return;
+  }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
   if (a === "quit-go") {
     if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
