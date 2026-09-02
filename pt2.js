@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "120";
+var PT2_VER = "121";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1963,25 +1963,8 @@ function renderPodoya(){
      반드시 새로 불러온다. */
   var _q = "?in=podotalk&t=" + Date.now() + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
-    '<div class="pt2-callwrap" style="position:relative">' +
-      '<iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
-        'allow="microphone; clipboard-write"></iframe>' +
-      /* 화면이 하얗게 뜨거나 안 열릴 때 손으로 다시 부를 수 있게 둔다.
-         원인을 못 찾았을 때 사용자가 앱을 지우지 않게 하는 마지막 문이다. */
-      '<button data-pt2="ai-reload" style="position:absolute;right:10px;bottom:10px;' +
-        'border:none;border-radius:11px;padding:8px 12px;background:rgba(30,22,52,.72);' +
-        'color:#fff;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;' +
-        'z-index:5">다시 열기</button>' +
-      '<div id="pt2-ai-diag" style="position:absolute;left:10px;bottom:10px;z-index:5;' +
-        'font-size:10.5px;color:#9a93ad"></div>' +
-    "</div>";
-
-  /* 지갑이 안 붙었으면 그 사실을 화면에 적어둔다. 조용히 안 되면
-     "말하기가 안 된다" 로만 보이고 원인을 알 길이 없다. */
-  try {
-    var dg = document.getElementById("pt2-ai-diag");
-    if (dg && !_pt) dg.textContent = "지갑 미연결 · 설정 → 크레딧에서 지갑 만들기";
-  } catch (e) {}
+    '<div class="pt2-callwrap"><iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
+      'allow="microphone; clipboard-write"></iframe></div>';
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
@@ -4783,11 +4766,6 @@ document.addEventListener("click", function (e) {
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
-  if (a === "ai-reload") {
-    /* 탭을 다시 그린다. 주소에 새 시각이 붙어 확실히 새로 불러온다. */
-    try { renderPodoya(); } catch (e) { location.reload(); }
-    return;
-  }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
   if (a === "quit-go") {
     if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
@@ -5309,6 +5287,38 @@ try { uiWatch(); } catch (e) {}
    index.html 이 <html> 에 pt2-boot 을 붙여 화면을 감춰두고, 여기서 다 그린
    뒤에 떼어낸다. 이 파일이 안 실려도 index.html 쪽 시간제한이 대신 떼어낸다. */
 try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
+
+/* ── 뒤로가기 ──
+   지금까지 설정 안쪽 화면에서 뒤로가기를 누르면 앱이 통째로 꺼졌다.
+   화면 이동을 주소(#해시)로만 하고 있어서, 브라우저가 보기에는
+   더 돌아갈 곳이 없었기 때문이다.
+
+   한 칸을 미리 깔아둔다. 뒤로가기를 누르면 그 칸을 먼저 만나고,
+   우리가 포도AI 로 보낸다. 이미 포도AI 에 있으면 그때는 막지 않는다 —
+   나가고 싶은 사람을 가두면 그게 더 나쁘다. */
+(function () {
+  var HOME = "#/talk/podoya";
+  function atHome() {
+    var h = String(location.hash || "");
+    return !h || h === "#" || h.indexOf(HOME) === 0;
+  }
+  function pad() { try { history.pushState({ pt2: "pad" }, ""); } catch (e) {} }
+  try { if (!history.state || !history.state.pt2) pad(); } catch (e) {}
+
+  window.addEventListener("popstate", function () {
+    /* 열려 있는 여닫이(드롭다운)를 먼저 접는다 */
+    var closed = false;
+    try {
+      var ds = document.querySelectorAll("details[open]");
+      for (var i = 0; i < ds.length; i++) { ds[i].open = false; closed = true; }
+    } catch (e) {}
+    if (closed) { pad(); return; }
+
+    if (atHome()) return;              /* 홈이면 그대로 나가게 둔다 */
+    try { location.hash = HOME; } catch (e) {}
+    pad();
+  });
+})();
 
 /* 화면을 다 그린 뒤에 문을 덮는다. 먼저 덮으면 뒤에서 그리는 동안
    빈 화면이 스쳐 보인다. */
