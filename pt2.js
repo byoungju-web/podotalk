@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "118";
+var PT2_VER = "119";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1703,8 +1703,10 @@ function renderCredits(){
     "</div>" +
 
     /* 포도AI와 지갑 합치기 — 처음 오신 분이 가장 먼저 보게 둔다 */
-    '<div class="tk-sec" style="margin-top:16px">포도AI 연결</div>' +
-    pkCardHtml() +
+    '<details class="pt2-fold" style="margin-top:16px">' +
+      '<summary><span style="flex:1">포도AI 연결</span><span class="fold-ar">\u25BE</span></summary>' +
+      pkCardHtml() +
+    "</details>" +
 
     /* 크레딧 사기 */
     '<div class="tk-sec" style="margin-top:16px">크레딧 사기</div>' +
@@ -2819,6 +2821,24 @@ function gAsk(cb) {
 
    열쇠는 구글 로그인을 거친 분에게만 내준다. uid 는 참여자 목록에
    그대로 드러나므로 그것만으로는 주인을 확인할 수 없기 때문이다. */
+/* 여닫이(드롭다운) 모양 — 눌러서 아래로 열고 다시 접는다 */
+(function () {
+  try {
+    if (document.getElementById("pt2-fold-css")) return;
+    var st = document.createElement("style");
+    st.id = "pt2-fold-css";
+    st.textContent =
+      ".pt2-fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;" +
+        "gap:8px;padding:13px 15px;border-radius:14px;background:rgba(0,0,0,.04);" +
+        "font-size:13px;font-weight:800}" +
+      ".pt2-fold > summary::-webkit-details-marker{display:none}" +
+      ".pt2-fold[open] > summary{margin-bottom:8px}" +
+      ".pt2-fold[open] > summary .fold-ar{transform:rotate(180deg)}" +
+      ".pt2-fold .fold-ar{font-size:13px;transition:transform .18s}";
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+
 function pkGet()  { return LSJ("pt2_pkey", null); }
 function pkSave(o){ LSS("pt2_pkey", JSON.stringify(o)); }
 function pkToken(){ var o = pkGet(); return (o && o.token) || ""; }
