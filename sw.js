@@ -9,7 +9,7 @@
       갱신될 때마다 꺼둔 방이 도로 켜졌다.
    ③ 오프라인일 때 빈 응답이 나가던 곳을 막았다.
    ────────────────────────────────────────────────────────────── */
-const CACHE = "podotalk-v55";
+const CACHE = "podotalk-v57";
 const KEEP = [CACHE, "pt2-cfg"];               /* 알림 설정 캐시는 건드리지 않는다 */
 
 /* manifest.json 은 일부러 뺐다. 넣으면 숏컷이 옛 것으로 굳는다. */
@@ -46,7 +46,11 @@ self.addEventListener("fetch", (e) => {
   // HTML·레이어 스크립트·manifest 는 네트워크 우선(새 버전 즉시 반영), 실패 시 캐시
   const fresh = FRESH.includes(url.pathname);
   if (req.mode === "navigate" || fresh) {
-    const key = req.mode === "navigate" ? "/index.html" : url.pathname;
+    /* ★ 주소창에 /pt2.js 나 /sw.js 를 직접 치면 브라우저는 그것도
+       "페이지 이동" 으로 본다. 그때 /index.html 자리에 저장하면
+       화면 캐시에 자바스크립트 원문이 들어앉는다. 실제로 그랬다.
+       파일을 확인하러 주소를 쳐본 것만으로 앱이 망가지면 안 된다. */
+    const key = (req.mode === "navigate" && !fresh) ? "/index.html" : url.pathname;
     e.respondWith(
       fetch(req).then((res) => {
         // manifest 는 오프라인 대비로만 복사해 둔다. 읽을 때는 늘 네트워크가 먼저다.
