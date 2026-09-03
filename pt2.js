@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "131";
+var PT2_VER = "132";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -4827,6 +4827,17 @@ document.addEventListener("click", function (e) {
        그래서 창 안쪽 화면에 들어가 있으면 탭을 눌러도 못 빠져나왔다.
        같은 탭을 다시 누르면 창을 새로 그려 홈으로 되돌린다. */
     if (String(location.hash || "").indexOf("#/talk/podoya") === 0) {
+      /* 창이 이미 떠 있으면 다시 그리지 않고 "처음 화면으로" 만 알린다.
+         다시 그리면 1.3MB 를 또 받아야 하고, 포도야는 마지막에 보던
+         화면을 기억하고 있어서 다시 그려도 같은 자리로 돌아온다. */
+      try {
+        var _fr = document.getElementById("pt2-aif");
+        if (_fr && _fr.contentWindow) {
+          _fr.contentWindow.postMessage({ podoya: "home" }, "https://podoya.ai.kr");
+          aiDepth = 0; aiMark = false;
+          return;
+        }
+      } catch (e) {}
       try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
       return;
     }
