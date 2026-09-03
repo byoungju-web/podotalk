@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "130";
+var PT2_VER = "131";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1961,16 +1961,35 @@ function renderPodoya(){
      아직 열쇠를 안 만든 분은 예전처럼 그냥 열린다(무료 기능만). */
   try { aiDepth = 0; aiMark = false; } catch (e) {}   /* 창을 새로 그리면 처음부터 */
   var _pt = ""; try { _pt = pkToken(); } catch (e) {}
-  /* 주소 끝에 여는 시각을 붙인다. 같은 주소를 다시 열 때 브라우저가
-     빈 화면을 그대로 재활용하는 일이 있었다. 시각이 매번 달라지면
-     반드시 새로 불러온다. */
-  var _q = "?in=podotalk&t=" + Date.now() + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
+  /* ★ 주소 끝에 여는 시각을 붙이면 안 된다.
+     매번 주소가 달라져 브라우저가 캐시를 못 쓰고, 탭을 옮길 때마다
+     1.3MB 짜리 화면을 통째로 다시 받는다. 느리거나 중간에 끊기면
+     하얀 화면이 된다. 실제로 그랬다.
+     주소를 고정해 두면 두 번째부터는 즉시 뜬다. 새 판을 받는 일은
+     서비스워커가 알아서 한다. */
+  var _q = "?in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-callwrap"><iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
       /* 창 안에서 쓰는 기능은 부모가 허락해줘야 한다.
          web-share 가 없어서 '친구에게 알리기'(카톡 공유)가 아무 반응이
          없었다. 카메라·위치도 같은 이유로 막힐 수 있어 함께 넘긴다. */
       'allow="microphone; camera; geolocation; clipboard-write; web-share"></iframe></div>';
+
+  /* 그래도 안 뜨면 조용히 한 번만 다시 부른다.
+     사용자에게 '다시 열기' 단추를 보이는 것보다, 앱이 스스로 회복하는
+     편이 낫다. 한 번만 하고 멈춘다 — 계속 반복하면 더 나쁘다. */
+  try {
+    var _f = document.getElementById("pt2-aif");
+    if (_f) {
+      var _ok = false;
+      _f.addEventListener("load", function () { _ok = true; });
+      setTimeout(function () {
+        if (_ok) return;
+        if (!document.getElementById("pt2-aif")) return;
+        try { _f.src = PODOYA + _q + "&r=1"; } catch (e) {}
+      }, 3500);
+    }
+  } catch (e) {}
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
