@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "129";
+var PT2_VER = "130";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1959,7 +1959,7 @@ function renderPodoya(){
      열쇠(PODO-XXXX-XXXX)가 아니라 기한이 있는 토큰을 넘긴다 —
      주소에 남는 값이므로 새더라도 피해가 작아야 한다.
      아직 열쇠를 안 만든 분은 예전처럼 그냥 열린다(무료 기능만). */
-  try { aiDepth = 0; } catch (e) {}      /* 창을 새로 그리면 겹 수도 처음부터 */
+  try { aiDepth = 0; aiMark = false; } catch (e) {}   /* 창을 새로 그리면 처음부터 */
   var _pt = ""; try { _pt = pkToken(); } catch (e) {}
   /* 주소 끝에 여는 시각을 붙인다. 같은 주소를 다시 열 때 브라우저가
      빈 화면을 그대로 재활용하는 일이 있었다. 시각이 매번 달라지면
@@ -5353,26 +5353,42 @@ try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
      설정 안쪽을 누를 때마다 포도AI 로 튀었다. 크롬은 주소가 바뀔 때도
      popstate 를 부르기 때문이다. */
 var aiDepth = 0;                 /* 창 안에 열려 있는 화면 겹 수 */
+var aiMark = false;              /* 뒤로가기를 받아낼 자리를 깔아뒀는지 */
+
+/* ── 방문기록은 딱 한 칸만 쓴다 ──
+   전에는 창 안 화면이 열릴 때마다 한 칸씩 쌓았다. 포도야에서 화면을
+   서너 개 열면 포도톡 기록에 포도AI 자리가 서너 개 끼어든다.
+   그 뒤 다른 탭에서 화면이 닫히며 뒤로가기가 불리면, 끼어든 그 자리로
+   떨어져 느닷없이 포도AI 가 떴다.
+
+   그래서 겹이 몇이든 자리는 하나만 깐다. 뒤로가기가 오면 그 자리를
+   쓰고, 아직 닫을 화면이 남아 있으면 다시 하나만 깐다.
+   포도AI 탭을 떠나면 더 깔지 않는다 — 남은 한 칸은 평범한 기록 하나라
+   해가 없다. */
+function aiPad() {
+  if (aiMark) return;
+  try { history.pushState({ pt2: "ai" }, ""); aiMark = true; } catch (e) {}
+}
+function aiOnPodoyaTab() {
+  return String(location.hash || "").indexOf("#/talk/podoya") === 0;
+}
 
 window.addEventListener("message", function (ev) {
   try {
     if (String(ev.origin || "").indexOf("podoya.ai.kr") < 0) return;
     var d = ev.data;
     if (!d || d.podoya !== "push") return;
-    /* 포도AI 탭을 보고 있을 때만 기록을 쌓는다.
-       탭을 떠난 뒤에도 창이 신호를 보내면, 다른 탭의 방문기록에
-       포도AI 자리가 끼어들어 뒤로가기가 엉뚱한 데로 간다. */
-    if (String(location.hash || "").indexOf("#/talk/podoya") !== 0) return;
-    if (aiDepth >= 20) return;                 /* 무한정 쌓이지 않게 */
+    if (!aiOnPodoyaTab()) return;          /* 그 탭을 보고 있을 때만 */
     aiDepth++;
-    history.pushState({ pt2: "ai", n: aiDepth }, "");
+    aiPad();
   } catch (e) {}
 });
 
 window.addEventListener("popstate", function () {
-  if (aiDepth <= 0) return;                 /* 창 안에 열린 게 없으면 상관 안 한다 */
-  /* 포도AI 탭을 떠나 있으면 창 안 화면은 이미 안 보인다. 겹 수만 비운다. */
-  if (String(location.hash || "").indexOf("#/talk/podoya") !== 0) { aiDepth = 0; return; }
+  if (!aiMark) return;                     /* 우리가 깐 자리가 아니다 */
+  aiMark = false;
+  if (aiDepth <= 0) return;
+  if (!aiOnPodoyaTab()) { aiDepth = 0; return; }
   aiDepth--;
   try {
     var f = document.getElementById("pt2-aif");
@@ -5380,6 +5396,7 @@ window.addEventListener("popstate", function () {
       f.contentWindow.postMessage({ podoya: "back" }, "https://podoya.ai.kr");
     }
   } catch (e) {}
+  if (aiDepth > 0) aiPad();                /* 아직 닫을 게 남았으면 한 칸만 다시 */
 });
 
 /* 화면을 다 그린 뒤에 문을 덮는다. 먼저 덮으면 뒤에서 그리는 동안
