@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "126";
+var PT2_VER = "127";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5353,6 +5353,8 @@ window.addEventListener("message", function (ev) {
 
 window.addEventListener("popstate", function () {
   if (aiDepth <= 0) return;                 /* 창 안에 열린 게 없으면 상관 안 한다 */
+  /* 포도AI 탭을 떠나 있으면 창 안 화면은 이미 안 보인다. 겹 수만 비운다. */
+  if (String(location.hash || "").indexOf("#/talk/podoya") !== 0) { aiDepth = 0; return; }
   aiDepth--;
   try {
     var f = document.getElementById("pt2-aif");
