@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "128";
+var PT2_VER = "129";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5359,6 +5359,11 @@ window.addEventListener("message", function (ev) {
     if (String(ev.origin || "").indexOf("podoya.ai.kr") < 0) return;
     var d = ev.data;
     if (!d || d.podoya !== "push") return;
+    /* 포도AI 탭을 보고 있을 때만 기록을 쌓는다.
+       탭을 떠난 뒤에도 창이 신호를 보내면, 다른 탭의 방문기록에
+       포도AI 자리가 끼어들어 뒤로가기가 엉뚱한 데로 간다. */
+    if (String(location.hash || "").indexOf("#/talk/podoya") !== 0) return;
+    if (aiDepth >= 20) return;                 /* 무한정 쌓이지 않게 */
     aiDepth++;
     history.pushState({ pt2: "ai", n: aiDepth }, "");
   } catch (e) {}
