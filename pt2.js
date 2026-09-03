@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "127";
+var PT2_VER = "128";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1967,7 +1967,10 @@ function renderPodoya(){
   var _q = "?in=podotalk&t=" + Date.now() + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-callwrap"><iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
-      'allow="microphone; clipboard-write"></iframe></div>';
+      /* 창 안에서 쓰는 기능은 부모가 허락해줘야 한다.
+         web-share 가 없어서 '친구에게 알리기'(카톡 공유)가 아무 반응이
+         없었다. 카메라·위치도 같은 이유로 막힐 수 있어 함께 넘긴다. */
+      'allow="microphone; camera; geolocation; clipboard-write; web-share"></iframe></div>';
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
@@ -4800,7 +4803,17 @@ document.addEventListener("click", function (e) {
   if (a === "pay-e")   { walPay("each"); return; }
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
-  if (a === "podoya") { location.hash = "#/talk/podoya"; return; }
+  if (a === "podoya") {
+    /* 이미 포도AI 탭에 있으면 주소가 안 바뀌어 아무 일도 안 일어난다.
+       그래서 창 안쪽 화면에 들어가 있으면 탭을 눌러도 못 빠져나왔다.
+       같은 탭을 다시 누르면 창을 새로 그려 홈으로 되돌린다. */
+    if (String(location.hash || "").indexOf("#/talk/podoya") === 0) {
+      try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
+      return;
+    }
+    location.hash = "#/talk/podoya";
+    return;
+  }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
   if (a === "quit-go") {
     if (!confirm("정말 탈퇴할까요?\n\n내가 만든 방과 대화가 서버에서 지워지고,\n이 폰에 저장된 자료도 모두 사라집니다.\n되돌릴 수 없습니다.")) return;
