@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "133";
+var PT2_VER = "134";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1967,9 +1967,10 @@ function renderPodoya(){
      하얀 화면이 된다. 실제로 그랬다.
      주소를 고정해 두면 두 번째부터는 즉시 뜬다. 새 판을 받는 일은
      서비스워커가 알아서 한다. */
-  /* home=1 을 붙여 "처음 화면부터" 를 알린다. 주소는 이 값 하나만
-     달라지므로 캐시는 그대로 쓰인다 — 1.3MB 를 다시 받지 않는다. */
-  var _q = "?in=podotalk&home=1" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
+  /* 창을 새로 만들면 포도야는 어차피 처음 화면부터 시작한다.
+     여기에 home=1 같은 걸 붙여 "홈으로 가라" 고 또 시키면, 아직
+     준비도 안 된 화면을 비워버려 흰 화면이 됐다. 아무것도 붙이지 않는다. */
+  var _q = "?in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-callwrap"><iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
       /* 창 안에서 쓰는 기능은 부모가 허락해줘야 한다.
