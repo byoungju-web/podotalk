@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "135";
+var PT2_VER = "136";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1978,21 +1978,11 @@ function renderPodoya(){
          없었다. 카메라·위치도 같은 이유로 막힐 수 있어 함께 넘긴다. */
       'allow="microphone; camera; geolocation; clipboard-write; web-share"></iframe></div>';
 
-  /* 그래도 안 뜨면 조용히 한 번만 다시 부른다.
-     사용자에게 '다시 열기' 단추를 보이는 것보다, 앱이 스스로 회복하는
-     편이 낫다. 한 번만 하고 멈춘다 — 계속 반복하면 더 나쁘다. */
-  try {
-    var _f = document.getElementById("pt2-aif");
-    if (_f) {
-      var _ok = false;
-      _f.addEventListener("load", function () { _ok = true; });
-      setTimeout(function () {
-        if (_ok) return;
-        if (!document.getElementById("pt2-aif")) return;
-        try { _f.src = PODOYA + _q + "&r=1"; } catch (e) {}
-      }, 3500);
-    }
-  } catch (e) {}
+  /* ★ 여기에 "3.5초 안에 안 뜨면 다시 부르기" 를 넣었다가 크게 데었다.
+     캐시에서 빨리 뜨면 load 가 리스너를 붙이기 전에 이미 끝난다.
+     그러면 잘 떠 있는 창을 3.5초 뒤에 강제로 다시 불러버린다.
+     적어둔 글이 날아가고, 다시 받는 도중에 화면이 깨졌다.
+     안 뜨는 일은 드물고, 뜬 것을 부수는 일은 매번이었다. 넣지 않는다. */
     /* '포도야에서 바로 열기' 버튼은 뺐다. 새 창으로 열면 크롬이 위에
        '포도야 — 폰에서 바로 쓰는 AI 비서 · podoya.ai.kr' 막대를 붙이는데,
        그건 브라우저가 붙이는 것이라 우리 코드로는 못 없앤다. 바로 이 칸에
