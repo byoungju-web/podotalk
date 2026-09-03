@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "134";
+var PT2_VER = "135";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -4830,10 +4830,16 @@ document.addEventListener("click", function (e) {
        그래서 창 안쪽 화면에 들어가 있으면 탭을 눌러도 못 빠져나왔다.
        같은 탭을 다시 누르면 창을 새로 그려 홈으로 되돌린다. */
     if (String(location.hash || "").indexOf("#/talk/podoya") === 0) {
-      /* 창을 통째로 새로 그린다. 이게 v129 에서 하던 방식이고 잘 됐다.
-         한때 "신호만 보내면 다시 안 받아도 되니 빠르다" 며 바꿨다가,
-         신호를 못 받는 화면에서는 홈으로 안 가고, 홈으로 가더라도 옛
-         화면이 안 지워져 두 겹으로 보였다. 확실한 쪽으로 되돌린다. */
+      /* 창에게 "처음 화면으로" 를 알린다. 창이 그 자리에서 홈으로 가므로
+         기다림이 없다. 창이 없거나 신호가 안 통하면 통째로 새로 그린다. */
+      try {
+        var _fr = document.getElementById("pt2-aif");
+        if (_fr && _fr.contentWindow) {
+          _fr.contentWindow.postMessage({ podoya: "home" }, "https://podoya.ai.kr");
+          aiDepth = 0; aiMark = false;
+          return;
+        }
+      } catch (e) {}
       try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
       return;
     }
