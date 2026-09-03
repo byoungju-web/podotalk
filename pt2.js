@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "125";
+var PT2_VER = "126";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1959,6 +1959,7 @@ function renderPodoya(){
      열쇠(PODO-XXXX-XXXX)가 아니라 기한이 있는 토큰을 넘긴다 —
      주소에 남는 값이므로 새더라도 피해가 작아야 한다.
      아직 열쇠를 안 만든 분은 예전처럼 그냥 열린다(무료 기능만). */
+  try { aiDepth = 0; } catch (e) {}      /* 창을 새로 그리면 겹 수도 처음부터 */
   var _pt = ""; try { _pt = pkToken(); } catch (e) {}
   /* 주소 끝에 여는 시각을 붙인다. 같은 주소를 다시 열 때 브라우저가
      빈 화면을 그대로 재활용하는 일이 있었다. 시각이 매번 달라지면
@@ -5323,47 +5324,43 @@ try { uiWatch(); } catch (e) {}
 try { document.documentElement.classList.remove("pt2-boot"); } catch (e) {}
 
 /* ── 뒤로가기 ──
-   설정 안쪽에서 뒤로가기를 누르면 앱이 통째로 꺼졌다. 화면 이동을
-   주소(#해시)로만 하고 있어서 브라우저가 보기엔 더 돌아갈 곳이
-   없었기 때문이다. 그래서 한 칸을 미리 깔아둔다.
+   포도AI 탭은 포도야를 '창(iframe)' 으로 띄운다. 창 안에서 화면을 열 때
+   창이 스스로 방문기록을 쌓으면 그게 포도톡 전체의 기록에 섞여서,
+   뒤로가기를 눌러도 밖으로 못 나가거나 엉뚱한 데로 갔다.
 
-   ★ 조심할 것 ★
-   크롬은 '뒤로가기' 뿐 아니라 '주소를 바꿔 앞으로 갈 때' 도 popstate 를
-   부른다. 그걸 구분하지 않고 홈으로 보냈더니 탭을 누를 때마다
-   포도AI 로 튀었다. 그래서 주소가 실제로 바뀌었는지를 먼저 본다.
-   주소가 바뀌었으면 평범한 이동이므로 아무것도 하지 않는다. */
-(function () {
-  var HOME = "#/talk/podoya";
-  var last = String(location.hash || "");
+   그렇다고 창 안에서 기록을 아예 안 쌓으면, 이번엔 뒤로가기가 창 안
+   화면을 안 닫고 포도톡을 뒤로 보낸다. 그것도 엉뚱하기는 마찬가지다.
 
-  function atHome() {
-    var h = String(location.hash || "");
-    return !h || h === "#" || h.indexOf(HOME) === 0;
-  }
-  function pad() { try { history.pushState({ pt2: "pad" }, ""); } catch (e) {} }
-  try { pad(); } catch (e) {}
+   그래서 이렇게 나눈다.
+     · 창 안에서 화면이 열리면 → 창이 부모에게 알린다 → 부모가 기록을 쌓는다
+     · 뒤로가기가 오면 → 부모가 창에게 "한 겹 닫아라" 라고 알린다
+   기록은 부모 한 곳에만 쌓이고, 닫는 일은 창이 한다. 서로 밟지 않는다.
 
-  window.addEventListener("hashchange", function () {
-    last = String(location.hash || "");
-  });
+   ★ 여기서 화면을 강제로 옮기지 않는다. 예전에 그렇게 했다가
+     설정 안쪽을 누를 때마다 포도AI 로 튀었다. 크롬은 주소가 바뀔 때도
+     popstate 를 부르기 때문이다. */
+var aiDepth = 0;                 /* 창 안에 열려 있는 화면 겹 수 */
 
-  window.addEventListener("popstate", function () {
-    var h = String(location.hash || "");
-    if (h !== last) { last = h; return; }   /* 평범한 화면 이동이다 */
+window.addEventListener("message", function (ev) {
+  try {
+    if (String(ev.origin || "").indexOf("podoya.ai.kr") < 0) return;
+    var d = ev.data;
+    if (!d || d.podoya !== "push") return;
+    aiDepth++;
+    history.pushState({ pt2: "ai", n: aiDepth }, "");
+  } catch (e) {}
+});
 
-    /* 여기까지 왔으면 더 돌아갈 곳이 없다는 뜻이다 */
-    var closed = false;
-    try {
-      var ds = document.querySelectorAll("details[open]");
-      for (var i = 0; i < ds.length; i++) { ds[i].open = false; closed = true; }
-    } catch (e) {}
-    if (closed) { pad(); return; }
-
-    if (atHome()) return;                   /* 홈이면 나가게 둔다 */
-    try { location.hash = HOME; last = HOME; } catch (e) {}
-    pad();
-  });
-})();
+window.addEventListener("popstate", function () {
+  if (aiDepth <= 0) return;                 /* 창 안에 열린 게 없으면 상관 안 한다 */
+  aiDepth--;
+  try {
+    var f = document.getElementById("pt2-aif");
+    if (f && f.contentWindow) {
+      f.contentWindow.postMessage({ podoya: "back" }, "https://podoya.ai.kr");
+    }
+  } catch (e) {}
+});
 
 /* 화면을 다 그린 뒤에 문을 덮는다. 먼저 덮으면 뒤에서 그리는 동안
    빈 화면이 스쳐 보인다. */
