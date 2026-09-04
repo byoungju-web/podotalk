@@ -4839,7 +4839,20 @@ document.addEventListener("click", function (e) {
       try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
       return;
     }
+    /* 다른 탭에서 눌렀을 때도 늘 처음 화면부터 보이게 한다.
+       창이 예전에 보던 화면을 기억하고 있을 수 있어, 주소를 바꾼 뒤
+       한 번 더 "홈으로" 를 보낸다. 창이 새로 그려졌으면 아무 일도
+       일어나지 않으므로 손해가 없다. */
+    aiDepth = 0; aiMark = false;
     location.hash = "#/talk/podoya";
+    setTimeout(function () {
+      try {
+        var _f3 = document.getElementById("pt2-aif");
+        if (_f3 && _f3.contentWindow) {
+          _f3.contentWindow.postMessage({ podoya: "home" }, location.origin);
+        }
+      } catch (e) {}
+    }, 400);
     return;
   }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
@@ -5454,4 +5467,45 @@ try {
 } catch (e) {}
 try { setTimeout(banCheck, 1200); } catch (e) {}
 
+})();
+
+
+/* ══════════════ 뒤로가기 안전장치 ══════════════
+   설정에서 크레딧 같은 안쪽 화면에 들어갔다 뒤로가기를 두 번 누르면
+   앱이 그대로 꺼졌다. 안쪽 화면 하나를 닫고 나면 되돌아갈 자리가
+   남아 있지 않아, 다음 뒤로가기가 브라우저를 닫아버리기 때문이다.
+
+   그래서 맨 아래에 빈 자리를 하나 깔아 둔다. 되돌아갈 곳이 없어지는
+   순간 그 자리로 떨어지고, 앱은 그대로 남는다. 정말 나가고 싶은 분은
+   2초 안에 한 번 더 누르면 나간다 — 안드로이드 앱들이 쓰는 방식이다. */
+(function () {
+  "use strict";
+  if (window.__pt2Back) return;
+  window.__pt2Back = 1;
+
+  var GAP = 2000;          /* 이 시간 안에 한 번 더 누르면 나간다 */
+  var asked = 0;
+  var armed = false;
+
+  function arm() {
+    try { history.pushState({ pt2back: 1 }, ""); armed = true; } catch (e) {}
+  }
+
+  window.addEventListener("popstate", function (ev) {
+    var st = ev && ev.state;
+    if (!st || !st.pt2back) return;      /* 우리가 깐 자리가 아니면 그대로 둔다 */
+    if (Date.now() - asked < GAP) {      /* 두 번째 — 보내준다 */
+      armed = false;
+      try { history.back(); } catch (e) {}
+      return;
+    }
+    asked = Date.now();
+    arm();                               /* 다시 깔아 둔다 */
+    try { say("한 번 더 누르면 나갑니다"); } catch (e) {}
+  });
+
+  /* 앱이 첫 화면을 다 그린 뒤에 깐다. 먼저 깔면 시작할 때 주소를
+     맞추는 과정에서 지워질 수 있다. */
+  if (document.readyState === "complete") setTimeout(arm, 600);
+  else window.addEventListener("load", function () { setTimeout(arm, 600); });
 })();

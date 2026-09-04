@@ -5465,11 +5465,15 @@ function _recSendLic(blob, onFail){
       _recApply(d.text);
     })['catch'](function(){ if(over) return; over=true; clearTimeout(to); onFail('연결 실패'); });
 }
-function _recToSR(){
+function _recToSR(why){
   /* 받아쓰기가 전부 막히면 예전 음성인식으로 (소리는 나지만 확실히 된다) */
   _recOff=true; sttResetMic();
   var run=window._sttAutoRun; window._sttAutoRun=null;
-  showToast('🎤 받아쓰기가 안 돼요 · 다시 말해주세요','rgba(0,0,0,.85)');
+  /* 왜 안 됐는지 함께 보여준다. 전에는 서버가 알려준 자세한 이유가
+     먼저 떴다가 이 토스트에 곧바로 덮여 사라졌다. 그래서 늘 "안 돼요"
+     한 줄만 남았고, 키 문제인지 소리 문제인지 알 수가 없었다. */
+  var _tail = (why && why!=='off' && why!=='quota') ? (' · '+_recShort(why)) : '';
+  showToast('🎤 받아쓰기가 안 돼요'+_tail+' · 다시 말해주세요','rgba(0,0,0,.85)');
   var t=window._stt.target, m=window._stt.mic, i=window._stt.idle, l=window._stt.listen||i;
   setTimeout(function(){ try{ sttStart(t,m,i,l,run); }catch(e){} }, 900);
 }
@@ -5477,9 +5481,15 @@ function _recSend(blob){
   var mb=document.getElementById(window._stt.mic);
   if(!blob || blob.size<2000){ sttResetMic(); window._sttAutoRun=null; showToast('🎤 잘 안 들렸어요. 다시 말해주세요','rgba(0,0,0,.85)'); return; }
   if(mb) mb.innerHTML='&#9203; 옮기는 중…';
-  if(dgKey){ _recSendDg(blob, function(){ _recToSR(); }); return; }   /* 본인 키 우선 */
-  if(licActive()){ _recSendLic(blob, function(){ _recToSR(); }); return; }
-  _recToSR();
+  /* 내 키가 죽어 있어도 서버로 넘어간다.
+     전에는 내 키가 실패하면 곧바로 예전 음성인식으로 갔다. 서버가 멀쩡한데도
+     받아쓰기가 안 되던 이유가 이것이다. 이제 내 키 → 서버 → 음성인식 순이다. */
+  var _toServer=function(why){
+    if(licActive()){ _recSendLic(blob, function(w2){ _recToSR(w2||why); }); return; }
+    _recToSR(why);
+  };
+  if(dgKey){ _recSendDg(blob, function(why){ _toServer(why); }); return; }   /* 본인 키 우선 */
+  _toServer();
 }
 function _recSendGemini(blob){
   var mb=document.getElementById(window._stt.mic);
