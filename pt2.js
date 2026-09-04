@@ -1946,7 +1946,13 @@ function walOut(){
 /* ══════════════ 포도AI ══════════════
    포도야(podoya.ai.kr)를 포도톡 안에서 연다. 밖으로 나가버리면 아래 탭 다섯 개가
    사라져서 돌아올 길이 없었다. 여기서 열면 탭이 그대로 남는다. */
-var PODOYA = "https://podoya.ai.kr/";
+/* ※ 2026-09-03 — 같은 도메인으로 옮겼다.
+   전에는 podoya.ai.kr 을 창에 띄웠다. 주소가 다르면 크롬이 창 안팎을
+   서로 다른 저장 칸으로 관리한다. 그래서 창 안의 캐시가 늘 비어 있어
+   탭을 열 때마다 1.3MB 짜리 화면을 다시 받았고, 그 받아오기가 한 번
+   실패하면 깨진 종이가 떴다. 열쇠도 따로 넘겨줘야 했다.
+   이제 같은 주소(/ai.html)라 캐시·저장소·로그인을 그대로 함께 쓴다. */
+var PODOYA = "/ai.html";
 function renderPodoya(){
   /* 머리말을 두지 않는다. 아래 탭에 이미 '포도AI' 라고 적혀 있어서
      같은 말이 위아래로 두 번 나왔고, 그만큼 화면이 좁아졌다.
@@ -4825,7 +4831,7 @@ document.addEventListener("click", function (e) {
       try {
         var _fr = document.getElementById("pt2-aif");
         if (_fr && _fr.contentWindow) {
-          _fr.contentWindow.postMessage({ podoya: "home" }, "https://podoya.ai.kr");
+          _fr.contentWindow.postMessage({ podoya: "home" }, location.origin);
           aiDepth = 0; aiMark = false;
           return;
         }
@@ -5397,7 +5403,10 @@ function aiOnPodoyaTab() {
 
 window.addEventListener("message", function (ev) {
   try {
-    if (String(ev.origin || "").indexOf("podoya.ai.kr") < 0) return;
+    /* 창이 같은 도메인(/ai.html)으로 옮겨졌다. 예전 주소도 함께 받아준다 —
+       폰에 옛 화면이 남아 있는 동안 뒤로가기가 끊기지 않게. */
+    var _o = String(ev.origin || "");
+    if (_o !== location.origin && _o.indexOf("podoya.ai.kr") < 0) return;
     var d = ev.data;
     if (!d || d.podoya !== "push") return;
     if (!aiOnPodoyaTab()) return;          /* 그 탭을 보고 있을 때만 */
@@ -5415,7 +5424,7 @@ window.addEventListener("popstate", function () {
   try {
     var f = document.getElementById("pt2-aif");
     if (f && f.contentWindow) {
-      f.contentWindow.postMessage({ podoya: "back" }, "https://podoya.ai.kr");
+      f.contentWindow.postMessage({ podoya: "back" }, location.origin);
     }
   } catch (e) {}
   if (aiDepth > 0) aiPad();                /* 아직 닫을 게 남았으면 한 칸만 다시 */
