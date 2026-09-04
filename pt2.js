@@ -2826,18 +2826,54 @@ function gAsk(cb) {
   if (!G_CLIENT_ID) { say("구글 로그인이 준비되지 않았어요"); return; }
   gLoad(function (ok2) {
     if (!ok2) { say("구글 로그인을 불러오지 못했어요"); return; }
+    /* 전에는 원탭(One Tap)만 띄웠다. 구글은 이것을 자주 막는다 —
+       사이트 데이터를 지운 직후, 쿠키 제한, 짧은 시간에 여러 번 시도.
+       막히면 아무 답도 오지 않아서 "구글 확인 중…" 에서 영영 멈췄다.
+       지갑이 안 만들어지던 진짜 이유가 이것이다.
+       이제 원탭을 먼저 띄워보고, 잠깐 기다려도 답이 없으면 진짜
+       로그인 단추를 띄운다. 단추는 눌러서 여는 창이라 막히지 않는다. */
+    var _gDone = false, _gSheet = null;
+    function _gClose() {
+      try { if (_gSheet && _gSheet.parentNode) _gSheet.parentNode.removeChild(_gSheet); } catch (e) {}
+      _gSheet = null;
+    }
+    function _gFinish(cred) {
+      if (_gDone) return;
+      _gDone = true; _gClose(); cb(cred);
+    }
     try {
       google.accounts.id.initialize({
         client_id: G_CLIENT_ID,
-        callback: function (res) { if (res && res.credential) cb(res.credential); },
+        callback: function (res) { if (res && res.credential) _gFinish(res.credential); },
         auto_select: true
       });
-      google.accounts.id.prompt(function (n) {
-        if (n && n.isNotDisplayed && n.isNotDisplayed()) {
-          say("구글 계정 선택 창이 막혔어요. 크롬에서 구글에 로그인돼 있는지 확인해 주세요");
-        }
-      });
-    } catch (e) { say("구글 로그인을 열지 못했어요"); }
+    } catch (e) { say("구글 로그인을 열지 못했어요"); return; }
+    try { google.accounts.id.prompt(); } catch (e) {}
+
+    setTimeout(function () {
+      if (_gDone) return;
+      _gSheet = document.createElement("div");
+      _gSheet.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);" +
+        "display:flex;align-items:center;justify-content:center";
+      var box = document.createElement("div");
+      box.style.cssText = "background:#fff;border-radius:18px;padding:22px 20px;max-width:300px;" +
+        "width:86%;text-align:center";
+      box.innerHTML =
+        '<div style="font-weight:800;font-size:15px;margin-bottom:6px">구글로 로그인</div>' +
+        '<div style="font-size:13px;color:#666;line-height:1.55;margin-bottom:15px">' +
+        '지갑을 만들려면 구글 확인이 한 번 필요해요.</div>' +
+        '<div id="pt2-gbtn" style="display:flex;justify-content:center"></div>' +
+        '<button id="pt2-gcancel" style="margin-top:15px;border:0;background:none;' +
+        'color:#888;font-size:13px">닫기</button>';
+      _gSheet.appendChild(box);
+      document.body.appendChild(_gSheet);
+      try {
+        google.accounts.id.renderButton(document.getElementById("pt2-gbtn"),
+          { theme: "outline", size: "large", text: "signin_with", shape: "pill" });
+      } catch (e) {}
+      var _c = document.getElementById("pt2-gcancel");
+      if (_c) _c.onclick = function () { _gDone = true; _gClose(); say("취소했어요"); };
+    }, 2500);
   });
 }
 
@@ -4826,16 +4862,18 @@ document.addEventListener("click", function (e) {
        그래서 창 안쪽 화면에 들어가 있으면 탭을 눌러도 못 빠져나왔다.
        같은 탭을 다시 누르면 창을 새로 그려 홈으로 되돌린다. */
     if (String(location.hash || "").indexOf("#/talk/podoya") === 0) {
-      /* 창에게 "처음 화면으로" 를 알린다. 창이 그 자리에서 홈으로 가므로
-         기다림이 없다. 창이 없거나 신호가 안 통하면 통째로 새로 그린다. */
+      /* 창에게 "처음 화면으로" 를 알리고, 곧바로 통째로 새로 그린다.
+         전에는 신호만 보내고 끝냈는데, 창이 깨져 있거나 신호를 못 받는
+         상태면 아무 일도 안 일어나 탭을 눌러도 홈으로 못 갔다.
+         이제 같은 주소(/ai.html)라 캐시에서 바로 뜨므로 새로 그려도 빠르고,
+         깨진 창까지 이 한 번으로 되살아난다. */
       try {
         var _fr = document.getElementById("pt2-aif");
         if (_fr && _fr.contentWindow) {
           _fr.contentWindow.postMessage({ podoya: "home" }, location.origin);
-          aiDepth = 0; aiMark = false;
-          return;
         }
       } catch (e) {}
+      aiDepth = 0; aiMark = false;
       try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
       return;
     }
