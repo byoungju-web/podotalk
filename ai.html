@@ -11389,7 +11389,19 @@ function closeGeminiKey(){document.getElementById('geminibg').style.display='non
 
 function verifyGeminiKey(){
   var ki=document.getElementById('gemini-ki'); var k=ki?ki.value.trim():'';
-  if(!k){showGeminiErr('API 키를 붙여넣어 줘');return;}
+  /* 칸을 비우고 저장하면 지운다.
+     전에는 빈 칸이면 "넣어줘" 만 하고 끝나서, 한 번 넣은 키를 앱 안에서
+     되돌릴 방법이 없었다. 워커 키로 돌아가려면 지울 수 있어야 한다. */
+  if(!k){
+    if(geminiKey){
+      geminiKey=''; lsS('podoai_gk','');
+      try{ if(aiModel==='gemini'){ aiModel='puter'; lsS('podoai_model','puter'); } }catch(e){}
+      closeGeminiKey(); updateMyStatus();
+      if(typeof showToast==='function') showToast('💎 Gemini 키를 지웠어요 · 이제 크레딧으로 씁니다','rgba(0,0,0,.85)');
+      return;
+    }
+    showGeminiErr('API 키를 붙여넣어 줘. 넣어둔 키를 지우려면 칸을 비우고 저장하세요');return;
+  }
   if(k.length < 20){showGeminiErr('올바른 Gemini API 키를 넣어줘');return;}
   var btn=document.getElementById('gemini-vb');
   btn.textContent='⏳ 확인 중…'; btn.disabled=true; hideGeminiErr();
@@ -14575,7 +14587,18 @@ function _openHref(url){
   if(!url) return;
   // 앱(WebView)은 외부앱 브리지로
   if(window.Android && typeof window.Android.openExternal==='function'){ try{ window.Android.openExternal(url); return; }catch(e){} }
-  // 브라우저: 같은 창에서 이동 (새 탭 → 팝업 차단 방지)
+  /* 창(iframe) 안에서는 같은 창을 갈아타면 안 된다.
+     상대 사이트가 창 안에 뜨는 것을 거부하면(카카오맵 앱 링크가 그렇다)
+     포도야 화면이 통째로 "연결을 거부했습니다" 로 바뀌어 버린다.
+     실제로 그것 때문에 깨진 종이가 반복해서 나왔다.
+     그래서 창 안에서는 새 탭으로 내보낸다. 새 탭이 막히면 포도톡에게
+     대신 열어달라고 부탁한다. 그래도 안 되면 예전처럼 한다. */
+  var _inFrame=false; try{ _inFrame=(window.top!==window.self); }catch(e){ _inFrame=true; }
+  if(_inFrame){
+    var _w=null; try{ _w=window.open(url,'_blank'); }catch(e){}
+    if(_w) return;
+    try{ parent.postMessage({ podoya:'open', url:url }, 'https://podotalk.kr'); return; }catch(e){}
+  }
   try{ window.location.assign(url); }
   catch(e){ window.location.href=url; }
 }

@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "139";
+var PT2_VER = "140";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5507,6 +5507,15 @@ window.addEventListener("message", function (ev) {
        폰에 옛 화면이 남아 있는 동안 뒤로가기가 끊기지 않게. */
     var _o = String(ev.origin || "");
     if (_o !== location.origin && _o.indexOf("podoya.ai.kr") < 0) return;
+    /* 창이 "이 주소 좀 열어줘" 라고 부탁하면 새 탭으로 열어준다.
+       창 안에서 새 탭이 막혔을 때의 마지막 길이다. 이게 없으면 창이
+       같은 자리에서 외부 주소로 갈아타다 화면이 통째로 날아간다. */
+    try {
+      if (ev.data && ev.data.podoya === "open" && ev.data.url) {
+        window.open(String(ev.data.url), "_blank");
+        return;
+      }
+    } catch (e) {}
     var d = ev.data;
     if (!d || d.podoya !== "push") return;
     if (!aiOnPodoyaTab()) return;          /* 그 탭을 보고 있을 때만 */
