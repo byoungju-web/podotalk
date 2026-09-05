@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "137";
+var PT2_VER = "138";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1976,7 +1976,11 @@ function renderPodoya(){
   /* 창을 새로 만들면 포도야는 어차피 처음 화면부터 시작한다.
      여기에 home=1 같은 걸 붙여 "홈으로 가라" 고 또 시키면, 아직
      준비도 안 된 화면을 비워버려 흰 화면이 됐다. 아무것도 붙이지 않는다. */
-  var _q = "?in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
+  /* 판 번호를 붙여 ai.html 도 새 판이 나오면 저절로 받게 한다.
+     전에는 주소가 늘 같아서, 저장소에 새 ai.html 을 올려도 폰은 옛것을
+     계속 썼다. PT2_VER 만 올리면 창 안까지 함께 새것이 된다.
+     번호가 안 바뀌는 동안에는 주소가 그대로라 캐시가 잘 물린다. */
+  var _q = "?v=" + PT2_VER + "&in=podotalk" + (_pt ? "&pt=" + encodeURIComponent(_pt) : "");
   document.querySelector("#view").innerHTML = head +
     '<div class="pt2-callwrap"><iframe id="pt2-aif" class="pt2-aiframe" src="' + PODOYA + _q + '" ' +
       /* 창 안에서 쓰는 기능은 부모가 허락해줘야 한다.
@@ -1995,6 +1999,41 @@ function renderPodoya(){
        같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
   fitAiSoon();
+
+  /* ── 창이 안 떴을 때만 다시 부른다 ──
+     전에는 시간만 재서 무조건 다시 불렀다가, 잘 떠 있는 창까지 부수고
+     적어둔 글을 날렸다. 그래서 그 장치를 통째로 뺐고, 그 뒤로는 첫 받아오기가
+     실패하면 깨진 종이가 그대로 남았다.
+     이제 주소가 같아졌으므로 창 안을 직접 들여다볼 수 있다.
+     아직 받는 중(loading)이면 건드리지 않고, 다 끝났는데 속이 비어 있을
+     때만 다시 부른다. 두 번까지만 해보고 멈춘다. */
+  (function () {
+    var tries = 0;
+    function alive() {
+      try {
+        var f = document.getElementById("pt2-aif");
+        if (!f) return true;                       /* 화면이 바뀌었다 — 그냥 둔다 */
+        var d = f.contentDocument;
+        if (!d) return false;
+        if (d.readyState === "loading") return true;  /* 아직 받는 중이다 */
+        if (!d.body || d.body.children.length === 0) return false;
+        return true;
+      } catch (e) { return false; }
+    }
+    function check() {
+      if (alive()) return;
+      var f = document.getElementById("pt2-aif");
+      if (!f) return;
+      if (tries >= 2) {
+        try { say("포도AI 화면을 불러오지 못했어요. 잠시 뒤 다시 눌러주세요"); } catch (e) {}
+        return;
+      }
+      tries++;
+      try { f.src = f.src; } catch (e) {}          /* 같은 주소로 한 번 더 */
+      setTimeout(check, 4500);
+    }
+    setTimeout(check, 4500);
+  })();
 }
 
 /* ── 포도야 창을 탭바 바로 위까지 ──
