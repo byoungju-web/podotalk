@@ -24,7 +24,7 @@
      0.2~0.5초 스쳐 보이던 이유다.
      여기서 화면을 잠깐 감춰 두고, pt2.js 가 다 그린 뒤에 드러낸다.
      pt2.js 가 아예 안 실려도 2초 뒤에는 무조건 드러나므로 갇히지 않는다. -->
-<link rel="preload" href="/pt2.js?v=142" as="script">
+<link rel="preload" href="/pt2.js?v=143" as="script">
 <style>
 /* 앱을 그리는 동안 빈 화면이 스쳐 보이지 않게 덮어둔다.
    전에는 감추기만 해서 흰 화면 → 내용 으로 툭 튀었다.
@@ -5957,7 +5957,24 @@ document.addEventListener("click", function(e){
   // 방 만들기 / 입장
   if(a==="fl-lang"){ flSetLang(el.getAttribute("data-v")); return; }
   if(a==="talk-new"){ openNewRoomSheet(el.getAttribute("data-mode")); return; }
-  if(a==="talk-save-key"){ var _kc=($("#tkKeyC")&&$("#tkKeyC").value||"").trim(); var _kg=($("#tkKeyG")&&$("#tkKeyG").value||"").trim(); DB.set("fl_key_claude", _kc); DB.set("fl_key_gemini", _kg); if(_kc){ syncKeyToPodoAI("claude", _kc); } if(_kg){ syncKeyToPodoAI("gemini", _kg); } if(_kc||_kg){ DB.set("fl_provider", _kc?"claude":"gemini"); } toast("AI 키를 저장했어요 ✅ (Podoya에도 반영)"); renderTalkSettings(); return; }
+  if(a==="talk-save-key"){ var _kc=($("#tkKeyC")&&$("#tkKeyC").value||"").trim(); var _kg=($("#tkKeyG")&&$("#tkKeyG").value||"").trim(); DB.set("fl_key_claude", _kc); DB.set("fl_key_gemini", _kg); if(_kc){ syncKeyToPodoAI("claude", _kc); } if(_kg){ syncKeyToPodoAI("gemini", _kg); } if(_kc||_kg){ DB.set("fl_provider", _kc?"claude":"gemini"); }
+    /* 칸을 비우고 저장하면 포도야 쪽 칸도 같이 지운다.
+       전에는 키가 있을 때만 반영해서, 비워도 포도야에는 그대로 남았다.
+       그래서 "지웠는데 안 지워진다" 가 반복됐다. */
+    try{ if(!_kc) localStorage.removeItem("podoai_k"); }catch(e){}
+    try{ if(!_kg) localStorage.removeItem("podoai_gk"); }catch(e){}
+    toast(_kc||_kg?"AI 키를 저장했어요 ✅ (Podoya에도 반영)":"넣어둔 키를 지웠어요 · 이제 크레딧으로 씁니다"); renderTalkSettings(); return; }
+  if(a==="key-clear"){
+    /* 포도톡 칸(fl_key_*)과 포도야 칸(podoai_*)은 이름이 서로 다르다.
+       한쪽만 지우면 다른 쪽이 살아남아 계속 그 키로 돌았다. 한 번에 지운다.
+       이 화면은 index.html 이 그리므로 누름도 여기서 받아야 한다 —
+       pt2.js 에 넣었을 때 단추는 보이는데 눌러도 아무 일이 없었던 이유다. */
+    var _kk=["fl_key_claude","fl_key_gemini","fl_provider","fl_gmodel",
+             "podoai_k","podoai_gk","podoai_model","podoai_dg"];
+    for(var _i=0;_i<_kk.length;_i++){ try{ localStorage.removeItem(_kk[_i]); }catch(e){} }
+    try{ DB.set("fl_key_claude",""); DB.set("fl_key_gemini",""); }catch(e){}
+    toast("넣어둔 키를 모두 지웠어요 🗑 이제 크레딧으로 씁니다");
+    renderTalkSettings(); return; }
   if(a==="talk-newmode"){ window._newRoom=window._newRoom||{}; window._newRoom.mode=el.getAttribute("data-v"); var wp=el.parentNode; wp.querySelectorAll("[data-action='talk-newmode']").forEach(function(b){ b.classList.remove("on"); }); el.classList.add("on"); return; }
   if(a==="talk-create"){ createRoom(); return; }
   if(a==="talk-join-code"){ openJoinSheet(); return; }
@@ -6778,7 +6795,7 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=142"></script>
+<script src="/pt2.js?v=143"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고

@@ -14597,10 +14597,42 @@ function _openHref(url){
   if(_inFrame){
     var _w=null; try{ _w=window.open(url,'_blank'); }catch(e){}
     if(_w) return;
-    try{ parent.postMessage({ podoya:'open', url:url }, 'https://podotalk.kr'); return; }catch(e){}
+    /* 새 탭이 막혔다. 크롬은 손으로 누른 것이 아니면 새 탭을 막는다.
+       그렇다고 같은 창을 갈아타면 포도야 화면이 통째로 날아간다
+       (카카오맵처럼 창 안에 뜨는 것을 거부하는 곳이 있다).
+       그래서 눌러서 열 수 있는 단추를 보여준다. 한 번만 더 누르면 열린다. */
+    _openAsk(url);
+    return;
   }
   try{ window.location.assign(url); }
   catch(e){ window.location.href=url; }
+}
+/* 막힌 주소를 손으로 열 수 있게 보여준다. 창 안에서만 쓴다. */
+function _openAsk(url){
+  try{
+    var old=document.getElementById('podoya-openask'); if(old) old.remove();
+    var d=document.createElement('div');
+    d.id='podoya-openask';
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:16px;z-index:99999;'+
+      'background:#16181f;color:#fff;border-radius:16px;padding:13px 14px;'+
+      'box-shadow:0 8px 28px rgba(0,0,0,.3);font-size:13.5px;line-height:1.5';
+    var host=''; try{ host=new URL(url).hostname.replace(/^www\./,''); }catch(e){ host='링크'; }
+    var a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener';
+    a.textContent='🔗 '+host+' 열기';
+    a.style.cssText='display:block;text-align:center;background:#7c3aed;color:#fff;'+
+      'padding:11px;border-radius:12px;font-weight:800;text-decoration:none;margin-top:9px';
+    a.onclick=function(){ setTimeout(function(){ try{ d.remove(); }catch(e){} }, 200); };
+    var t=document.createElement('div');
+    t.textContent='새 탭이 막혔어요. 아래를 눌러 열어주세요.';
+    var x=document.createElement('button');
+    x.textContent='닫기';
+    x.style.cssText='margin-top:7px;width:100%;background:none;border:0;color:#9aa0b0;font-size:12.5px';
+    x.onclick=function(){ try{ d.remove(); }catch(e){} };
+    d.appendChild(t); d.appendChild(a); d.appendChild(x);
+    document.body.appendChild(d);
+    setTimeout(function(){ try{ d.remove(); }catch(e){} }, 15000);
+  }catch(e){}
 }
 function openUrl(url, svcId){ if(!url) return; go(url, svcId); }
 
