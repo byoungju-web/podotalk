@@ -5306,9 +5306,17 @@ var REC_TICK=60;
 var _rec={stream:null, mr:null, chunks:[], ac:null, an:null, timer:null, relTimer:null, active:false, cancel:false};
 var _recOff=false;   /* Gemini 받아쓰기가 전부 실패하면 이번 세션은 예전 음성인식으로 */
 
+/* 창(iframe) 안인가. 창 안에서는 폰 자체 음성인식이 동작하지 않는다 —
+   크롬이 창 안의 마이크를 다르게 다루기 때문이다. 그래서 그 길로 넘어가면
+   무조건 실패한다. "듣는 중" 이 뜨면 늘 안 되던 이유가 이것이다. */
+function _recInFrame(){
+  try{ return window.top !== window.self; }catch(e){ return true; }
+}
 function _recAvail(){
   try{
-    if(_recOff) return false;
+    /* 창 안에서는 서버 받아쓰기만 쓴다. 되돌아갈 길이 없으므로
+       한 번 실패했다고 꺼버리면 그 뒤로 영영 안 된다. */
+    if(_recOff && !_recInFrame()) return false;
     if(!dgKey && !licActive()) return false;           /* 키도 이용권도 없으면 원래 음성인식 */
     if(!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return false;
     return true;                                       /* Deepgram — 조용하고 빠름 */
@@ -5466,8 +5474,11 @@ function _recSendLic(blob, onFail){
     })['catch'](function(){ if(over) return; over=true; clearTimeout(to); onFail('연결 실패'); });
 }
 function _recToSR(why){
-  /* 받아쓰기가 전부 막히면 예전 음성인식으로 (소리는 나지만 확실히 된다) */
-  _recOff=true; sttResetMic();
+  /* 받아쓰기가 전부 막히면 예전 음성인식으로 (소리는 나지만 확실히 된다).
+     다만 창 안에서는 그 길이 막혀 있으므로 꺼두지 않는다. 꺼두면 다음번에도
+     막다른 길로 가서 영영 안 된다. 창 안에서는 늘 서버로 다시 해본다. */
+  if(!_recInFrame()) _recOff=true;
+  sttResetMic();
   var run=window._sttAutoRun; window._sttAutoRun=null;
   /* 왜 안 됐는지 함께 보여준다. 전에는 서버가 알려준 자세한 이유가
      먼저 떴다가 이 토스트에 곧바로 덮여 사라졌다. 그래서 늘 "안 돼요"
@@ -5496,8 +5507,9 @@ function _recSendGemini(blob){
   if(!geminiKey || !(window.AudioContext||window.webkitAudioContext)){ _recToSR(); return; }
   var fail=function(m){ sttResetMic(); window._sttAutoRun=null; showToast('🎤 '+_recShort(m||'음성을 옮기지 못했어요'),'rgba(0,0,0,.85)'); };
   var giveUp=function(lastErr){
-    /* Gemini 받아쓰기가 막혔다 → 이번 세션은 예전 음성인식으로 돌리고, 바로 다시 듣는다 */
-    _recOff=true;
+    /* Gemini 받아쓰기가 막혔다 → 예전 음성인식으로 돌리고, 바로 다시 듣는다.
+       창 안에서는 그 길이 막혀 있으므로 꺼두지 않는다(위와 같은 이유). */
+    if(!_recInFrame()) _recOff=true;
     var run=window._sttAutoRun; window._sttAutoRun=null; sttResetMic();
     showToast('🎤 받아쓰기 안 됨'+(lastErr?(' · '+_recShort(lastErr)):'')+' · 다시 말해주세요','rgba(0,0,0,.85)');
     var t=window._stt.target, m=window._stt.mic, idl=window._stt.idle, lis=window._stt.listen||idl;
@@ -5564,6 +5576,10 @@ function _recPrewarm(){
 }
 function _recStart(targetId, micId, idleHtml, listeningHtml){
   var mb=document.getElementById(micId);
+  /* 마이크가 켜질 때 나는 "틱" 은 크롬이 내는 소리라 앱에서 끌 수 없다.
+     대신 소리보다 먼저 안내를 띄워, 그 소리가 "이제 말하세요" 라는
+     신호로 읽히게 한다. 그러면 갑작스럽게 느껴지지 않는다. */
+  if(mb) mb.innerHTML='&#127908; 말씀하세요';
   var go=function(stream){
     _rec.stream=stream; _rec.active=true; _rec.cancel=false; window._stt.listening=true;
     window._stt.listen=listeningHtml;
