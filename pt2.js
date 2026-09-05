@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "138";
+var PT2_VER = "139";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -2021,16 +2021,26 @@ function renderPodoya(){
       } catch (e) { return false; }
     }
     function check() {
-      if (alive()) return;
+      if (alive()) { window.__aiFix = 0; return; }   /* 떴으면 셈을 되돌린다 */
       var f = document.getElementById("pt2-aif");
       if (!f) return;
-      if (tries >= 2) {
+      var done = window.__aiFix || 0;
+      if (done >= 2) {
+        window.__aiFix = 0;
         try { say("포도AI 화면을 불러오지 못했어요. 잠시 뒤 다시 눌러주세요"); } catch (e) {}
         return;
       }
-      tries++;
-      try { f.src = f.src; } catch (e) {}          /* 같은 주소로 한 번 더 */
-      setTimeout(check, 4500);
+      window.__aiFix = done + 1;
+      if (done === 0) {
+        /* 첫 번째 — 같은 창에 다시 부른다 */
+        try { f.src = f.src; } catch (e) {}
+        setTimeout(check, 4500);
+      } else {
+        /* 두 번째 — 창을 통째로 새로 만든다.
+           깨진 창은 안이 망가져 있어 다시 불러도 그대로일 때가 있다.
+           그럴 땐 껍데기부터 새로 만들어야 살아난다. */
+        try { renderPodoya(); } catch (e) {}
+      }
     }
     setTimeout(check, 4500);
   })();
