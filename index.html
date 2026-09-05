@@ -24,7 +24,7 @@
      0.2~0.5초 스쳐 보이던 이유다.
      여기서 화면을 잠깐 감춰 두고, pt2.js 가 다 그린 뒤에 드러낸다.
      pt2.js 가 아예 안 실려도 2초 뒤에는 무조건 드러나므로 갇히지 않는다. -->
-<link rel="preload" href="/pt2.js?v=140" as="script">
+<link rel="preload" href="/pt2.js?v=141" as="script">
 <style>
 /* 앱을 그리는 동안 빈 화면이 스쳐 보이지 않게 덮어둔다.
    전에는 감추기만 해서 흰 화면 → 내용 으로 툭 튀었다.
@@ -5390,6 +5390,10 @@ function openKeySheet(prov){
     (isG?'<div class="tk-field"><label>Gemini 모델</label><input id="ks-gmodel" value="'+escapeHtml(gmodel)+'"></div><div class="hint" style="margin-top:-4px;margin-bottom:8px">기본 gemini-flash-latest</div>':'')+
     '<button data-action="'+(isG?"open-gemini-key":"open-claude-key")+'" style="width:100%;margin-bottom:10px;padding:11px;border:1.5px solid '+(isG?"#1a73e8":"#6D28D9")+';border-radius:11px;background:'+(isG?"#EEF4FF":"#F5F0FF")+';color:'+(isG?"#1a73e8":"#6D28D9")+';font-weight:800;font-size:13px;font-family:inherit;cursor:pointer">🔗 키 발급 페이지 열기</button>'+
     '<button class="cta grape" data-action="key-save" data-v="'+prov+'">키 저장하고 연결</button>'+
+    /* 넣은 키를 앱 안에서 되돌릴 방법이 없었다. 칸을 비우고 저장해도
+       포도야가 쓰는 칸(podoai_k · podoai_gk)은 이름이 달라 그대로 남았다.
+       그래서 양쪽을 한 번에 지우는 단추를 둔다. */
+    '<button class="cta" data-action="key-clear" style="margin-top:8px;background:#fff;border:1px solid #e5e5ea;color:#c0392b">넣어둔 키 모두 지우기</button>'+
     (own?'<button class="cta" style="margin-top:8px;background:#fff;color:var(--order);border:1.5px solid var(--order);box-shadow:none" data-action="key-del" data-v="'+prov+'">이 키 삭제</button>':'')+
     '<button class="cta" style="margin-top:8px;background:#fff;color:var(--sub);border:1.5px solid var(--tk-line);box-shadow:none" data-action="close-sheet">닫기</button>'+
   '</div>';
@@ -6770,7 +6774,7 @@ ptWelcome();
 </script>
 
 <!-- 🍇 PT2 레이어 — 서버 방 + @봇. 위 코드는 손대지 않는다. 고칠 때마다 v 숫자를 올릴 것 -->
-<script src="/pt2.js?v=140"></script>
+<script src="/pt2.js?v=141"></script>
 <!-- ── 옛 화면 자동 복구 ─────────────────────────────────────────
      pt2.js 가 안 왔거나 옛 파일이 왔으면 이 화면이 예전 모습으로 나온다.
      그때마다 캐시를 손으로 비우는 건 번거롭다. 여기서 스스로 확인하고

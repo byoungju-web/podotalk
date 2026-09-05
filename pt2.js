@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "140";
+var PT2_VER = "141";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -4940,6 +4940,24 @@ document.addEventListener("click", function (e) {
         }
       } catch (e) {}
     }, 400);
+    return;
+  }
+  if (a === "key-clear") {
+    /* 포도톡이 쓰는 칸과 포도야가 쓰는 칸을 한 번에 지운다.
+       이름이 서로 달라(fl_key_* 와 podoai_*) 한쪽만 지우면 다른 쪽이
+       계속 살아 있었다. 그래서 "지웠는데 안 지워진다" 가 반복됐다. */
+    try {
+      var _kk = ["fl_key_claude", "fl_key_gemini", "fl_provider", "fl_gmodel",
+                 "podoai_k", "podoai_gk", "podoai_model", "podoai_dg"];
+      for (var _i = 0; _i < _kk.length; _i++) {
+        try { localStorage.removeItem(_kk[_i]); } catch (e) {}
+      }
+      if (window.DB && typeof DB.set === "function") {
+        try { DB.set("fl_key_claude", ""); DB.set("fl_key_gemini", ""); } catch (e) {}
+      }
+    } catch (e) {}
+    try { say("넣어둔 키를 모두 지웠어요 · 이제 크레딧으로 씁니다"); } catch (e) {}
+    setTimeout(function () { try { location.reload(); } catch (e) {} }, 700);
     return;
   }
   if (a === "quit") { location.hash = "#/talk/quit"; return; }
