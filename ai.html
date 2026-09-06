@@ -5329,13 +5329,17 @@ function _recMime(){
 }
 function _recClearTimer(){ if(_rec.timer){ clearInterval(_rec.timer); _rec.timer=null; } }
 function _recRelease(){
-  /* 마이크를 매번 다시 열면 그것도 소리가 날 수 있어 잠깐 물고 있다가 놓는다 */
+  /* 전에는 소리를 줄이려고 마이크를 45초 동안 물고 있었다. 그 때문에
+     두 번째부터는 여는 소리가 안 났고, 물고 있던 마이크가 중간에 잠기면
+     녹음은 되는데 속이 비어 서버가 "200 빈 결과" 를 돌려줬다.
+     소리는 조금 나더라도 매번 새로 여는 쪽이 확실하다. 쓰는 분도
+     그 소리를 "이제 말하세요" 신호로 쓰고 계셨다. */
   if(_rec.relTimer) clearTimeout(_rec.relTimer);
   _rec.relTimer=setTimeout(function(){
     _rec.relTimer=null;
     try{ if(_rec.stream) _rec.stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
     _rec.stream=null; _rec.an=null;
-  }, 45000);
+  }, 300);
 }
 function _recCut(){ _recClearTimer(); try{ if(_rec.mr && _rec.mr.state==='recording') _rec.mr.stop(); }catch(e){} }
 function _recAbort(){ if(!_rec.active) return; _rec.cancel=true; _recCut(); }
@@ -5617,9 +5621,22 @@ function _recStart(targetId, micId, idleHtml, listeningHtml){
     }, REC_TICK);
   };
   if(mb) mb.innerHTML=listeningHtml;          /* 체감 0초 — 기다리게 두지 않는다 */
+  /* 열려 있는 마이크를 다시 쓰면 여는 소리가 안 나서 조용하다. 다만
+     그 마이크가 잠겨 있으면(다른 앱이 가져갔거나 화면이 잠겼다가 돌아온 뒤)
+     녹음은 되는데 속이 비어 "200 빈 결과" 가 된다. 눈으로는 살아 있는 것과
+     구별이 안 된다. 그래서 소리를 담을 수 있는 상태일 때만 다시 쓴다. */
   if(_rec.stream && _rec.stream.active){
-    if(_rec.relTimer){ clearTimeout(_rec.relTimer); _rec.relTimer=null; }
-    go(_rec.stream); return;
+    var _ok=false;
+    try{
+      var _tr=_rec.stream.getAudioTracks()[0];
+      _ok = !!(_tr && _tr.readyState==='live' && !_tr.muted && _tr.enabled);
+    }catch(e){ _ok=false; }
+    if(_ok){
+      if(_rec.relTimer){ clearTimeout(_rec.relTimer); _rec.relTimer=null; }
+      go(_rec.stream); return;
+    }
+    try{ _rec.stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+    _rec.stream=null; _rec.an=null;
   }
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1, sampleRate:16000}})
     .then(go)['catch'](function(){ sttResetMic(); showToast('마이크 권한을 허용해 주세요.','rgba(0,0,0,.85)'); });
