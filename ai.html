@@ -5347,7 +5347,16 @@ function _recAvail(){
     /* 창 안에서는 서버 받아쓰기만 쓴다. 되돌아갈 길이 없으므로
        한 번 실패했다고 꺼버리면 그 뒤로 영영 안 된다. */
     if(_recOff && !_recInFrame()) return false;
-    if(!dgKey && !licActive() && !geminiKey) return false;   /* 딥그램 키·이용권·제미나이 키 중 하나도 없으면 원래 음성인식 */
+    /* 조용한 녹음 방식은 '내 딥그램 키' 가 있을 때만 쓴다.
+       그 키가 없으면 녹음 → 서버/제미나이로 보내 글자를 받아오는데,
+       서버는 크레딧 응답이 막혀 있고 제미나이는 몇 초가 걸린다.
+       그동안 화면에는 아무 글자도 안 들어와 "말로하기가 죽은" 것처럼
+       보였다. 예전처럼 폰 음성인식을 먼저 쓴다 — 켤 때 "틱" 소리가 나는
+       대신, 말하는 즉시 글자가 들어오고 곧바로 실행된다.
+       ★ 서버 받아쓰기를 다시 쓰고 싶으면 아래 줄을
+         if(!dgKey && !licActive() && !geminiKey) return false;
+         로 바꾸면 된다. */
+    if(!dgKey) return false;
     if(!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return false;
     return true;                                       /* Deepgram — 조용하고 빠름 */
   }catch(e){ return false; }
@@ -5520,14 +5529,6 @@ function _recToSR(why){
   var _tail = (why && why!=='off' && why!=='quota') ? (' · '+_recShort(why)) : '';
   showToast('🎤 받아쓰기가 안 돼요'+_tail+' · 다시 말해주세요','rgba(0,0,0,.85)');
   var t=window._stt.target, m=window._stt.mic, i=window._stt.idle, l=window._stt.listen||i;
-  /* 창(포도톡) 안에서는 예전 음성인식이 아예 동작하지 않는다. 그런데도
-     여기서 다시 sttStart 를 부르면 그 막다른 길로 들어가, 마이크 소리도
-     안 나고 글도 안 들어오는 채로 끝난다. 그래서 창 안에서는 되돌리지 않고
-     무엇을 하면 되는지 알려준다. */
-  if(_recInFrame()){
-    showToast('🎤 마이 탭에서 제미나이 키를 넣거나 크레딧을 채우면 말로하기가 됩니다','rgba(0,0,0,.85)');
-    return;
-  }
   setTimeout(function(){ try{ sttStart(t,m,i,l,run); }catch(e){} }, 900);
 }
 function _recSend(blob){
@@ -8705,15 +8706,24 @@ function vansWebPath(aiQ, ai){
         /* 호출은 성공했는데 본문이 비어 오는 경우도 있다. 이때도 이유를 남긴다. */
         vansRenderWeb(d, d.answer ? null : 'AI가 빈 답을 보냈어요 (모델이 응답을 만들지 못했거나 JSON 형식이 깨진 경우)'); },
       function(e){ vansRenderWeb({answer:'', sources:rs}, (e&&e.message)||'오류'); });
-  }, function(){ vansPlainAI(aiQ, true); });
+  }, function(e){ vansPlainAI(aiQ, (e&&e.message)||true); });
 }
 
 function vansPlainAI(query, webFailed){
   var ai=document.getElementById('vans-ai'); if(!ai) return;
   while(ai.firstChild) ai.removeChild(ai.firstChild);
-  /* '브라우저 CORS 제한' 이라고 적어두었던 막대는 뺐다. 실제로는 크레딧
-     응답(402)이나 서버 연결 문제로 여기 오는 일이 훨씬 많아서, 원인과
-     상관없는 문구가 늘 떠 있었다. 그냥 답을 보여준다. */
+  /* 여기 오는 이유는 여러 가지다(크레딧 응답 402 · 서버 오류 · 연결 끊김).
+     예전에는 무조건 "브라우저 CORS 제한" 이라고 적어 두어서 늘 틀린
+     문구가 떴고, 그것을 지웠더니 이번엔 아무 설명도 없이 빈 화면이 됐다.
+     받은 이유를 그대로 적는다. */
+  if(webFailed){
+    var b=document.createElement('div');
+    b.textContent='⚠️ 실시간 웹검색을 못 했어요'+
+      ((typeof webFailed==='string' && webFailed) ? (' — '+String(webFailed).replace(/^LIC:/,'')) : '')+
+      ' · AI 지식으로 답해요.';
+    b.style.cssText='background:#fff6e6;border:1px solid rgba(180,120,0,.35);border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:600;color:#7a5200;margin-bottom:12px;line-height:1.6;word-break:break-word';
+    ai.appendChild(b);
+  }
   var ansBox=document.createElement('div'); ansBox.id='vans-answer'; ai.appendChild(ansBox);
   var exBox=document.createElement('div'); exBox.id='vans-extras'; ai.appendChild(exBox);
   var _ck=aiCacheGet(query), _hA=!!(_ck&&_ck.a), _hB=!!(_ck&&_ck.b);
