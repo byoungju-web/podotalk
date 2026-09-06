@@ -5894,7 +5894,7 @@ function svAllowed(id){
   if(c==='KR') return true;                              /* 한국: 전부 */
   return SV_GLOBAL_IDS.indexOf(id)>=0;                   /* 그 외: 글로벌만 */
 }
-function defaultRouteId(){ var c=_cc(); if(c==='KR') return 'navsearch'; if(c==='JP') return 'yahoojp'; return 'google'; }
+function defaultRouteId(){ var c=_cc(); if(c==='KR') return 'google'; if(c==='JP') return 'yahoojp'; return 'google'; }
 /* 현재 국가에서 AI가 고를 수 있는 서비스 목록 */
 function activeRoutes(){
   var c=_cc();
@@ -8554,7 +8554,22 @@ function vansFillExtras(d){
 function vansRenderWeb(d, err){
   var ai=document.getElementById('vans-ai'); if(!ai) return;
   while(ai.firstChild) ai.removeChild(ai.firstChild);
-  ai.appendChild(vansAnswerCard((d&&d.answer)||'', '💬 AI 설명 (실시간 웹검색)'));
+  /* 답이 비었을 때 이유를 그대로 적는다.
+     여태 err 를 받아만 놓고 쓰지 않아서, 크레딧이 모자란 것인지
+     워커가 죽은 것인지 모델이 빈 답을 준 것인지 화면에서는
+     "설명을 불러오지 못했어요" 한 줄로 똑같이 보였다. */
+  var _ans=(d&&d.answer)||'';
+  if(!_ans && err){
+    var _c=vansCardWrap('💬 AI 설명 (실시간 웹검색)');
+    var _p=document.createElement('div'); _p.style.cssText='font-size:15px;color:#141720;line-height:1.7';
+    _p.textContent='설명을 불러오지 못했어요.'; _c.appendChild(_p);
+    var _r=document.createElement('div');
+    _r.style.cssText='margin-top:9px;background:#fff6e6;border:1px solid rgba(180,120,0,.35);border-radius:11px;padding:10px 12px;font-size:13px;color:#7a5200;line-height:1.65;word-break:break-word';
+    _r.textContent='이유: '+String(err).replace(/^LIC:/,'');
+    _c.appendChild(_r); ai.appendChild(_c);
+  } else {
+    ai.appendChild(vansAnswerCard(_ans, '💬 AI 설명 (실시간 웹검색)'));
+  }
   if(d && d.sources && d.sources.length) ai.appendChild(vansSourcesCard(d.sources));
   ai.appendChild(vansWarn());
 }
@@ -8633,7 +8648,9 @@ function vansWebPath(aiQ, ai){
     var ctx=rs.map(function(x,i){ return '['+(i+1)+'] '+(x.title||'')+'\n'+(x.snippet||'')+'\n출처: '+(x.url||''); }).join('\n\n');
     var sysW='너는 한국어 답변 도우미야. 아래 "웹 검색 결과"만 근거로 사용자 질문에 정확하고 최신 정보로 답해. 결과에 없는 내용은 지어내지 말고 모른다고 해. 반드시 JSON 객체 하나만 출력(마크다운/설명 금지):\n{"answer":"검색 결과에 근거한 핵심 답변 4~7문장, 문단은 \\n 으로 구분"}\n\n웹 검색 결과:\n'+ctx;
     callAI({ system:sysW, messages:[{role:'user',content:aiQ}], maxTokens:1000, noLang:true },
-      function(txt){ var d=vansParse(txt); if(!d){ d={answer:String(txt||'').trim()}; } d.sources=rs; vansRenderWeb(d); },
+      function(txt){ var d=vansParse(txt); if(!d){ d={answer:String(txt||'').trim()}; } d.sources=rs;
+        /* 호출은 성공했는데 본문이 비어 오는 경우도 있다. 이때도 이유를 남긴다. */
+        vansRenderWeb(d, d.answer ? null : 'AI가 빈 답을 보냈어요 (모델이 응답을 만들지 못했거나 JSON 형식이 깨진 경우)'); },
       function(e){ vansRenderWeb({answer:'', sources:rs}, (e&&e.message)||'오류'); });
   }, function(){ vansPlainAI(aiQ, true); });
 }
