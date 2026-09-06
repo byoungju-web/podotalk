@@ -8421,12 +8421,11 @@ function vansShoppingBack(topic, fullq){
   dz.onclick=function(){ openUrl('https://search.danawa.com/dsearch.php?query='+kw,'shop'); };
   body.appendChild(dz);
 }
-/* 카카오는 모바일 웹으로 들어가면 plink 앱설치 안내 화면을 먼저 띄운다.
-   그래서 "바로 지도가 뜨던" 동작이 설치 안내로 바뀌었다. 이건 카카오 쪽
-   화면이라 우리가 끌 수 없다. 곧장 열리는 네이버 지도로 보낸다.
-   카카오로 되돌리려면 아래 주소만 map.kakao.com/?q= 로 바꾸면 된다. */
+/* 지도는 카카오로 돌린다. 모바일 웹으로 들어가면 카카오가 plink 앱설치
+   안내를 먼저 띄우므로, 아래 _pmAppHref 가 안드로이드에서는 앱 주소로
+   바꿔준다. 앱이 없는 폰만 이 웹 주소로 간다. */
 function vansMapUrl(q){
-  return 'https://map.naver.com/p/search/'+encodeURIComponent(q);
+  return 'https://map.kakao.com/?q='+encodeURIComponent(q);
 }
 function vansAddMaps(container, q){
   var t=document.createElement('div'); t.style.cssText='font-size:13.5px;font-weight:700;color:#5b6178;margin-bottom:8px'; t.textContent='🗺 지도에서 바로 찾기 — "'+q+'"'; container.appendChild(t);
@@ -14712,19 +14711,28 @@ function _openHref(url){
 /* 손으로 누르는 단추에서는 지도 앱을 바로 열 수 있다.
    말로 물으면 답이 async 로 오기 때문에 크롬이 "손으로 누른 것"으로 보지
    않아 새 탭이 막히고, 여기 단추로 내려온다. 그때 웹 주소 대신 앱 주소를
-   걸어주면 파일1(모바일 웹)을 거치지 않고 곧장 지도 앱이 열린다.
+   걸어주면 카카오 설치안내(plink)를 거치지 않고 곧장 지도 앱이 열린다.
    앱이 안 깔린 폰은 browser_fallback_url 로 예전처럼 웹이 열린다. */
 function _pmAppHref(url){
   try{
     if(!/Android/i.test(navigator.userAgent||'')) return url;
-    var u=new URL(url);
-    if(u.hostname.indexOf('map.naver.com') < 0) return url;
-    var q=u.searchParams.get('query') || '';
-    if(!q){ var m=u.pathname.split('/search/')[1]||''; q=decodeURIComponent(m); }
-    if(!q) return url;
-    return 'intent://search?query='+encodeURIComponent(q)+'&appname=podotalk.kr'
-      +'#Intent;scheme=nmap;package=com.nhn.android.nmap;S.browser_fallback_url='
-      +encodeURIComponent(url)+';end';
+    var u=new URL(url), q='';
+    if(u.hostname.indexOf('map.kakao.com') >= 0){
+      q=u.searchParams.get('q')||'';
+      if(!q) return url;
+      return 'intent://search?q='+encodeURIComponent(q)
+        +'#Intent;scheme=kakaomap;package=net.daum.android.map;S.browser_fallback_url='
+        +encodeURIComponent(url)+';end';
+    }
+    if(u.hostname.indexOf('map.naver.com') >= 0){
+      q=u.searchParams.get('query')||'';
+      if(!q){ q=decodeURIComponent(u.pathname.split('/search/')[1]||''); }
+      if(!q) return url;
+      return 'intent://search?query='+encodeURIComponent(q)+'&appname=podotalk.kr'
+        +'#Intent;scheme=nmap;package=com.nhn.android.nmap;S.browser_fallback_url='
+        +encodeURIComponent(url)+';end';
+    }
+    return url;
   }catch(e){ return url; }
 }
 /* 막힌 주소를 손으로 열 수 있게 보여준다. 창 안에서만 쓴다. */
