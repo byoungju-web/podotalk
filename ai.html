@@ -1843,8 +1843,29 @@ function callAI(opts, onSuccess, onError){
   routeUserAI(opts, onSuccess, onError);
 }
 
+/* 내 제미나이 키가 있으면 폰에서 직접 부른다.
+
+   워커로 보내면 podoya-api 의 callClaude 첫 줄이
+     if (opts.ownKey && opts.provider === "gemini") return callGeminiKey(...)
+   이라서 곧장 구글로 가는데, 그 요청은 폰이 아니라 Cloudflare 에서
+   나간다. 구글이 그 자리를 보고
+     "User location is not supported for the API use"
+   로 거절했다. 폰(한국)에서 부르면 통과한다.
+   Anthropic 키는 멀쩡하다(probe 200). 애초에 불리지도 않았을 뿐이다.
+
+   덤으로 크레딧이 0 이 된다. 내 키로 내 몫을 쓰는 것이기 때문이다.
+   ★ 폰에서도 실패하면 예전처럼 워커로 넘긴다. 그래서 지금보다
+     나빠지는 경우는 없다. */
+function _gemDirect(){
+  try{ return (aiModel==='gemini' && !!geminiKey); }catch(e){ return false; }
+}
+
 function routeUserAI(opts, onSuccess, onError){
   if(licForAI()){                       /* 🍇 크레딧 — 본인 키가 있으면 절반만 나간다 */
+    if(_gemDirect()){
+      callGemini(opts, onSuccess, function(){ callPodo(opts, onSuccess, onError); });
+      return;
+    }
     callPodo(opts, onSuccess, onError);
   } else if(aiModel === 'puter'){
     callPuter(opts, onSuccess, onError);
@@ -8629,6 +8650,14 @@ function vansRenderWeb(d, err){
 }
 function callAIStream(opts, onDelta, onDone, onError){
   if(typeof licForAI==='function' && licForAI()){   /* 🎟️ 이용권은 통째로 받아서 한 번에 보여준다 */
+    /* 위 routeUserAI 와 같은 이유로, 내 제미나이 키가 있으면 폰에서
+       직접 받는다. 실패하면 예전처럼 워커로 넘긴다. */
+    if(typeof _gemDirect==='function' && _gemDirect()){
+      geminiStream(opts, onDelta, onDone, function(){
+        callPodo(opts, function(t){ if(t) onDelta(t); onDone(t); }, onError);
+      });
+      return;
+    }
     callPodo(opts, function(t){ if(t) onDelta(t); onDone(t); }, onError);
     return;
   }
