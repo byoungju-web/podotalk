@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "144";
+var PT2_VER = "145";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -2001,7 +2001,21 @@ function renderPodoya(panel){
        같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
   fitAiSoon();
-  if (panel) aiOpenPanel(String(panel));
+  if (panel && AI_PANELS[String(panel)]) {
+    /* 세부 화면을 여는 동안 홈 화면이 잠깐 비치지 않게 창을 가려 둔다 (열리면 걷음, 최대 4초) */
+    try {
+      var _fr0 = document.getElementById("pt2-aif");
+      if (_fr0) { _fr0.style.visibility = "hidden"; }
+      var _veil = document.createElement("div");
+      _veil.id = "pt2-aiveil";
+      _veil.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f4f1fa;color:#6d28d9;font-size:14px;font-weight:700;z-index:5";
+      _veil.textContent = "여는 중…";
+      var _wrap = document.querySelector(".pt2-callwrap");
+      if (_wrap) { _wrap.style.position = "relative"; _wrap.appendChild(_veil); }
+      setTimeout(aiUnveil, 4000);
+    } catch (e) {}
+    aiOpenPanel(String(panel));
+  }
 
   /* ── 창이 안 떴을 때만 다시 부른다 ──
      전에는 시간만 재서 무조건 다시 불렀다가, 잘 떠 있는 창까지 부수고
@@ -5537,20 +5551,27 @@ var AI_PANELS = {
   adv: "openPodoAdvanced",       /* 🔌 고급기능 */
   menu: "openPodoMenu"           /* ☰ 기능 메뉴 */
 };
+function aiUnveil() {
+  try { var f = document.getElementById("pt2-aif"); if (f) f.style.visibility = ""; } catch (e) {}
+  try { var v = document.getElementById("pt2-aiveil"); if (v && v.parentNode) v.parentNode.removeChild(v); } catch (e) {}
+}
 function aiOpenPanel(panel) {
   var fn = AI_PANELS[panel];
   if (!fn) return;
   var tries = 0;
   (function wait() {
-    if (++tries > 40) return;
-    if (!aiOnPodoyaTab()) return;                       /* 그 사이 다른 탭으로 갔다 */
+    if (++tries > 40) { aiUnveil(); return; }
+    if (!aiOnPodoyaTab()) { aiUnveil(); return; }       /* 그 사이 다른 탭으로 갔다 */
     var f = document.getElementById("pt2-aif");
     var w = null;
     try { w = f && f.contentWindow; } catch (e) { w = null; }
     var ready = false;
     try { ready = !!(w && w.document && w.document.readyState === "complete" && typeof w[fn] === "function" && w.document.getElementById("uni-q")); } catch (e) { ready = false; }
     if (!ready) { setTimeout(wait, 300); return; }
-    setTimeout(function () { try { w[fn](); } catch (e) {} }, 250);   /* 홈 화면이 다 그려진 뒤에 연다 */
+    setTimeout(function () {
+      try { w[fn](); } catch (e) {}
+      setTimeout(aiUnveil, 350);                        /* 세부 화면이 올라온 뒤에 가림막을 걷는다 */
+    }, 250);   /* 홈 화면이 다 그려진 뒤에 연다 */
   })();
 }
 
