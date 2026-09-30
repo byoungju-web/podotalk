@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "143";
+var PT2_VER = "144";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1953,7 +1953,9 @@ function walOut(){
    실패하면 깨진 종이가 떴다. 열쇠도 따로 넘겨줘야 했다.
    이제 같은 주소(/ai.html)라 캐시·저장소·로그인을 그대로 함께 쓴다. */
 var PODOYA = "/ai.html";
-function renderPodoya(){
+function renderPodoya(panel){
+  /* panel: "fn"(기능) "agents"(에이전트팀) "routine"(저장루틴) "secretary"(포도야 비서) "hub"(커넥션 허브)
+            "pfn"(Podoya 기능) "adv"(고급기능) "menu"(기능 메뉴) — 창(ai.html)이 뜬 뒤 그 화면을 대신 열어 준다. 없으면 홈. */
   /* 머리말을 두지 않는다. 아래 탭에 이미 '포도AI' 라고 적혀 있어서
      같은 말이 위아래로 두 번 나왔고, 그만큼 화면이 좁아졌다.
      좁은 폰에서는 한 줄이 아깝다. */
@@ -1999,6 +2001,7 @@ function renderPodoya(){
        같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
   fitAiSoon();
+  if (panel) aiOpenPanel(String(panel));
 
   /* ── 창이 안 떴을 때만 다시 부른다 ──
      전에는 시간만 재서 무조건 다시 불렀다가, 잘 떠 있는 창까지 부수고
@@ -2385,7 +2388,7 @@ window.renderTalk = function (sub, arg) {
   }
   if (sub === "calllog") { renderPodo(arg || "log"); toTop(); return; }
   if (sub === "quit") { renderQuit(); return; }
-  if (sub === "podoya") { renderPodoya(); return; }
+  if (sub === "podoya") { renderPodoya(arg); return; }   /* #/talk/podoya/<화면> 이면 그 화면까지 열어 준다 (coverfo 홈 버튼용) */
   if (sub === "credits") { renderCredits(); toTop(); return; }
   if (sub === "safety")  { renderSafety(); return; }
   if (sub === "blocked") { renderBlocked(); return; }
@@ -4923,6 +4926,7 @@ document.addEventListener("click", function (e) {
         }
       } catch (e) {}
       aiDepth = 0; aiMark = false;
+      try { history.replaceState(null, "", "#/talk/podoya"); } catch (e) {}   /* #/talk/podoya/<화면> 으로 들어왔어도 탭을 누르면 홈 주소로 */
       try { renderPodoya(); } catch (e) { location.hash = "#/talk/podoya"; }
       return;
     }
@@ -5517,6 +5521,37 @@ function aiPad() {
 }
 function aiOnPodoyaTab() {
   return String(location.hash || "").indexOf("#/talk/podoya") === 0;
+}
+
+/* ── #/talk/podoya/<화면> — 창(ai.html) 안의 화면을 대신 열어 준다 ──
+   coverfo.com 홈의 '기능·에이전트팀·저장루틴·포도야 비서·커넥션 허브·Podoya 기능' 버튼이
+   이 주소로 들어온다. ai.html 은 같은 도메인이라 창 안의 함수를 바로 부를 수 있다.
+   창이 아직 준비 안 됐으면 0.3초마다 다시 보고, 12초까지만 기다린다. 못 찾으면 그냥 홈. */
+var AI_PANELS = {
+  fn: "showFeatureGuide",        /* 📋 기능 */
+  agents: "agentTeamGo",         /* 🤖 에이전트팀 (입력칸이 비어 있으면 입력칸에 커서를 둔다 — 원래 버튼과 같음) */
+  routine: "showAgentRoutines",  /* 📁 저장루틴 */
+  secretary: "openPodoAssist",   /* 🍇 포도야 비서 */
+  hub: "openConnectHub",         /* 🔗 커넥션 허브 */
+  pfn: "openPodoFeatureGrid",    /* 🧩 Podoya 기능 */
+  adv: "openPodoAdvanced",       /* 🔌 고급기능 */
+  menu: "openPodoMenu"           /* ☰ 기능 메뉴 */
+};
+function aiOpenPanel(panel) {
+  var fn = AI_PANELS[panel];
+  if (!fn) return;
+  var tries = 0;
+  (function wait() {
+    if (++tries > 40) return;
+    if (!aiOnPodoyaTab()) return;                       /* 그 사이 다른 탭으로 갔다 */
+    var f = document.getElementById("pt2-aif");
+    var w = null;
+    try { w = f && f.contentWindow; } catch (e) { w = null; }
+    var ready = false;
+    try { ready = !!(w && w.document && w.document.readyState === "complete" && typeof w[fn] === "function" && w.document.getElementById("uni-q")); } catch (e) { ready = false; }
+    if (!ready) { setTimeout(wait, 300); return; }
+    setTimeout(function () { try { w[fn](); } catch (e) {} }, 250);   /* 홈 화면이 다 그려진 뒤에 연다 */
+  })();
 }
 
 window.addEventListener("message", function (ev) {
