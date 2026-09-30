@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "145";
+var PT2_VER = "146";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1358,6 +1358,9 @@ function chaseBot() {
    포도AI 는 podoya.ai.kr 로 넘어간다. 아이콘은 앱 아이콘(podotalk-192.png)을
    그대로 쓴다 — 🍇 는 채팅 목록의 포도야 비서와 겹쳐서 헷갈렸다.
    index.html 은 건드리지 않고 여기서 버튼만 다시 그린다. */
+/* coverfo.com 홈 안(iframe)에서 열린 상태인지 — 그때만 포도AI 탭이 'coverfo' 가 되고 누르면 홈으로 돌아간다 */
+function inCoverfo() { try { return window.top !== window; } catch (e) { return true; } }
+function cfPost(msg) { try { if (inCoverfo()) window.parent.postMessage(msg, "*"); } catch (e) {} }
 function fixTabbar() {
   var bar = document.getElementById("talkbar");
   if (!bar || bar.getAttribute("data-pt2") === "1") return;
@@ -1367,7 +1370,7 @@ function fixTabbar() {
        하려면 아직 갈 길이 멀어서 탭에서 뺐다. 필요해지면 되살리면 된다. */
     /* 순서 : 포도AI · 채팅 · 일반채팅 · 통역톡 · 설정
        앱을 열면 포도AI 가 먼저 나오므로 탭도 맨 앞에 둔다. */
-    '<button data-pt2="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>포도AI</button>' +
+    '<button data-pt2="podoya" id="tk-tab-podoya"><span class="ti" style="display:flex;align-items:center;justify-content:center;height:22px"><img src="/podotalk-192.png" alt="" style="width:22px;height:22px;border-radius:7px;display:block;object-fit:cover"></span>' + (inCoverfo() ? "coverfo" : "포도AI") + '</button>' +
     '<button data-action="talk-tab" data-v="direct" id="tk-tab-direct"><span class="ti">💬</span>채팅</button>' +
     '<button data-action="talk-tab" data-v="open" id="tk-tab-open"><span class="ti">👥</span>일반채팅</button>' +
     '<button data-pt2="lang" id="tk-tab-lang"><span class="ti">🌐</span>통역톡</button>' +
@@ -2001,7 +2004,7 @@ function renderPodoya(panel){
        같은 화면이 이미 떠 있으므로 굳이 밖으로 나갈 이유도 없다. */
   markTab("podoya");
   fitAiSoon();
-  if (panel && AI_PANELS[String(panel)]) {
+  if (panel && aiPanels()[String(panel)]) {
     /* 세부 화면을 여는 동안 홈 화면이 잠깐 비치지 않게 창을 가려 둔다 (열리면 걷음, 최대 4초) */
     try {
       var _fr0 = document.getElementById("pt2-aif");
@@ -4924,6 +4927,7 @@ document.addEventListener("click", function (e) {
   if (a === "wal-in")  { walIn(); return; }
   if (a === "wal-out") { walOut(); return; }
   if (a === "podoya") {
+    if (inCoverfo()) { cfPost({ podotalk: "home" }); return; }   /* coverfo 안에서는 이 탭이 'coverfo' — 홈으로 */
     /* 이미 포도AI 탭에 있으면 주소가 안 바뀌어 아무 일도 안 일어난다.
        그래서 창 안쪽 화면에 들어가 있으면 탭을 눌러도 못 빠져나왔다.
        같은 탭을 다시 누르면 창을 새로 그려 홈으로 되돌린다. */
@@ -5541,77 +5545,68 @@ function aiOnPodoyaTab() {
    coverfo.com 홈의 '기능·에이전트팀·저장루틴·포도야 비서·커넥션 허브·Podoya 기능' 버튼이
    이 주소로 들어온다. ai.html 은 같은 도메인이라 창 안의 함수를 바로 부를 수 있다.
    창이 아직 준비 안 됐으면 0.3초마다 다시 보고, 12초까지만 기다린다. 못 찾으면 그냥 홈. */
-var AI_PANELS = {
-  fn: "showFeatureGuide",        /* 📋 기능 */
-  agents: "agentTeamGo",         /* 🤖 에이전트팀 (입력칸이 비어 있으면 입력칸에 커서를 둔다 — 원래 버튼과 같음) */
-  routine: "showAgentRoutines",  /* 📁 저장루틴 */
-  secretary: "openPodoAssist",   /* 🍇 포도야 비서 */
-  hub: "openConnectHub",         /* 🔗 커넥션 허브 */
-  pfn: "openPodoFeatureGrid",    /* 🧩 Podoya 기능 */
-  adv: "openPodoAdvanced",       /* 🔌 고급기능 */
-  menu: "openPodoMenu"           /* ☰ 기능 메뉴 */
-};
+/* 함수로 둔다 — 화면을 처음 그리는 코드가 이 줄보다 먼저 돌아도(호이스팅) 목록을 읽을 수 있게 */
+function aiPanels() { return {
+  /* fn: 창(ai.html) 안의 함수 이름 / txt: 그 함수가 없을 때 대신 누를 단추의 글자(이모지·공백 제외) / via: 먼저 열어야 하는 메뉴 */
+  fn:        { fn: "showFeatureGuide",   txt: ["기능"] },                        /* 📋 기능 — '이렇게 말해보세요' */
+  agents:    { fn: "agentTeamGo",        txt: ["에이전트팀"] },
+  routine:   { fn: "showAgentRoutines",  txt: ["저장루틴", "저장된루틴열기"] },
+  secretary: { fn: "openPodoAssist",     txt: ["포도야비서"] },
+  hub:       { fn: "openConnectHub",     txt: ["커넥션허브"] },
+  pfn:       { fn: "openPodoFeatureGrid", txt: ["Podoya기능", "포도야기능"], via: "menu" },
+  adv:       { fn: "openPodoAdvanced",   txt: ["고급기능"], via: "menu" },
+  menu:      { fn: "openPodoMenu",       txt: [], title: "기능 메뉴" }
+}; }
+function aiNorm(t) { return String(t || "").replace(/[^0-9A-Za-z가-힣]/g, ""); }
+function aiFindBtn(doc, spec) {
+  try {
+    if (spec.title) { var b0 = doc.querySelector('button[title="' + spec.title + '"]'); if (b0) return b0; }
+    var els = doc.querySelectorAll("button, a, [role=button], [onclick]");
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]; if (!el.offsetParent && el.tagName !== "A") continue;   /* 안 보이는 것은 건너뜀 */
+      var t = aiNorm(el.textContent);
+      for (var k = 0; k < spec.txt.length; k++) { if (t === aiNorm(spec.txt[k])) return el; }
+    }
+  } catch (e) {}
+  return null;
+}
 function aiUnveil() {
   try { var f = document.getElementById("pt2-aif"); if (f) f.style.visibility = ""; } catch (e) {}
   try { var v = document.getElementById("pt2-aiveil"); if (v && v.parentNode) v.parentNode.removeChild(v); } catch (e) {}
 }
-function aiOpenPanel(panel) {
-  var fn = AI_PANELS[panel];
-  if (!fn) return;
+/* 한 화면 열기: 함수가 있으면 함수, 없으면 같은 글자의 단추를 누른다. 성공하면 cb(true) */
+function aiFire(w, spec, cb) {
   var tries = 0;
   (function wait() {
-    if (++tries > 40) { aiUnveil(); return; }
-    if (!aiOnPodoyaTab()) { aiUnveil(); return; }       /* 그 사이 다른 탭으로 갔다 */
-    var f = document.getElementById("pt2-aif");
-    var w = null;
-    try { w = f && f.contentWindow; } catch (e) { w = null; }
-    var ready = false;
-    try { ready = !!(w && w.document && w.document.readyState === "complete" && typeof w[fn] === "function" && w.document.getElementById("uni-q")); } catch (e) { ready = false; }
-    if (!ready) { setTimeout(wait, 300); return; }
+    if (++tries > 40) { cb(false); return; }
+    if (!aiOnPodoyaTab()) { cb(false); return; }
+    var doc = null; try { doc = w && w.document; } catch (e) { doc = null; }
+    if (!doc || doc.readyState !== "complete" || !doc.body || doc.body.children.length === 0) { setTimeout(wait, 300); return; }
+    var fnOk = false; try { fnOk = typeof w[spec.fn] === "function"; } catch (e) { fnOk = false; }
+    var btn = aiFindBtn(doc, spec);
+    if (!fnOk && !btn) { setTimeout(wait, 300); return; }
     setTimeout(function () {
-      try { w[fn](); } catch (e) {}
-      setTimeout(aiUnveil, 350);                        /* 세부 화면이 올라온 뒤에 가림막을 걷는다 */
-    }, 250);   /* 홈 화면이 다 그려진 뒤에 연다 */
+      var done = false;
+      if (fnOk) { try { w[spec.fn](); done = true; } catch (e) { done = false; } }
+      if (!done && btn) { try { btn.click(); done = true; } catch (e) {} }
+      cb(done);
+    }, 200);
   })();
 }
-
-window.addEventListener("message", function (ev) {
-  try {
-    /* 창이 같은 도메인(/ai.html)으로 옮겨졌다. 예전 주소도 함께 받아준다 —
-       폰에 옛 화면이 남아 있는 동안 뒤로가기가 끊기지 않게. */
-    var _o = String(ev.origin || "");
-    if (_o !== location.origin && _o.indexOf("podoya.ai.kr") < 0) return;
-    /* 창이 "이 주소 좀 열어줘" 라고 부탁하면 새 탭으로 열어준다.
-       창 안에서 새 탭이 막혔을 때의 마지막 길이다. 이게 없으면 창이
-       같은 자리에서 외부 주소로 갈아타다 화면이 통째로 날아간다. */
-    try {
-      if (ev.data && ev.data.podoya === "open" && ev.data.url) {
-        window.open(String(ev.data.url), "_blank");
-        return;
-      }
-    } catch (e) {}
-    var d = ev.data;
-    if (!d || d.podoya !== "push") return;
-    if (!aiOnPodoyaTab()) return;          /* 그 탭을 보고 있을 때만 */
-    aiDepth++;
-    aiPad();
-  } catch (e) {}
-});
-
-window.addEventListener("popstate", function () {
-  if (!aiMark) return;                     /* 우리가 깐 자리가 아니다 */
-  aiMark = false;
-  if (aiDepth <= 0) return;
-  if (!aiOnPodoyaTab()) { aiDepth = 0; return; }
-  aiDepth--;
-  try {
-    var f = document.getElementById("pt2-aif");
-    if (f && f.contentWindow) {
-      f.contentWindow.postMessage({ podoya: "back" }, location.origin);
-    }
-  } catch (e) {}
-  if (aiDepth > 0) aiPad();                /* 아직 닫을 게 남았으면 한 칸만 다시 */
-});
+function aiOpenPanel(panel) {
+  var spec = aiPanels()[panel];
+  if (!spec) { aiUnveil(); return; }
+  var f = document.getElementById("pt2-aif");
+  var w = null; try { w = f && f.contentWindow; } catch (e) { w = null; }
+  if (!w) { aiUnveil(); return; }
+  var open = function () { aiFire(w, spec, function () { setTimeout(aiUnveil, 350); }); };
+  if (spec.via && aiPanels()[spec.via]) {
+    /* 메뉴 안에 있는 화면: 메뉴를 먼저 열고 잠시 뒤 그 항목을 누른다 */
+    aiFire(w, aiPanels()[spec.via], function (ok) { if (ok) setTimeout(open, 350); else aiUnveil(); });
+  } else {
+    open();
+  }
+}
 
 /* 화면을 다 그린 뒤에 문을 덮는다. 먼저 덮으면 뒤에서 그리는 동안
    빈 화면이 스쳐 보인다. */
@@ -5619,7 +5614,8 @@ try { gateCheck(); } catch (e) {}
 
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
 try { fixTabbar(); } catch (e) {}
-window.addEventListener("hashchange", function () { try { fixTabbar(); } catch (e) {} });
+window.addEventListener("hashchange", function () { try { fixTabbar(); } catch (e) {} try { cfPost({ podotalk: "route", hash: location.hash }); } catch (e) {} });
+try { cfPost({ podotalk: "route", hash: location.hash }); } catch (e) {}
 
 if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
 
