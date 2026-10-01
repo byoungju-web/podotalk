@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "147";
+var PT2_VER = "148";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5549,7 +5549,8 @@ function aiOnPodoyaTab() {
 function aiPanels() { return {
   /* fn: 창(ai.html) 안의 함수 이름 / txt: 그 함수가 없을 때 대신 누를 단추의 글자(이모지·공백 제외) / via: 먼저 열어야 하는 메뉴 */
   /* el: 그 화면의 요소 id (coverfo 안에서 '‹'·'닫기' 로 닫히면 coverfo 홈으로 돌려보내기 위해 지켜본다) */
-  fn:        { fn: "showFeatureGuide",   txt: ["기능"], el: "vans-bg" },          /* 📋 기능 — '이렇게 말해보세요' */
+  /* fn: coverfo 안에서는 위쪽 '🎤 AI 음성 비서' 머리말과 입력칸 줄(vans-bg 의 첫 두 칸)을 숨기고 목록만 보인다 */
+  fn:        { fn: "showFeatureGuide",   txt: ["기능"], el: "vans-bg", css: "#vans-bg > div:nth-child(1), #vans-bg > div:nth-child(2) { display:none !important }" },
   agents:    { fn: "agentTeamGo",        txt: ["에이전트팀"], el: "agent-panel" },
   routine:   { fn: "showAgentRoutines",  txt: ["저장루틴", "저장된루틴열기"], el: "agent-panel", full: true },
   secretary: { fn: "openPodoAssist",     txt: ["포도야비서"], el: "assist-bg" },
@@ -5582,11 +5583,14 @@ function aiWatchClose(w, spec) {
 /* ── coverfo 안에서 '저장루틴' 만 열 때: 창 안 홈(날씨·입력칸·단추)은 숨기고 '저장된 루틴' 칸만 화면 가득 ──
    ai.html 은 손대지 않고, coverfo 안에서만 스타일 한 줄을 창에 넣는다. */
 function aiRoutineFull(w) {
+  aiCss(w, "cf-routine-css", "#agent-panel{position:fixed !important;inset:0 !important;z-index:700 !important;background:#fff !important;overflow:auto !important;-webkit-overflow-scrolling:touch;margin:0 !important;padding:14px 14px calc(24px + env(safe-area-inset-bottom)) !important;box-sizing:border-box}");
+}
+/* coverfo 안에서만 창(ai.html)에 스타일 한 줄을 넣는다 (ai.html 파일은 그대로) */
+function aiCss(w, id, text) {
   if (!inCoverfo()) return;
   try {
-    var d = w.document; if (!d || d.getElementById("cf-routine-css")) return;
-    var st = d.createElement("style"); st.id = "cf-routine-css";
-    st.textContent = "#agent-panel{position:fixed !important;inset:0 !important;z-index:700 !important;background:#fff !important;overflow:auto !important;-webkit-overflow-scrolling:touch;margin:0 !important;padding:14px 14px calc(24px + env(safe-area-inset-bottom)) !important;box-sizing:border-box}";
+    var d = w.document; if (!d || d.getElementById(id)) return;
+    var st = d.createElement("style"); st.id = id; st.textContent = text;
     (d.head || d.documentElement).appendChild(st);
   } catch (e) {}
 }
@@ -5633,7 +5637,7 @@ function aiOpenPanel(panel) {
   var w = null; try { w = f && f.contentWindow; } catch (e) { w = null; }
   if (!w) { aiUnveil(); return; }
   /* 창이 다 뜬 뒤(aiFire 가 연 뒤)에 넣어야 한다 — 먼저 넣으면 아직 빈 창(about:blank)에 들어가 사라진다 */
-  var open = function () { aiFire(w, spec, function (ok) { if (ok && spec.full) aiRoutineFull(w); setTimeout(aiUnveil, 350); if (ok) aiWatchClose(w, spec); }); };
+  var open = function () { aiFire(w, spec, function (ok) { if (ok && spec.full) aiRoutineFull(w); if (ok && spec.css) aiCss(w, "cf-" + spec.el + "-css", spec.css); setTimeout(aiUnveil, 350); if (ok) aiWatchClose(w, spec); }); };
   if (spec.via && aiPanels()[spec.via]) {
     /* 메뉴 안에 있는 화면: 메뉴를 먼저 열고 잠시 뒤 그 항목을 누른다 */
     aiFire(w, aiPanels()[spec.via], function (ok) { if (ok) setTimeout(open, 350); else aiUnveil(); });
