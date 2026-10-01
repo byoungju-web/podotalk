@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "146";
+var PT2_VER = "147";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5548,15 +5548,48 @@ function aiOnPodoyaTab() {
 /* 함수로 둔다 — 화면을 처음 그리는 코드가 이 줄보다 먼저 돌아도(호이스팅) 목록을 읽을 수 있게 */
 function aiPanels() { return {
   /* fn: 창(ai.html) 안의 함수 이름 / txt: 그 함수가 없을 때 대신 누를 단추의 글자(이모지·공백 제외) / via: 먼저 열어야 하는 메뉴 */
-  fn:        { fn: "showFeatureGuide",   txt: ["기능"] },                        /* 📋 기능 — '이렇게 말해보세요' */
-  agents:    { fn: "agentTeamGo",        txt: ["에이전트팀"] },
-  routine:   { fn: "showAgentRoutines",  txt: ["저장루틴", "저장된루틴열기"] },
-  secretary: { fn: "openPodoAssist",     txt: ["포도야비서"] },
-  hub:       { fn: "openConnectHub",     txt: ["커넥션허브"] },
-  pfn:       { fn: "openPodoFeatureGrid", txt: ["Podoya기능", "포도야기능"], via: "menu" },
-  adv:       { fn: "openPodoAdvanced",   txt: ["고급기능"], via: "menu" },
-  menu:      { fn: "openPodoMenu",       txt: [], title: "기능 메뉴" }
+  /* el: 그 화면의 요소 id (coverfo 안에서 '‹'·'닫기' 로 닫히면 coverfo 홈으로 돌려보내기 위해 지켜본다) */
+  fn:        { fn: "showFeatureGuide",   txt: ["기능"], el: "vans-bg" },          /* 📋 기능 — '이렇게 말해보세요' */
+  agents:    { fn: "agentTeamGo",        txt: ["에이전트팀"], el: "agent-panel" },
+  routine:   { fn: "showAgentRoutines",  txt: ["저장루틴", "저장된루틴열기"], el: "agent-panel", full: true },
+  secretary: { fn: "openPodoAssist",     txt: ["포도야비서"], el: "assist-bg" },
+  hub:       { fn: "openConnectHub",     txt: ["커넥션허브"], el: "podoadvf-bg" },
+  pfn:       { fn: "openPodoFeatureGrid", txt: ["Podoya기능", "포도야기능"], via: "menu", el: "podofeat-bg" },
+  adv:       { fn: "openPodoAdvanced",   txt: ["고급기능"], via: "menu", el: "podoadv-bg" },
+  menu:      { fn: "openPodoMenu",       txt: [], title: "기능 메뉴", el: "podomenu-bg" }
 }; }
+/* ── coverfo 안에서만: 열어 준 화면이 닫히면(상단 '‹' · '닫기') coverfo 홈으로 ──
+   포도톡을 직접 쓸 때(inCoverfo 가 아닐 때)는 아무것도 하지 않는다. */
+var aiWatchT = null;
+function aiWatchClose(w, spec) {
+  if (!inCoverfo() || !spec || !spec.el) return;
+  if (aiWatchT) { clearInterval(aiWatchT); aiWatchT = null; }
+  var seen = false, n = 0;
+  var vis = function () {
+    try {
+      var el = w.document.getElementById(spec.el); if (!el) return false;
+      var cs = w.getComputedStyle(el);
+      return cs.display !== "none" && cs.visibility !== "hidden";
+    } catch (e) { return false; }
+  };
+  aiWatchT = setInterval(function () {
+    if (!aiOnPodoyaTab() || ++n > 20000) { clearInterval(aiWatchT); aiWatchT = null; return; }
+    var v = vis();
+    if (v) { seen = true; return; }
+    if (seen) { clearInterval(aiWatchT); aiWatchT = null; cfPost({ podotalk: "home" }); }
+  }, 250);
+}
+/* ── coverfo 안에서 '저장루틴' 만 열 때: 창 안 홈(날씨·입력칸·단추)은 숨기고 '저장된 루틴' 칸만 화면 가득 ──
+   ai.html 은 손대지 않고, coverfo 안에서만 스타일 한 줄을 창에 넣는다. */
+function aiRoutineFull(w) {
+  if (!inCoverfo()) return;
+  try {
+    var d = w.document; if (!d || d.getElementById("cf-routine-css")) return;
+    var st = d.createElement("style"); st.id = "cf-routine-css";
+    st.textContent = "#agent-panel{position:fixed !important;inset:0 !important;z-index:700 !important;background:#fff !important;overflow:auto !important;-webkit-overflow-scrolling:touch;margin:0 !important;padding:14px 14px calc(24px + env(safe-area-inset-bottom)) !important;box-sizing:border-box}";
+    (d.head || d.documentElement).appendChild(st);
+  } catch (e) {}
+}
 function aiNorm(t) { return String(t || "").replace(/[^0-9A-Za-z가-힣]/g, ""); }
 function aiFindBtn(doc, spec) {
   try {
@@ -5599,7 +5632,8 @@ function aiOpenPanel(panel) {
   var f = document.getElementById("pt2-aif");
   var w = null; try { w = f && f.contentWindow; } catch (e) { w = null; }
   if (!w) { aiUnveil(); return; }
-  var open = function () { aiFire(w, spec, function () { setTimeout(aiUnveil, 350); }); };
+  /* 창이 다 뜬 뒤(aiFire 가 연 뒤)에 넣어야 한다 — 먼저 넣으면 아직 빈 창(about:blank)에 들어가 사라진다 */
+  var open = function () { aiFire(w, spec, function (ok) { if (ok && spec.full) aiRoutineFull(w); setTimeout(aiUnveil, 350); if (ok) aiWatchClose(w, spec); }); };
   if (spec.via && aiPanels()[spec.via]) {
     /* 메뉴 안에 있는 화면: 메뉴를 먼저 열고 잠시 뒤 그 항목을 누른다 */
     aiFire(w, aiPanels()[spec.via], function (ok) { if (ok) setTimeout(open, 350); else aiUnveil(); });
@@ -5615,6 +5649,20 @@ try { gateCheck(); } catch (e) {}
 /* 켜져 있으면 목록을 미리 한 번 받아둔다 */
 try { fixTabbar(); } catch (e) {}
 window.addEventListener("hashchange", function () { try { fixTabbar(); } catch (e) {} try { cfPost({ podotalk: "route", hash: location.hash }); } catch (e) {} });
+/* coverfo 홈의 단추가 "이 화면 열어 줘" 라고 보내면 (같은 주소를 다시 눌러도) 그 화면을 새로 그린다.
+   주소만 바꾸면 같은 주소일 때 hashchange 가 안 나서 전 화면이 그대로 남았다. 기록은 replaceState 라 쌓이지 않는다. */
+window.addEventListener("message", function (ev) {
+  try {
+    if (!inCoverfo()) return;
+    var d = ev.data; if (!d || d.coverfo !== "route" || !d.hash) return;
+    var h = String(d.hash); if (h.indexOf("#/talk") !== 0) return;
+    try { history.replaceState(null, "", h); } catch (e) {}
+    var seg = h.slice(2).split("/"); var sub = seg[1] || "podoya"; var arg = seg[2] ? decodeURIComponent(seg[2]) : null;
+    window.renderTalk(sub, arg);
+    try { fixTabbar(); } catch (e) {}
+    cfPost({ podotalk: "route", hash: h });
+  } catch (e) {}
+});
 try { cfPost({ podotalk: "route", hash: location.hash }); } catch (e) {}
 
 if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
@@ -5654,6 +5702,8 @@ try { setTimeout(banCheck, 1200); } catch (e) {}
   var armed = false;
 
   function arm() {
+    /* coverfo 창(iframe) 안: 기록을 쌓지 않는다 — coverfo 가 뒤로가기로 창을 닫고 홈으로 보낸다. (이 블록은 위 큰 함수 밖이라 inCoverfo 를 못 보므로 직접 본다) */
+    try { if (window.top !== window) return; } catch (e) { return; }
     try { history.pushState({ pt2back: 1 }, ""); armed = true; } catch (e) {}
   }
 
