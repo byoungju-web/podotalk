@@ -828,7 +828,7 @@ body{background:#f4f5fa;display:flex;justify-content:center;min-height:100vh;fon
         <div style="font-size:10px;color:#1f2430;margin-bottom:7px">Puter 모델 · 사용량은 각 유저가 자기 Puter 계정으로 부담</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="puter-chip" data-m="gpt-5.4-nano" onclick="setPuterModel('gpt-5.4-nano',this)">&#9889; 빠름&#183;저렴</button>
-          <button class="puter-chip" data-m="google/gemini-3.5-flash" onclick="setPuterModel('google/gemini-3.5-flash',this)">&#128142; 균형</button>
+          <button class="puter-chip" data-m="google/gemini-3.6-flash" onclick="setPuterModel('google/gemini-3.6-flash',this)">&#128142; 균형</button>
           <button class="puter-chip" data-m="claude-sonnet-4-6" onclick="setPuterModel('claude-sonnet-4-6',this)">&#127815; 고품질</button>
         </div>
       </div>
@@ -1819,6 +1819,8 @@ var aiModel = lsG('podoai_model', (function(){
    Puter 로그인 화면은 크레딧이 없을 때만 나온다. */
 // Puter(키리스, User-Pays) 기본 모델 — 사용량은 각 유저가 자기 Puter 계정으로 부담
 var PUTER_MODEL = lsG('podoai_puter_model','gpt-5.4-nano');
+/* 2026-10-11 구글이 gemini-3.5-flash 를 내리고 3.6 으로 돌림 → 예전에 '균형'을 골라 저장해 둔 분도 새 이름으로 바꿔 둔다 */
+if (PUTER_MODEL === 'google/gemini-3.5-flash') { PUTER_MODEL = 'google/gemini-3.6-flash'; try { lsS('podoai_puter_model', PUTER_MODEL); } catch (e) {} }
 
 var hist = [];
 var loading = false;
@@ -1917,7 +1919,7 @@ function callPuter(opts, onSuccess, onError){
   var msgs = (opts.messages || []).slice();
   if(opts.system){ msgs.unshift({ role:'system', content: opts.system }); }
   try{
-    puter.ai.chat(msgs, { model: (opts.fast ? 'google/gemini-3.5-flash' : PUTER_MODEL), max_tokens: opts.maxTokens || 500 })
+    puter.ai.chat(msgs, { model: (opts.fast ? 'google/gemini-3.6-flash' : PUTER_MODEL), max_tokens: opts.maxTokens || 500 })
       .then(function(res){
         var text = '';
         try{
@@ -8712,7 +8714,7 @@ function puterStream(opts,onDelta,onDone,onError){
   var msgs=(opts.messages||[]).slice(); if(opts.system) msgs.unshift({role:'system',content:opts.system});
   (async function(){
     try{
-      var stream=await puter.ai.chat(msgs,{ model:(opts.fast?'google/gemini-3.5-flash':PUTER_MODEL), stream:true, max_tokens:opts.maxTokens||500 });
+      var stream=await puter.ai.chat(msgs,{ model:(opts.fast?'google/gemini-3.6-flash':PUTER_MODEL), stream:true, max_tokens:opts.maxTokens||500 });
       var full='';
       for await (const part of stream){ var t=(part&&part.text)||''; if(t){ full+=t; onDelta(t); } }
       onDone(full);
