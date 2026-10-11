@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "150";
+var PT2_VER = "151";
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1675,6 +1675,22 @@ function cfwUnlink(quiet) {
   if (!quiet) say("연결을 끊었어요 · 포도톡 자체 지갑을 씁니다");
   try { if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits(); } catch (e) {}
 }
+/* v76 연결 중 요금표 — coverfo 단가표(PRICES)를 읽어 그대로 보여준다. 못 읽으면 같은 값의 기본표 */
+var cdLine = null; /* 요금표 한 줄 그리기 (renderCredits 안에서 정해짐) */
+var CFW_DEF_PRICES = { stt: 0.1, room_ai: 0.1, fast: 0.2, multi: 0.1, face: 0.3, search: 0.4, quality: 0.8, phone: 6 };
+function cfwCostHtml(line){
+  var P = CFW.prices || CFW_DEF_PRICES;
+  var v = function (k) { var n = Number(P[k]); return isFinite(n) ? n : CFW_DEF_PRICES[k]; };
+  var t = function (n) { return String(Math.round(n * 10) / 10); };
+  return line("말하기 (받아쓰기)", t(v("stt")), cfwWon(v("stt"))) +
+    line("채팅방 AI 답", t(v("room_ai")), cfwWon(v("room_ai"))) +
+    line("포도AI · 빠른 답", t(v("fast")), cfwWon(v("fast"))) +
+    line("다중 동시통역", t(v("multi")), "한 마디에 언어 하나당 " + cfwWon(v("multi")) + " · 세 나라 말이면 " + t(v("multi") * 3)) +
+    line("마주보기 통역", t(v("face")), "1분에 · " + cfwWon(v("face"))) +
+    line("포도AI · 웹검색", t(v("search")), cfwWon(v("search"))) +
+    line("포도AI · 고품질 답", t(v("quality")), cfwWon(v("quality"))) +
+    line("전화통역", t(v("phone")), "1분에 · " + cfwWon(v("phone")));
+}
 /* 크레딧 화면 맨 위 카드 */
 function cfwCardHtml() {
   var cfIc = '<span style="display:inline-block;width:17px;height:17px;border-radius:6px;background:#6d28d9;color:#fff;font-size:11px;font-weight:900;text-align:center;line-height:17px;vertical-align:-3px;margin-right:5px">c</span>';
@@ -1682,18 +1698,18 @@ function cfwCardHtml() {
     var how = CFW.token ? "coverfo 홈 안이라 자동으로 연결됨" : "연결 코드 " + esc(CFW.code);
     return '<div class="tk-card" style="padding:16px;border:1.5px solid #6d28d9">' +
       '<div style="font-size:15px;font-weight:800;margin-bottom:6px">' + cfIc + "coverfo 지갑 사용 중</div>" +
-      '<div style="text-align:center;padding:8px 0 4px"><div class="pt2-sub">남은 크레딧</div>' +
+      '<div style="text-align:center;padding:8px 0 4px"><div class="pt2-sub">남은 coverfo 크레딧</div>' +
         '<div id="cfwBal" style="font-size:34px;font-weight:900;color:var(--tk-grape);line-height:1.2">' + (CFW.paid === null ? "…" : cfwFmt(CFW.paid)) + "</div>" +
         '<div id="cfwWon" class="pt2-sub">' + (CFW.paid === null ? "" : "≈ " + Math.round(CFW.paid * CFW.won).toLocaleString() + "원 · 1크레딧 = 99원") + "</div></div>" +
       '<div class="pt2-sub" style="line-height:1.7;margin-top:6px">' + how + "<br>coverfo · 포도톡 · 포도야 어디서 써도 같은 지갑입니다. 충전·환불은 coverfo 에서 합니다.</div>" +
-      '<a class="cta" href="https://coverfo.com/buy" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:10px">coverfo 에서 충전하기 (100 · 550 · 1,200)</a>' +
+      '<a class="cta" href="https://coverfo.com/buy" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:10px">coverfo 에서 충전하기 (100 · 300 · 550 · 1,200)</a>' +
       (CFW.token ? "" : '<div style="text-align:center;margin-top:10px"><button data-pt2="cfw-unlink" style="border:none;background:none;color:var(--tk-sub);font-size:11.5px;text-decoration:underline;cursor:pointer;font-family:inherit">연결 끊기 (포도톡 자체 지갑으로)</button></div>') +
     "</div>";
   }
   return '<div class="tk-card" style="padding:16px">' +
     '<div style="font-size:15px;font-weight:800;margin-bottom:6px">' + cfIc + "coverfo 지갑에 연결하기</div>" +
     '<div class="pt2-sub" style="line-height:1.7;margin-bottom:10px">coverfo.com 에서 충전한 크레딧(1크레딧 = 99원)을 포도톡·포도야에서 그대로 씁니다.<br>' +
-      "coverfo.com → 사이드바 → 설정 → <b>크레딧 지갑 · 포도톡 연결</b> → <b>코드 만들기</b> 로 받은 코드를 넣으세요.</div>" +
+      "coverfo.com → 사이드바 → <b>이용료 · 충전 · 포도톡 연결</b> → <b>코드 만들기</b> 로 받은 코드를 넣으세요. (coverfo 홈 안에서 열면 코드 없이 자동 연결)</div>" +
     '<input id="cfwCode" class="tk-in" placeholder="CF-XXXX-XXXX" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:1px;text-align:center;font-weight:800">' +
     '<button class="cta" style="margin-top:10px" data-pt2="cfw-link">연결하기</button>' +
     '<div class="pt2-sub" style="margin-top:9px;font-size:11px">연결 안 하면 지금처럼 포도톡 자체 지갑(아래)을 씁니다.</div>' +
@@ -1706,6 +1722,11 @@ window.addEventListener("message", function (ev) {
     var d = ev.data; if (!d || d.coverfo !== "wallet") return;
     if (String(ev.origin || "").indexOf("coverfo.com") < 0) return;
     CFW.token = d.token || ""; CFW.email = d.email || "";
+    /* v76 서버(포도톡 Worker)가 coverfo 지갑에서 깎으려면 연결 코드가 필요하다.
+       coverfo 로그인 토큰으로 이 계정의 코드를 받아(없으면 만들어) 서버에 알려 둔다. */
+    if (CFW.token) cfwFetch({ op: "code" }).then(function (j) {
+      if (j && j.ok && j.code) { CFW.code = j.code; LSS("pt2_cfcode", j.code); cfwTellServer(j.code); }
+    }, function () {});
     if (CFW.token) { cfwBalance(function () { try { if ((location.hash || "").indexOf("#/talk/credits") === 0) renderCredits(); } catch (e) {} }); }
   } catch (e) {}
 });
@@ -1807,11 +1828,17 @@ function renderCredits(){
   var b = CDS.balance;
   document.querySelector("#view").innerHTML = head +
     cfwCardHtml() +
-    '<div class="tk-sec" style="margin-top:16px">' + (cfwLinked() ? "포도톡 자체 지갑 (연결 전 잔액)" : "포도톡 자체 지갑") + "</div>" +
+    '<div class="tk-sec" style="margin-top:16px">' + (cfwLinked() ? "포도톡에 남은 크레딧 (먼저 쓰임)" : "포도톡 지갑") + "</div>" +
     '<div class="tk-card" style="padding:18px 16px;text-align:center">' +
-      '<div class="pt2-sub" style="margin-bottom:6px">남은 크레딧</div>' +
+      '<div class="pt2-sub" style="margin-bottom:6px">남은 포도톡 크레딧</div>' +
       '<div id="cdBal" style="font-size:34px;font-weight:900;color:var(--tk-grape);line-height:1.2">' +
         (b === null ? "…" : Number(b).toLocaleString()) + "</div>" +
+      '<div id="cdBalCf" class="pt2-sub" style="margin-top:4px">' + cdBalCfText(b) + "</div>" +
+      '<div class="pt2-sub" style="margin-top:8px;line-height:1.7;text-align:left">' +
+        (cfwLinked()
+          ? "이 숫자를 <b>먼저</b> 쓰고, 다 쓰면 위의 <b>coverfo 지갑</b>에서 나갑니다. 따로 옮길 필요 없어요.<br>포도톡 크레딧 10 = coverfo 크레딧 1 (같은 금액)"
+          : "포도톡 크레딧 1 ≈ 9.9원 · coverfo 지갑에 연결하면 coverfo 크레딧(1 = 99원)으로 같이 씁니다") +
+      "</div>" +
     "</div>" +
 
     /* 포도AI와 지갑 합치기 — 처음 오신 분이 가장 먼저 보게 둔다 */
@@ -1822,8 +1849,11 @@ function renderCredits(){
 
     /* 크레딧 사기 */
     '<div class="tk-sec" style="margin-top:16px">크레딧 사기</div>' +
-    '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
-    '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>' +
+    (cfwLinked()
+      ? '<div class="tk-card" style="padding:6px 10px">' + cfwPacksHtml() + "</div>" +
+        '<div class="pt2-sub" style="margin-top:8px;line-height:1.7">1크레딧 = 99원 · coverfo 에서 결제하면 이 지갑(coverfo 지갑)에 바로 들어옵니다. 같은 coverfo 계정으로 결제해 주세요.</div>'
+      : '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
+        '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>') +
 
     '<div class="tk-sec" style="margin-top:16px">충전 코드로 채우기</div>' +
     '<div class="tk-card" style="padding:14px 15px">' +
@@ -1882,8 +1912,11 @@ function renderCredits(){
        줄을 맞춘다. 무료는 0 이 아니라 '무료' 라고 적는다 —
        0 은 눈에 안 들어오고 '무료' 는 들어온다. */
     '<div class="tk-sec" style="margin-top:18px">무엇이 얼마</div>' +
+    '<div class="pt2-sub" style="margin:-2px 2px 8px">' + (cfwLinked()
+      ? "coverfo 크레딧 기준 (1크레딧 = 99원)"
+      : "포도톡 크레딧 기준 (1크레딧 ≈ 9.9원) · coverfo 에 연결하면 숫자가 1/10 로 보여요 (금액은 같아요)") + "</div>" +
     (function () {
-      var line = function (name, val, sub, free) {
+      var line = cdLine = function (name, val, sub, free) {
         return '<div style="display:flex;align-items:baseline;gap:10px;padding:9px 0;' +
             'border-bottom:1px solid rgba(0,0,0,.05)">' +
             '<div style="flex:1;min-width:0">' +
@@ -1900,18 +1933,11 @@ function renderCredits(){
         line("1:1 동시통역", "무료", "둘이 쓰는 통역은 값을 받지 않아요", 1) +
         line("남의 말 듣고 읽기", "무료", "", 1) +
         (cfwLinked()
-          ? line("말하기 (받아쓰기)", "0.1", cfwWon(0.1)) +
-            line("채팅방 AI 답", "0.1", cfwWon(0.1)) +
-            line("포도AI · 빠른 답", "0.2", cfwWon(0.2)) +
-            line("다중 동시통역", "0.3", "한 마디에 방 안의 언어 수만큼 · " + cfwWon(0.3)) +
-            line("마주보기 통역", "0.3", "1분에 · " + cfwWon(0.3)) +
-            line("포도AI · 웹검색", "0.4", cfwWon(0.4)) +
-            line("포도AI · 고품질 답", "1", "99원") +
-            line("전화통역", "6", "1분에 · " + cfwWon(6))
+          ? '<div id="cfwCost">' + cfwCostHtml(line) + "</div>"
           : line("말하기 (받아쓰기)", "1", "") +
             line("채팅방 AI 답", "1", "") +
             line("포도AI · 빠른 답", "2", "") +
-            line("다중 동시통역", "3", "한 마디에 방 안의 언어 수만큼 · 세 나라 말이면 3") +
+            line("다중 동시통역", "1", "한 마디에 언어 하나당 · 세 나라 말이면 3") +
             line("마주보기 통역", "3", "1분에") +
             line("포도AI · 웹검색", "4", "") +
             line("포도AI · 고품질 답", "8", "") +
@@ -1934,6 +1960,11 @@ function renderCredits(){
   /* 예전에는 잔액을 받아온 뒤 화면을 통째로 다시 그렸다. 그 바람에
      코드를 입력하는 중에 칸이 지워져 글자가 안 들어갔다.
      이제는 숫자와 목록만 제자리에서 바꾼다. */
+  if (cfwLinked()) cfwPrices(function (P) {
+    if (!P || (location.hash || "").indexOf("#/talk/credits") !== 0) return;
+    var el = document.getElementById("cfwCost"); if (!el) return;
+    el.innerHTML = cfwCostHtml(cdLine);
+  });
   if (cfwLinked()) cfwBalance(function (p) {
     if ((location.hash || "").indexOf("#/talk/credits") !== 0 || p === null) return;
     var e1 = document.getElementById("cfwBal"), e2 = document.getElementById("cfwWon");
@@ -1944,9 +1975,32 @@ function renderCredits(){
     if ((location.hash || "").indexOf("#/talk/credits") !== 0) return;
     var b = document.getElementById("cdBal");
     if (b && CDS.balance !== null) b.textContent = Number(CDS.balance).toLocaleString();
+    var bc = document.getElementById("cdBalCf");
+    if (bc && CDS.balance !== null) bc.textContent = cdBalCfText(CDS.balance);
     var pk = document.getElementById("cdPacks");
     if (pk && CDS.packs && CDS.packs.length) pk.innerHTML = cdPacksHtml();
   });
+}
+/* v76 coverfo 지갑 패키지 — coverfo /api/pay 의 패키지와 같은 값 (starter 100·basic 300·plus 550·pro 1,200) */
+var CFW_PACKS = [
+  { credits: 100, krw: 9900, label: "가볍게" },
+  { credits: 300, krw: 29000, label: "1크레딧당 97원" },
+  { credits: 550, krw: 49000, label: "가장 많이 선택 · 1크레딧당 89원" },
+  { credits: 1200, krw: 99000, label: "1크레딧당 83원" }
+];
+function cfwPacksHtml(){
+  return CFW_PACKS.map(function (k) {
+    return '<div class="pt2-blkrow"><span>' +
+      "<b>" + Number(k.credits).toLocaleString() + "크레딧</b>" +
+      "<small>" + esc(k.label) + "</small></span>" +
+      '<a class="pt2-blkx" href="https://coverfo.com/pricing#charge" target="_blank" rel="noopener" ' +
+      'style="display:inline-block;text-decoration:none">' + Number(k.krw).toLocaleString() + "원</a></div>";
+  }).join("");
+}
+function cdBalCfText(b){
+  if (b === null || b === undefined) return "";
+  if (!cfwLinked()) return "약 " + Math.round(Number(b) * 9.9).toLocaleString() + "원";
+  return "= coverfo 크레딧 " + (Math.round(Number(b)) / 10).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " · 약 " + Math.round(Number(b) * 9.9).toLocaleString() + "원";
 }
 function cdPacksHtml(){
   if (!CDS.packs || !CDS.packs.length) return '<div class="pt2-sub">불러오는 중…</div>';
