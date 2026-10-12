@@ -1677,7 +1677,7 @@ function cfwUnlink(quiet) {
 }
 /* v76 연결 중 요금표 — coverfo 단가표(PRICES)를 읽어 그대로 보여준다. 못 읽으면 같은 값의 기본표 */
 var cdLine = null; /* 요금표 한 줄 그리기 (renderCredits 안에서 정해짐) */
-var CFW_DEF_PRICES = { stt: 0.1, room_ai: 0.1, fast: 0.2, multi: 0.1, face: 0.2, search: 0.4, quality: 0.8, phone: 6 };
+var CFW_DEF_PRICES = { stt: 0.1, room_ai: 0.1, fast: 0.2, multi: 0.1, face: 0.3, search: 0.4, quality: 0.8, phone: 6 };
 function cfwCostHtml(line){
   var P = CFW.prices || CFW_DEF_PRICES;
   var v = function (k) { var n = Number(P[k]); return isFinite(n) ? n : CFW_DEF_PRICES[k]; };
@@ -1938,7 +1938,7 @@ function renderCredits(){
             line("채팅방 AI 답", "0.1", "") +
             line("포도AI · 빠른 답", "0.2", "") +
             line("다중 동시통역", "0.1", "한 마디에 언어 하나당 · 세 나라 말이면 0.3") +
-            line("마주보기 통역", "0.2", "한 마디에") +
+            line("마주보기 통역", "0.3", "한 마디에") +
             line("포도AI · 웹검색", "0.4", "") +
             line("포도AI · 고품질 답", "0.8", "") +
             line("전화통역", "6", "1분에")) +
