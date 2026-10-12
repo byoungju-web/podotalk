@@ -1836,8 +1836,8 @@ function renderCredits(){
       '<div id="cdBalCf" class="pt2-sub" style="margin-top:4px">' + cdBalCfText(b) + "</div>" +
       '<div class="pt2-sub" style="margin-top:8px;line-height:1.7;text-align:left">' +
         (cfwLinked()
-          ? "이 숫자를 <b>먼저</b> 쓰고, 다 쓰면 위의 <b>coverfo 지갑</b>에서 나갑니다. 따로 옮길 필요 없어요.<br>포도톡 크레딧 10 = coverfo 크레딧 1 (같은 금액)"
-          : "포도톡 크레딧 1 ≈ 9.9원 · coverfo 지갑에 연결하면 coverfo 크레딧(1 = 99원)으로 같이 씁니다") +
+          ? "이 숫자를 <b>먼저</b> 쓰고, 다 쓰면 위의 <b>coverfo 지갑</b>에서 나갑니다. 따로 옮길 필요 없어요.<br>포도톡 크레딧 = coverfo 크레딧 (1:1 · 같은 금액)"
+          : "포도톡 크레딧 1 = 99원 · coverfo 지갑에 연결하면 같은 크레딧으로 같이 씁니다") +
       "</div>" +
     "</div>" +
 
@@ -1853,7 +1853,7 @@ function renderCredits(){
       ? '<div class="tk-card" style="padding:6px 10px">' + cfwPacksHtml() + "</div>" +
         '<div class="pt2-sub" style="margin-top:8px;line-height:1.7">1크레딧 = 99원 · coverfo 에서 결제하면 이 지갑(coverfo 지갑)에 바로 들어옵니다. 같은 coverfo 계정으로 결제해 주세요.</div>'
       : '<div class="tk-card" id="cdPacks" style="padding:6px 10px">' + cdPacksHtml() + "</div>" +
-        '<div class="pt2-sub" style="margin-top:8px">1크레딧으로 번역 한 줄을 보냅니다.</div>') +
+        '<div class="pt2-sub" style="margin-top:8px">1크레딧 = 99원 · 번역 한 줄에 0.1크레딧입니다.</div>') +
 
     '<div class="tk-sec" style="margin-top:16px">충전 코드로 채우기</div>' +
     '<div class="tk-card" style="padding:14px 15px">' +
@@ -1914,7 +1914,7 @@ function renderCredits(){
     '<div class="tk-sec" style="margin-top:18px">무엇이 얼마</div>' +
     '<div class="pt2-sub" style="margin:-2px 2px 8px">' + (cfwLinked()
       ? "coverfo 크레딧 기준 (1크레딧 = 99원)"
-      : "포도톡 크레딧 기준 (1크레딧 ≈ 9.9원) · coverfo 에 연결하면 숫자가 1/10 로 보여요 (금액은 같아요)") + "</div>" +
+      : "포도톡 크레딧 기준 (1크레딧 = 99원)") + "</div>" +
     (function () {
       var line = cdLine = function (name, val, sub, free) {
         return '<div style="display:flex;align-items:baseline;gap:10px;padding:9px 0;' +
@@ -1934,14 +1934,14 @@ function renderCredits(){
         line("남의 말 듣고 읽기", "무료", "", 1) +
         (cfwLinked()
           ? '<div id="cfwCost">' + cfwCostHtml(line) + "</div>"
-          : line("말하기 (받아쓰기)", "1", "") +
-            line("채팅방 AI 답", "1", "") +
-            line("포도AI · 빠른 답", "2", "") +
-            line("다중 동시통역", "1", "한 마디에 언어 하나당 · 세 나라 말이면 3") +
-            line("마주보기 통역", "3", "1분에") +
-            line("포도AI · 웹검색", "4", "") +
-            line("포도AI · 고품질 답", "8", "") +
-            line("전화통역", "60", "1분에")) +
+          : line("말하기 (받아쓰기)", "0.1", "") +
+            line("채팅방 AI 답", "0.1", "") +
+            line("포도AI · 빠른 답", "0.2", "") +
+            line("다중 동시통역", "0.1", "한 마디에 언어 하나당 · 세 나라 말이면 0.3") +
+            line("마주보기 통역", "0.3", "1분에") +
+            line("포도AI · 웹검색", "0.4", "") +
+            line("포도AI · 고품질 답", "0.8", "") +
+            line("전화통역", "6", "1분에")) +
       "</div>";
     })() +
 
@@ -1999,8 +1999,8 @@ function cfwPacksHtml(){
 }
 function cdBalCfText(b){
   if (b === null || b === undefined) return "";
-  if (!cfwLinked()) return "약 " + Math.round(Number(b) * 9.9).toLocaleString() + "원";
-  return "= coverfo 크레딧 " + (Math.round(Number(b)) / 10).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " · 약 " + Math.round(Number(b) * 9.9).toLocaleString() + "원";
+  if (!cfwLinked()) return "약 " + Math.round(Number(b) * 99).toLocaleString() + "원";
+  return "= coverfo 크레딧 " + Number(b).toLocaleString() + " · 약 " + Math.round(Number(b) * 99).toLocaleString() + "원";
 }
 function cdPacksHtml(){
   if (!CDS.packs || !CDS.packs.length) return '<div class="pt2-sub">불러오는 중…</div>';
