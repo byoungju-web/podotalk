@@ -19,6 +19,8 @@
         AI 답 아래에 "🧠 기억해 둘까요?" 작은 칸을 띄운다. 누르면 🧠 내 기억에 저장(이 폰에만).
       · 묻는 말 · 전화번호 · 카드/계좌 · 비밀번호가 든 문장은 제안하지 않는다.
       · "아니요" 를 누른 문장은 다시 묻지 않는다.
+   ③ 📡 서버 기억 + 서버 생활 브리핑 (🧠 내 기억에서 켜는 사람만)
+      · 포도톡 워커(/pm/…)에 무작위 기억 번호 + 열쇠로 저장. 뜻으로 찾기 · 폰이 꺼져 있어도 오는 브리핑.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
@@ -140,7 +142,10 @@
   if (typeof _origRun === "function") {
     window.briefRun = function (id, manual) {
       var b = null; try { b = briefGet(id); } catch (e) {}
-      if (b && b.life) { lifeRun(b, manual); return; }
+      if (b && b.life) {
+        if (b.server && pmOn()) { if (manual) pmBriefNow(b); return; }   /* 서버가 보내는 중이면 폰은 따로 안 보낸다 */
+        lifeRun(b, manual); return;
+      }
       return _origRun.apply(this, arguments);
     };
   }
@@ -169,7 +174,7 @@
     return '<div id="lf-card" style="background:linear-gradient(135deg,#fff7e6,#fff1f6);border:1.5px solid #fcd9a8;border-radius:13px;padding:12px 13px;margin-bottom:12px">' +
       '<div style="font-size:13.5px;font-weight:900;color:#b45309">☀️ 생활 브리핑 <span style="font-size:11px;font-weight:800;color:#15803d;background:#e7f8ee;border-radius:999px;padding:2px 8px;margin-left:4px">외부앱 연결 없이 바로</span></div>' +
       '<div style="font-size:11.5px;color:#8a5a20;margin-top:5px;line-height:1.55">이 폰에 있는 것만 모아 아침 한 장으로 정리해 포도톡으로 보내요.<br>' + src.join(" · ") + '</div>' +
-      (b ? '<div style="font-size:12px;font-weight:800;color:#15803d;margin-top:9px">켜져 있어요 · 매일 ' + pad(b.hh | 0) + ':' + pad(b.mm | 0) + ' → ' + esc(b.room || "나") + ' 방 (아래 "내 리포트"에서 지금 받기 · 끄기)</div>'
+      (b ? '<div style="font-size:12px;font-weight:800;color:#15803d;margin-top:9px">켜져 있어요 · 매일 ' + pad(b.hh | 0) + ':' + pad(b.mm | 0) + ' → ' + esc(b.room || "나") + ' 방' + (b.server && pmOn() ? ' · 📡 서버가 보냄' : '') + ' (아래 "내 리포트"에서 지금 받기 · 끄기)</div>' + pmServerRowHtml(b)
         : '<div style="display:flex;gap:8px;margin-top:10px;align-items:center">' +
             '<span style="font-size:12px;font-weight:800;color:#8a5a20">매일</span>' +
             '<input id="lf-time" type="time" value="07:00" style="flex:1;box-sizing:border-box;background:#fff;border:1px solid #f3d4a8;border-radius:10px;padding:9px 10px;font-size:14px;color:#111;outline:none;font-family:inherit">' +
@@ -246,12 +251,165 @@
     window.addMsg = function (role, text) {
       var r = _origAdd.apply(this, arguments);
       try {
-        if (role === "me") pending = candidate(text);
+        if (role === "me") { pending = candidate(text); pmQueueChat(text); }
         else if (pending && typeof podoMeAddFact === "function") { var f = pending; pending = ""; suggest(f); }
       } catch (e) {}
       return r;
     };
   }
+
+  /* ════════ ③ 📡 서버 기억 (켜는 사람만) + 서버 생활 브리핑 ════════
+     · 켜면 이 폰이 무작위 "기억 번호 + 열쇠"를 만든다. 열쇠는 이 폰에만 있고 서버엔 해시만 간다.
+     · 저장되는 것: 🧠 내 기억(사실) · 채팅에서 내가 한 말 · 할 일(브리핑용). 전화 · 카드 · 비밀번호가 든 글은 서버가 버린다.
+     · 서버 생활 브리핑: 포도톡 워커 크론이 정한 시각에 만들어 방에 넣고 푸시 → 폰이 꺼져 있어도 온다.
+     · 끄면(모두 지우기) 서버의 기억 · 예약 · 열쇠가 한 번에 지워진다. */
+  var PM_API = "https://podotalk-api.hasin7jk.workers.dev";   /* podoya-talk.js 의 API 와 같은 워커 */
+  var PM_KEY = "podoai_pm";
+  function pmState() { try { var s = JSON.parse(LS(PM_KEY, "null")); return s && s.mid && s.key ? s : null; } catch (e) { return null; } }
+  function pmOn() { var s = pmState(); return !!(s && s.on); }
+  function rnd(n) { var a = new Uint8Array(n); crypto.getRandomValues(a); return Array.prototype.map.call(a, function (x) { return ("0" + x.toString(16)).slice(-2); }).join(""); }
+  function pmCall(path, extra) {
+    var s = pmState(); if (!s) return Promise.reject(new Error("서버 기억이 꺼져 있어요"));
+    var body = Object.assign({ mid: s.mid, key: s.key }, extra || {});
+    return fetch(PM_API + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || !j.ok) throw new Error(j.error || ("오류 " + r.status)); return j; }); });
+  }
+  function pmProfileItems() {
+    var out = [];
+    try {
+      var m = podoMe(), L = { name: "내 이름/호칭", biz: "상호", job: "하는 일", tone: "메시지 말투", hours: "영업/근무시간", note: "기타" };
+      Object.keys(L).forEach(function (k) { if (m[k]) out.push({ kind: "fact", text: L[k] + ": " + m[k] }); });
+      (Array.isArray(m.facts) ? m.facts : []).forEach(function (f) { out.push({ kind: "fact", text: f }); });
+    } catch (e) {}
+    return out;
+  }
+  function pmUpload(items) {
+    var p = Promise.resolve(0);
+    for (var i = 0; i < items.length; i += 20) (function (part) { p = p.then(function (n) { return pmCall("/pm/add", { items: part }).then(function (j) { return n + (j.saved || 0); }); }); })(items.slice(i, i + 20));
+    return p;
+  }
+  function pmEnable() {
+    if (!confirm("📡 서버 기억을 켤까요?\n\n· 🧠 내 기억과, 앞으로 채팅에서 내가 한 말을 포도톡 서버에 저장해 '뜻으로 찾기'와 서버 생활 브리핑에 써요.\n· 전화번호 · 카드 · 비밀번호가 든 글은 저장하지 않아요.\n· 열쇠는 이 폰에만 있어요. 이 폰을 잃어버리거나 앱 데이터를 지우면 서버 기억도 다시 볼 수 없어요.\n· 언제든 '서버 기억 모두 지우기'로 서버에서 완전히 지울 수 있어요.")) return;
+    var s = pmState() || { mid: "pm" + rnd(12), key: rnd(24) };
+    s.on = 1; LSS(PM_KEY, JSON.stringify(s));
+    pmCall("/pm/enable").then(function () { return pmUpload(pmProfileItems()); })
+      .then(function (n) { say("📡 서버 기억을 켰어요 · " + n + "개 올림"); pmSyncTodos(); try { openPodoMe(); } catch (e) {} })
+      .catch(function (e) { s.on = 0; LSS(PM_KEY, JSON.stringify(s)); say("켜지 못했어요: " + e.message); try { openPodoMe(); } catch (x) {} });
+  }
+  function pmWipe() {
+    if (!confirm("서버에 저장된 기억 · 서버 브리핑 예약을 모두 지우고 서버 기억을 끌까요?\n(이 폰의 🧠 내 기억은 그대로 남아요)")) return;
+    pmCall("/pm/wipe").then(function () {
+      try { localStorage.removeItem(PM_KEY); } catch (e) {}
+      try { var a = briefsAll(); a.forEach(function (b) { if (b && b.life) b.server = false; }); window.__pmSkip = 1; saveBriefs(a); window.__pmSkip = 0; } catch (e) {}
+      say("🗑 서버 기억을 모두 지웠어요"); try { openPodoMe(); } catch (e) {}
+    }).catch(function (e) { say("지우지 못했어요: " + e.message); });
+  }
+  function pmSearchUI() {
+    var q = ((document.getElementById("pm-q") || {}).value || "").trim(), out = document.getElementById("pm-res");
+    if (!q || !out) return;
+    out.innerHTML = '<div style="font-size:12px;color:#6d28d9;padding:6px 0">⏳ 찾는 중…</div>';
+    pmCall("/pm/search", { q: q, k: 5 }).then(function (j) {
+      var r = j.results || [];
+      out.innerHTML = r.length ? r.map(function (x) {
+        return '<div style="padding:7px 0;border-top:1px solid #f0f0f0;font-size:12.5px;color:#333;line-height:1.5">' +
+          '<span style="font-size:10.5px;font-weight:800;color:#7c3aed;margin-right:5px">' + ({ fact: "🧠 기억", chat: "💬 대화", todo: "✅ 할 일", note: "📝" }[x.kind] || "") + '</span>' + esc(x.text) +
+          '<span style="font-size:10.5px;color:#aaa;margin-left:5px">' + new Date(x.created).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }) + '</span></div>';
+      }).join("") : '<div style="font-size:12px;color:#999;padding:6px 0">찾은 기억이 없어요</div>';
+    }).catch(function (e) { out.innerHTML = '<div style="font-size:12px;color:#b91c1c;padding:6px 0">⚠️ ' + esc(e.message) + '</div>'; });
+  }
+  window.pmEnable = pmEnable; window.pmWipe = pmWipe; window.pmSearchUI = pmSearchUI;
+  window.pmReupload = function () { pmUpload(pmProfileItems()).then(function (n) { say("⬆️ " + n + "개 올렸어요"); }).catch(function (e) { say("실패: " + e.message); }); };
+
+  function pmCardHtml() {
+    var on = pmOn();
+    return '<div id="pm-card" style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:13px;padding:12px 13px;margin-bottom:14px">' +
+      '<div style="font-size:13px;font-weight:900;color:#1d4ed8">📡 서버 기억 · 뜻으로 찾기 <span style="font-size:11px;font-weight:800;color:' + (on ? "#15803d" : "#888") + '">' + (on ? "켜짐" : "꺼짐") + '</span></div>' +
+      (on
+        ? '<div style="font-size:11.5px;color:#4a6390;margin-top:5px;line-height:1.55">내 기억 · 채팅에서 내가 한 말이 서버에 쌓여요. "어제 그 쇼핑몰"처럼 뜻으로 찾을 수 있고, 폰이 꺼져 있어도 생활 브리핑이 와요.</div>' +
+          '<div style="display:flex;gap:7px;margin-top:9px"><input id="pm-q" placeholder="예: 어제 찾던 쇼핑몰" onkeydown="if(event.key===\'Enter\')pmSearchUI()" style="flex:1;min-width:0;box-sizing:border-box;background:#fff;border:1px solid #cfe2ff;border-radius:10px;padding:9px 11px;font-size:13.5px;outline:none;font-family:inherit">' +
+          '<button onclick="pmSearchUI()" style="padding:9px 13px;border-radius:10px;border:none;background:#2563eb;color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">🔎 찾기</button></div>' +
+          '<div id="pm-res"></div>' +
+          '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="pmReupload()" style="flex:1;padding:9px;border-radius:10px;border:1px solid #cfe2ff;background:#fff;color:#1d4ed8;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit">⬆️ 내 기억 다시 올리기</button>' +
+          '<button onclick="pmWipe()" style="flex:1;padding:9px;border-radius:10px;border:1px solid #f0d0d0;background:#fff;color:#c04040;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit">🗑 서버 기억 모두 지우기</button></div>'
+        : '<div style="font-size:11.5px;color:#4a6390;margin-top:5px;line-height:1.55">켜면 내 기억과 채팅에서 내가 한 말을 서버에 저장해 <b>뜻으로 찾기</b>와 <b>폰이 꺼져 있어도 오는 생활 브리핑</b>에 써요. 켜기 전에 무엇이 저장되는지 한 번 더 알려 드려요.</div>' +
+          '<button onclick="pmEnable()" style="width:100%;margin-top:9px;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-weight:900;font-size:13.5px;cursor:pointer;font-family:inherit">📡 서버 기억 켜기</button>') +
+      '</div>';
+  }
+  var _origMe = window.openPodoMe;
+  if (typeof _origMe === "function") {
+    window.openPodoMe = function () {
+      var r = _origMe.apply(this, arguments);
+      try {
+        var bg = document.getElementById("podome-bg"), w = bg && bg.lastElementChild, box = w && w.firstElementChild;   /* 맨 위 보라색 안내 칸 */
+        var old = bg && bg.querySelector("#pm-card"); if (old) old.remove();
+        if (box) box.insertAdjacentHTML("afterend", pmCardHtml());
+      } catch (e) {}
+      return r;
+    };
+  }
+  /* 새 사실이 생기면 서버에도 */
+  var _origFact = window.podoMeAddFact;
+  if (typeof _origFact === "function") {
+    window.podoMeAddFact = function (s) {
+      var ok = _origFact.apply(this, arguments);
+      try { if (ok && pmOn()) pmCall("/pm/add", { items: [{ kind: "fact", text: String(s || "") }] }).catch(function () {}); } catch (e) {}
+      return ok;
+    };
+  }
+  /* 채팅에서 내가 한 말 — 모아서 10초마다 한 번에 */
+  var chatQ = [], chatT = null;
+  function pmQueueChat(text) {
+    if (!pmOn()) return;
+    var t = String(text || "").replace(/\s+/g, " ").trim(); if (t.length < 4) return;
+    chatQ.push({ kind: "chat", text: t.slice(0, 300) });
+    if (!chatT) chatT = setTimeout(function () { var part = chatQ.splice(0, 20); chatT = null; if (part.length) pmCall("/pm/add", { items: part }).catch(function () {}); }, 10000);
+  }
+  /* 할 일 — 서버 브리핑이 쓰도록 안 끝난 것만 통째로 */
+  function pmSyncTodos() {
+    if (!pmOn()) return;
+    try { var a = (typeof getTodos === "function" ? getTodos() : []) || []; pmCall("/pm/todos", { todos: a.filter(function (t) { return t && !t.done; }).map(function (t) { return t.text || t.t || ""; }).filter(Boolean).slice(0, 20) }).catch(function () {}); } catch (e) {}
+  }
+  if (typeof window.setTodos === "function") { var _origST = window.setTodos; window.setTodos = function () { var r = _origST.apply(this, arguments); clearTimeout(window.__pmTodoT); window.__pmTodoT = setTimeout(pmSyncTodos, 3000); return r; }; }
+  /* 생활 브리핑 예약을 서버와 맞춘다 (켜기 · 끄기 · 지우기 · 시각 바꾸기 모두 saveBriefs 를 거친다) */
+  function pmSyncBrief() {
+    if (!pmOn() || window.__pmSkip) return;
+    var b = lifeGet();
+    var on = !!(b && b.on && b.server);
+    var room = b ? (window.podotalkEnsureRoom ? window.podotalkEnsureRoom(b.room || "나") : "") : "";
+    pmCall("/pm/brief/set", { on: on ? 1 : 0, hh: b ? b.hh : 7, mm: b ? b.mm : 0, room_id: room || "", poster: LS("podoya_pt_uid", ""), city: (b && b.city) || "" })
+      .then(function () { if (on) pmSyncTodos(); })
+      .catch(function (e) { if (on) say("📡 서버 브리핑 예약 실패: " + e.message); });
+  }
+  if (typeof window.saveBriefs === "function") { var _origSB = window.saveBriefs; window.saveBriefs = function () { var r = _origSB.apply(this, arguments); try { pmSyncBrief(); } catch (e) {} return r; }; }
+  window.lifeServerSave = function () {
+    var a = briefsAll(), b = null; a.forEach(function (x) { if (x && x.life) b = x; }); if (!b) return;
+    var cb = document.getElementById("lf-srv"), city = ((document.getElementById("lf-city") || {}).value || "").trim();
+    b.server = !!(cb && cb.checked); b.city = city;
+    saveBriefs(a);
+    say(b.server ? "📡 폰이 꺼져 있어도 서버가 매일 " + b.hh + "시에 보내요" : "📱 이 폰이 켜졌을 때 보내요");
+    try { openRevReport(); } catch (e) {}
+  };
+  function pmServerRowHtml(b) {
+    if (!pmOn()) return '<div style="font-size:11.5px;color:#8a5a20;margin-top:8px">📡 폰이 꺼져 있어도 받으려면 <b>포도야 비서 → 🧠 내 기억 → 서버 기억 켜기</b>를 먼저 해 주세요.</div>';
+    return '<div style="margin-top:10px;padding-top:9px;border-top:1px dashed #f3d4a8">' +
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:800;color:#8a5a20"><input id="lf-srv" type="checkbox"' + (b.server ? " checked" : "") + ' style="width:18px;height:18px;accent-color:#ea580c"> 📡 폰이 꺼져 있어도 서버가 보내기</label>' +
+      '<div style="display:flex;gap:7px;margin-top:7px"><input id="lf-city" placeholder="날씨 볼 도시 (예: 서울)" value="' + esc(b.city || "") + '" style="flex:1;min-width:0;box-sizing:border-box;background:#fff;border:1px solid #f3d4a8;border-radius:10px;padding:9px 10px;font-size:13.5px;outline:none;font-family:inherit">' +
+      '<button onclick="lifeServerSave()" style="padding:9px 13px;border-radius:10px;border:none;background:#ea580c;color:#fff;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">저장</button></div>' +
+      '<div style="font-size:10.5px;color:#a0784a;margin-top:5px;line-height:1.5">서버는 도시 이름으로만 날씨를 봐요 (GPS 위치는 보내지 않음). 할 일 · 내 기억 · 최근 대화는 서버 기억에 있는 것을 써요.</div></div>';
+  }
+  /* 서버 브리핑 "지금 받기" */
+  function pmBriefNow(b) {
+    var btn = document.getElementById("briefnow-" + b.id);
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ 서버에서 만드는 중…"; }
+    pmSyncTodos();
+    setTimeout(function () {
+      pmCall("/pm/brief/run").then(function () { say("✅ 서버가 포도톡 방에 보냈어요"); })
+        .catch(function (e) { say("실패: " + e.message); })
+        .then(function () { if (btn) { btn.disabled = false; btn.textContent = "▶ 지금 받기"; } });
+    }, 1200);
+  }
+  if (pmOn()) setTimeout(pmSyncTodos, 4000);
+
   /* 시험용 (콘솔): lifeBrief._candidate("나는 강남에서 카페를 해") */
   window.lifeBrief = { _candidate: candidate, run: function () { var b = lifeGet(); if (b) lifeRun(b, true); } };
 })();
