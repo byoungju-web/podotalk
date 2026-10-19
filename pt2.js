@@ -5735,6 +5735,7 @@ function aiPanels() { return {
   agents:    { fn: "agentTeamGo",        txt: ["에이전트팀"], el: "agent-panel" },
   routine:   { fn: "showAgentRoutines",  txt: ["저장루틴", "저장된루틴열기"], el: "agent-panel", full: true },
   secretary: { fn: "openPodoAssist",     txt: ["포도야비서"], el: "assist-bg" },
+  report:    { fn: "openRevReport",      txt: ["매일리포트"], el: "report-bg" },   /* coverfo 홈 "자동화 비서" 옆 📊 아이콘 (v152) */
   hub:       { fn: "openConnectHub",     txt: ["커넥션허브"], el: "podoadvf-bg" },
   pfn:       { fn: "openPodoFeatureGrid", txt: ["Podoya기능", "포도야기능"], via: "menu", el: "podofeat-bg" },
   adv:       { fn: "openPodoAdvanced",   txt: ["고급기능"], via: "menu", el: "podoadv-bg" },
