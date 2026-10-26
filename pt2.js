@@ -5851,6 +5851,67 @@ window.addEventListener("message", function (ev) {
 });
 try { cfPost({ podotalk: "route", hash: location.hash }); } catch (e) {}
 
+/* ── v84 coverfo 소리(음성) "○○ 루틴 실행해" / "어제 저장한 루틴 실행해" ──
+   coverfo 가 {coverfo:"routine-run", name, when} 를 보내면: 저장루틴 화면을 열고, 창(ai.html)의 저장된 루틴에서
+   이름·날짜(when: latest·today·yesterday)로 찾아 '불러오기'(= 바로 실행)를 누른 것과 똑같이 실행한다.
+   결과는 {podotalk:"routine", ok, name, steps} 또는 {ok:false, names:[저장된 루틴 이름…]} 로 coverfo 에 알린다. ai.html 은 그대로. */
+function rtNorm(t) { return String(t || "").toLowerCase().replace(/[^0-9a-z가-힣]/g, "").replace(/(루틴|routine)$/g, ""); }
+function rtDay(ts, back) {
+  var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - back);
+  var e = new Date(d.getTime()); e.setDate(e.getDate() + 1);
+  return ts >= d.getTime() && ts < e.getTime();
+}
+function rtPick(arr, name, when) {
+  var list = (arr || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+  if (when === "today") list = list.filter(function (r) { return rtDay(r.ts || 0, 0); });
+  if (when === "yesterday") list = list.filter(function (r) { return rtDay(r.ts || 0, 1); });
+  var q = rtNorm(name);
+  if (!q) return list[0] || null;               /* 이름 없이 날짜만(또는 '마지막') → 가장 최근 */
+  var best = null, bs = 0;
+  list.forEach(function (r) {
+    var n = rtNorm(r.name), sc = 0;
+    if (n === q) sc = 100; else if (n.indexOf(q) >= 0) sc = 80; else if (q.indexOf(n) >= 0 && n.length >= 2) sc = 70;
+    else if (rtNorm(r.req).indexOf(q) >= 0) sc = 50;
+    if (sc > bs) { bs = sc; best = r; }
+  });
+  return best;
+}
+window.addEventListener("message", function (ev) {
+  try {
+    if (!inCoverfo()) return;
+    var d = ev.data; if (!d || d.coverfo !== "routine-run") return;
+    var name = String(d.name || ""), when = String(d.when || "");
+    var h = "#/talk/podoya/routine";
+    try { history.replaceState(null, "", h); } catch (e) {}
+    window.renderTalk("podoya", "routine");
+    try { fixTabbar(); } catch (e) {}
+    cfPost({ podotalk: "route", hash: h });
+    var tries = 0;
+    (function wait() {
+      var f = document.getElementById("pt2-aif"), w = null, ready = false;
+      try { w = f && f.contentWindow; } catch (e) { w = null; }
+      try {
+        /* 창이 저장루틴 목록을 다 그린 뒤에 실행해야 목록 그리기가 실행 화면을 덮어쓰지 않는다 */
+        var panel = w && w.document.getElementById("agent-panel");
+        ready = !!(w && typeof w.agentRoutines === "function" && typeof w.loadAgentRoutine === "function" &&
+          panel && w.getComputedStyle(panel).display !== "none" && (panel.textContent || "").indexOf("저장된 루틴") >= 0);
+      } catch (e) { ready = false; }
+      if (!ready) {
+        if (++tries > 60) { cfPost({ podotalk: "routine", ok: false, error: "routine screen not ready" }); return; }
+        setTimeout(wait, 300); return;
+      }
+      var arr = []; try { arr = w.agentRoutines() || []; } catch (e) { arr = []; }
+      var names = arr.map(function (r) { return r.name; }).slice(0, 15);
+      var pick = rtPick(arr, name, when);
+      if (!pick) { cfPost({ podotalk: "routine", ok: false, names: names, error: arr.length ? "no match" : "no saved routines" }); return; }
+      setTimeout(function () {
+        try { w.loadAgentRoutine(pick.id); cfPost({ podotalk: "routine", ok: true, name: pick.name, steps: (pick.steps || []).length }); }
+        catch (e) { cfPost({ podotalk: "routine", ok: false, names: names, error: String((e && e.message) || e) }); }
+      }, 500);
+    })();
+  } catch (e) {}
+});
+
 if (STEP >= 2 && on()) { try { refreshRooms(); } catch (e) {} }
 
 /* 차단 목록과 내 제한 상태를 미리 받아둔다 */
