@@ -1722,6 +1722,8 @@ window.addEventListener("message", function (ev) {
     var d = ev.data; if (!d || d.coverfo !== "wallet") return;
     if (String(ev.origin || "").indexOf("coverfo.com") < 0) return;
     CFW.token = d.token || ""; CFW.email = d.email || "";
+    /* coverfo 에 로그인돼 있으면 포도톡도 그 계정으로 자동 로그인 ("구글로 시작하기" 화면 없이) */
+    if (CFW.token) { try { cfAutoLogin(CFW.token); } catch (e0) {} }
     /* v76 서버(포도톡 Worker)가 coverfo 지갑에서 깎으려면 연결 코드가 필요하다.
        coverfo 로그인 토큰으로 이 계정의 코드를 받아(없으면 만들어) 서버에 알려 둔다. */
     if (CFW.token) cfwFetch({ op: "code" }).then(function (j) {
@@ -3043,6 +3045,25 @@ function gSend(idToken) {
   });
 }
 
+/* coverfo 홈 안(iframe): coverfo 가 넘겨준 로그인 토큰으로 포도톡 계정에 자동 로그인.
+   서버(/talk/auth/coverfo)가 coverfo 로그인 서버에 진짜인지 확인하고, 같은 구글 계정이면 같은 포도톡 계정으로 묶는다.
+   coverfo 밖에서 포도톡을 따로 열면 지금처럼 "구글로 시작하기" 화면이 나온다. */
+var CF_AUTO = { busy: false, tried: "", waited: false };
+function cfAutoLogin(token) {
+  if (!token || acct() || CF_AUTO.busy || CF_AUTO.tried === token) return;
+  CF_AUTO.busy = true; CF_AUTO.tried = token;
+  api("/talk/auth/coverfo", { body: { token: token, uid: myUid() } }).then(function (d) {
+    CF_AUTO.busy = false;
+    if (!d || !d.ok) { try { gateCheck(); } catch (e) {} return; }   /* 안 되면 예전처럼 구글 로그인 화면 */
+    try { window.DB.set("pododa_uid", d.uid); } catch (e) {}
+    LSS("pt2_acct", JSON.stringify({ email: d.email || "", name: d.name || "", via: "coverfo" }));
+    try { gateHide(); } catch (e3) {}
+    if (d.gift) say("환영합니다 · 크레딧 " + d.gift + "개를 드렸어요");
+    else if (d.moved) say(d.moved + "개 방을 계정으로 옮겼어요");
+    refreshRooms(function () { try { renderTalkSettings(); } catch (e2) {} });
+  });
+}
+
 function gLogin() {
   if (!G_CLIENT_ID) {
     alert("아직 구글 로그인 준비가 안 됐어요.\n\npt2.js 맨 위의 G_CLIENT_ID 에 구글 클라이언트 ID 를 넣고, 워커에도 GOOGLE_CLIENT_ID 를 넣어야 동작합니다.");
@@ -3360,7 +3381,17 @@ function gateHide() {
   var g = document.getElementById("pt2-gate");
   if (g) g.remove();
 }
-function gateCheck() { if (gateOn()) gateShow(); else gateHide(); }
+function gateCheck() {
+  if (!gateOn()) { gateHide(); return; }
+  /* coverfo 홈 안이면 coverfo 가 로그인 토큰을 넘겨줄 때까지 잠깐(5초) 기다린다 → 그 토큰으로 자동 로그인.
+     coverfo 에 로그인 안 돼 있거나 자동 로그인이 안 되면 그때 구글 로그인 화면을 띄운다. */
+  if (inCoverfo() && !CF_AUTO.waited) {
+    CF_AUTO.waited = true;
+    setTimeout(function () { if (gateOn() && !CF_AUTO.busy) gateShow(); }, 5000);
+    return;
+  }
+  gateShow();
+}
 
 function gLogout() {
   if (!confirm("로그아웃하면 이 폰에서 방 목록이 비워집니다.\n다시 로그인하면 그대로 돌아옵니다.\n\n로그아웃할까요?")) return;
