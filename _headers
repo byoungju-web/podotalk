@@ -9,3 +9,6 @@
 
 /
   Cache-Control: no-cache
+
+/pt2.js
+  Cache-Control: no-cache

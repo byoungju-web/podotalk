@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "152";   /* v152: index.html 이 2026-10-19 부터 ?v=152 를 부르는데 이 숫자만 151 로 남아 있어 '캐시 불일치' 경고가 늘 떴다 → 맞춤 */
+var PT2_VER = "153";   /* v153: coverfo 앱 안(창)에서는 예전 v152 주소의 옛 파일이 계속 쓰여, 주소 숫자를 새로 바꿔 새 파일을 받게 함 (index.html ?v=153 과 같게) */
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
