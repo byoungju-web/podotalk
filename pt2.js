@@ -27,7 +27,7 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "151";
+var PT2_VER = "152";   /* v152: index.html 이 2026-10-19 부터 ?v=152 를 부르는데 이 숫자만 151 로 남아 있어 '캐시 불일치' 경고가 늘 떴다 → 맞춤 */
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -5071,17 +5071,28 @@ document.addEventListener("click", function (e) {
   /* 캐시 불일치 경고에서 누르는 버튼.
      서비스워커 캐시를 비우고, 주소에 시각을 붙여 서버에서 새로 받는다. */
   if (a === "hardreload") {
+    /* v152: 누르면 바로 '새로 받는 중…' 으로 바뀌게(눌렸는지 알 수 있게), 서비스워커도 해제하고,
+       주소의 다른 값(?in=coverfo 등 coverfo 안에서 열린 표시)은 지우지 않고 nocache 만 바꿔 붙인다 */
+    try { el.disabled = true; el.textContent = "⏳ 새로 받는 중…"; } catch (_e) {}
     var go = function () {
-      var u = location.href.split("#")[0].split("?")[0];
-      location.replace(u + "?nocache=" + Date.now() + (location.hash || ""));
+      var base = location.href.split("#")[0];
+      var qs = base.indexOf("?") >= 0 ? base.slice(base.indexOf("?") + 1) : "";
+      var keep = qs.split("&").filter(function (p) { return p && p.indexOf("nocache=") !== 0; });
+      keep.push("nocache=" + Date.now());
+      location.replace(base.split("?")[0] + "?" + keep.join("&") + (location.hash || ""));
     };
+    var done = false, once = function () { if (!done) { done = true; go(); } };
+    setTimeout(once, 2500);   /* 캐시·워커 정리가 멈춰도 2.5초 뒤에는 새로 받는다 */
     try {
+      var jobs = [];
       if (window.caches && caches.keys) {
-        caches.keys().then(function (ks) {
-          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
-        }).then(go, go);
-      } else go();
-    } catch (e) { go(); }
+        jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+      }
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+      }
+      Promise.all(jobs).then(once, once);
+    } catch (e) { once(); }
     return;
   }
 
