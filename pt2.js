@@ -27,7 +27,8 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "154";   /* v154: coverfo 안(창)에서는 아래 탭 5개를 숨김 · 포도AI 창에 집안 기기(home)·발송 채널(deliver) 바로 열기 추가 (index.html ?v=154 와 같게) */
+var PT2_VER = "155";   /* v155: coverfo 🧩 포도야 기능 격자에서 한 칸씩 바로 열기 (f_<기능>) · index.html ?v=155 와 같게 */
+/* v154 메모: coverfo 안(창)에서는 아래 탭 5개를 숨김 · 포도AI 창에 집안 기기(home)·발송 채널(deliver) 바로 열기 추가 (index.html ?v=154 와 같게) */
 /* v153 메모: coverfo 앱 안(창)에서는 예전 v152 주소의 옛 파일이 계속 쓰여, 주소 숫자를 새로 바꿔 새 파일을 받게 함 (index.html ?v=153 과 같게) */
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
@@ -5798,6 +5799,21 @@ function aiPanels() { return {
   /* v154: coverfo 포도야 비서 화면에서 바로 여는 두 칸 (아직 coverfo 로 옮기지 않은 것) */
   home:      { fn: "openSmartHome",      txt: ["집안기기"], el: "smarthome-bg" },
   deliver:   { fn: "openDeliverSettings", txt: ["발송채널"], el: "podoadvf-bg" },
+  /* v155: coverfo 🧩 포도야 기능 격자의 '포도톡' 칸 — 창(ai.html)의 그 기능 함수를 바로 부른다 (아직 coverfo 로 옮기지 않은 것) */
+  f_tgfeat:    { fn: "openTelegram", txt: ["텔레그램"] },
+  f_companion: { fn: "openCompanion", txt: ["AI컴패니언"] },
+  f_senior:    { fn: "openSenior", txt: ["시니어"] },
+  f_voiceact:  { fn: "openVoiceAct", txt: ["말로열기"] },
+  f_study:     { fn: "openStudy", txt: ["AI학습"] },
+  f_cardscan:  { fn: "openCardScanner", txt: ["AI명함"] },
+  f_biz:       { fn: "openBiz", txt: ["사장님비서"] },
+  f_ledger:    { fn: "openLedger", txt: ["AI가계부"] },
+  f_english:   { fn: "openEnglishPractice", txt: ["영어회화"] },
+  f_travel:    { fn: "openTravel", txt: ["여행플래너"] },
+  f_fridge:    { fn: "openFridge", txt: ["냉장고요리"] },
+  f_naming:    { fn: "openNaming", txt: ["작명"] },
+  f_fortune:   { fn: "openFortune", txt: ["운세"] },
+  f_quiz:      { fn: "openQuiz", txt: ["퀴즈생성"] },
   menu:      { fn: "openPodoMenu",       txt: [], title: "기능 메뉴", el: "podomenu-bg" }
 }; }
 /* ── coverfo 안에서만: 열어 준 화면이 닫히면(상단 '‹' · '닫기') coverfo 홈으로 ──
