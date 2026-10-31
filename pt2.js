@@ -27,7 +27,8 @@
 if (window.__PT2__) return;
 window.__PT2__ = 1;
 
-var PT2_VER = "153";   /* v153: coverfo 앱 안(창)에서는 예전 v152 주소의 옛 파일이 계속 쓰여, 주소 숫자를 새로 바꿔 새 파일을 받게 함 (index.html ?v=153 과 같게) */
+var PT2_VER = "154";   /* v154: coverfo 안(창)에서는 아래 탭 5개를 숨김 · 포도AI 창에 집안 기기(home)·발송 채널(deliver) 바로 열기 추가 (index.html ?v=154 와 같게) */
+/* v153 메모: coverfo 앱 안(창)에서는 예전 v152 주소의 옛 파일이 계속 쓰여, 주소 숫자를 새로 바꿔 새 파일을 받게 함 (index.html ?v=153 과 같게) */
 var STEP = 7;                                            /* ← 1~7 */
 var IMPORT_MODE = "bulk";   /* "bulk" = /talk/import 사용(권장) · "replay" = /talk/message 로 재전송 */
 var DEF_API = "https://podotalk-api.hasin7jk.workers.dev";
@@ -1371,6 +1372,19 @@ function chaseBot() {
    index.html 은 건드리지 않고 여기서 버튼만 다시 그린다. */
 /* coverfo.com 홈 안(iframe)에서 열린 상태인지 — 그때만 포도AI 탭이 'coverfo' 가 되고 누르면 홈으로 돌아간다 */
 function inCoverfo() { try { return window.top !== window; } catch (e) { return true; } }
+/* v154: coverfo 안(창)에서 열릴 때는 아래 탭 5개(포도AI·채팅·일반채팅·통역톡·설정)를 숨긴다.
+   coverfo 가 화면마다 위쪽 '✕ 닫기'·뒤로가기를 따로 가지고 있어서 탭이 겹쳐 보였다.
+   포도톡 앱을 직접 열 때(창이 아닐 때)는 그대로 나온다. 탭이 차지하던 아래 여백도 줄인다. */
+(function () {
+  try {
+    if (!inCoverfo()) return;
+    document.documentElement.classList.add("pt2-incf");
+    var st = document.createElement("style"); st.id = "pt2-incf-css";
+    st.textContent = "html.pt2-incf .talkbar, html.pt2-incf body.talk-mode .talkbar { display:none !important }" +
+      " html.pt2-incf body.talk-mode #view { padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important }";
+    (document.head || document.documentElement).appendChild(st);
+  } catch (e) {}
+})();
 function cfPost(msg) { try { if (inCoverfo()) window.parent.postMessage(msg, "*"); } catch (e) {} }
 function fixTabbar() {
   var bar = document.getElementById("talkbar");
@@ -5781,6 +5795,9 @@ function aiPanels() { return {
   hub:       { fn: "openConnectHub",     txt: ["커넥션허브"], el: "podoadvf-bg" },
   pfn:       { fn: "openPodoFeatureGrid", txt: ["Podoya기능", "포도야기능"], via: "menu", el: "podofeat-bg" },
   adv:       { fn: "openPodoAdvanced",   txt: ["고급기능"], via: "menu", el: "podoadv-bg" },
+  /* v154: coverfo 포도야 비서 화면에서 바로 여는 두 칸 (아직 coverfo 로 옮기지 않은 것) */
+  home:      { fn: "openSmartHome",      txt: ["집안기기"], el: "smarthome-bg" },
+  deliver:   { fn: "openDeliverSettings", txt: ["발송채널"], el: "podoadvf-bg" },
   menu:      { fn: "openPodoMenu",       txt: [], title: "기능 메뉴", el: "podomenu-bg" }
 }; }
 /* ── coverfo 안에서만: 열어 준 화면이 닫히면(상단 '‹' · '닫기') coverfo 홈으로 ──
